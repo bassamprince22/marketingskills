@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/requireAuth'
 import { getServiceClient } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { error: authError } = await requireAuth()
+  if (authError) return authError
 
   const { searchParams } = new URL(req.url)
   const workspaceId = searchParams.get('workspace_id')
@@ -31,8 +30,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { error: authError } = await requireAuth()
+  if (authError) return authError
 
   const body = await req.json()
   const { id, ...updates } = body

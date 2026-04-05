@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/requireAuth'
 import { getServiceClient } from '@/lib/supabase'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { error: authError } = await requireAuth()
+  if (authError) return authError
 
   const db = getServiceClient()
   const { data, error } = await db
@@ -15,14 +14,14 @@ export async function GET() {
 
   if (error) {
     console.error('GET /api/workspaces error:', error)
-    return NextResponse.json({ error: error.message, details: error }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
   return NextResponse.json({ workspaces: data ?? [] })
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { error: authError } = await requireAuth()
+  if (authError) return authError
 
   const body = await req.json()
   const db = getServiceClient()
@@ -47,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error('POST /api/workspaces error:', error)
-    return NextResponse.json({ error: error.message, details: error }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
   return NextResponse.json({ workspace: data }, { status: 201 })
 }

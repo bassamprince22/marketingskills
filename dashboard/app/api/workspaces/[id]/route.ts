@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/requireAuth'
 import { getServiceClient } from '@/lib/supabase'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { error: authError } = await requireAuth()
+  if (authError) return authError
 
   const body = await req.json()
   const db = getServiceClient()
 
-  // Only update fields that are present in the body
   const allowed = [
     'name', 'tiktok_token', 'instagram_token', 'instagram_user_id',
     'linkedin_token', 'linkedin_person_id', 'buffer_token',
@@ -36,8 +34,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { error: authError } = await requireAuth()
+  if (authError) return authError
 
   const db = getServiceClient()
   const { error } = await db.from('workspaces').delete().eq('id', params.id)

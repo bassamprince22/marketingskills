@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/requireAuth'
 import { getServiceClient } from '@/lib/supabase'
 import { destroyUpdate } from '@/lib/buffer'
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { error: authError } = await requireAuth()
+  if (authError) return authError
 
   const { update_id, workspace_id } = await req.json()
   if (!update_id || !workspace_id) {

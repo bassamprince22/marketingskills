@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/requireAuth'
 import { getServiceClient } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { error: authError } = await requireAuth()
+  if (authError) return authError
 
   const { searchParams } = new URL(req.url)
   const workspaceId = searchParams.get('workspace_id')
@@ -25,8 +24,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { error: authError } = await requireAuth()
+  if (authError) return authError
 
   const body = await req.json()
   const { workspace_id, ...rest } = body
@@ -35,7 +34,6 @@ export async function PUT(req: NextRequest) {
 
   const db = getServiceClient()
 
-  // Also handle workspace-level fields (automation_enabled, brand_colors, hashtags)
   const workspaceFields = [
     'automation_enabled', 'brand_colors', 'niche_hashtags_tiktok',
     'niche_hashtags_instagram', 'content_mix_broll', 'content_mix_avatar', 'content_mix_real',
@@ -55,5 +53,6 @@ export async function PUT(req: NextRequest) {
   if (Object.keys(configUpdates).length > 1) {
     await db.from('config').upsert({ workspace_id, ...configUpdates }, { onConflict: 'workspace_id' })
   }
+
   return NextResponse.json({ ok: true })
 }
