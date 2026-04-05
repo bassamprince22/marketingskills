@@ -31,7 +31,9 @@ export async function GET() {
     return out
   })
 
-  return NextResponse.json({ workspaces: masked })
+  return NextResponse.json({ workspaces: masked }, {
+    headers: { 'Cache-Control': 'no-store' }
+  })
 }
 
 export async function POST(req: NextRequest) {
