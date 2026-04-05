@@ -13,8 +13,11 @@ export async function GET() {
     .select('id, name, automation_enabled, brand_colors, niche_hashtags_tiktok, niche_hashtags_instagram, content_mix_broll, content_mix_avatar, content_mix_real, created_at')
     .order('created_at', { ascending: true })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ workspaces: data })
+  if (error) {
+    console.error('GET /api/workspaces error:', error)
+    return NextResponse.json({ error: error.message, details: error }, { status: 500 })
+  }
+  return NextResponse.json({ workspaces: data ?? [] })
 }
 
 export async function POST(req: NextRequest) {
@@ -42,6 +45,9 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('POST /api/workspaces error:', error)
+    return NextResponse.json({ error: error.message, details: error }, { status: 500 })
+  }
   return NextResponse.json({ workspace: data }, { status: 201 })
 }
