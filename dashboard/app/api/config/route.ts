@@ -48,20 +48,12 @@ export async function PUT(req: NextRequest) {
     else configUpdates[k] = v
   }
 
-  const promises: Promise<unknown>[] = []
-
   if (Object.keys(workspaceUpdates).length > 0) {
-    promises.push(
-      db.from('workspaces').update(workspaceUpdates).eq('id', workspace_id)
-    )
+    await db.from('workspaces').update(workspaceUpdates).eq('id', workspace_id)
   }
 
   if (Object.keys(configUpdates).length > 1) {
-    promises.push(
-      db.from('config').upsert({ workspace_id, ...configUpdates }, { onConflict: 'workspace_id' })
-    )
+    await db.from('config').upsert({ workspace_id, ...configUpdates }, { onConflict: 'workspace_id' })
   }
-
-  await Promise.all(promises)
   return NextResponse.json({ ok: true })
 }
