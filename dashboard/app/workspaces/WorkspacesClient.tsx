@@ -162,7 +162,7 @@ export function WorkspacesClient() {
             <p className="text-xs text-slate-400 mb-3">Stored encrypted in Supabase Vault. Never committed to code.</p>
             <div className="space-y-3">
               {CREDENTIAL_FIELDS.map(({ key, label, placeholder }) => {
-                const isSaved = (editing[key] as string)?.includes('saved')
+                const isSaved = typeof editing[key] === 'string' && (editing[key] as string).includes('saved')
                 return (
                   <div key={key}>
                     <label className="block text-xs font-medium text-slate-500 mb-1">
