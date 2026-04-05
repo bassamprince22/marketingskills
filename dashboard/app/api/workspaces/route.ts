@@ -9,14 +9,29 @@ export async function GET() {
   const db = getServiceClient()
   const { data, error } = await db
     .from('workspaces')
-    .select('id, name, automation_enabled, brand_colors, niche_hashtags_tiktok, niche_hashtags_instagram, content_mix_broll, content_mix_avatar, content_mix_real, created_at')
+    .select('*')
     .order('created_at', { ascending: true })
 
   if (error) {
     console.error('GET /api/workspaces error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  return NextResponse.json({ workspaces: data ?? [] })
+
+  // Mask credential fields — return "saved" placeholder so UI shows ✓ but never exposes full keys
+  const CREDENTIAL_KEYS = [
+    'tiktok_token', 'instagram_token', 'instagram_user_id',
+    'linkedin_token', 'linkedin_person_id', 'buffer_token',
+    'higgsfield_api_key', 'higgsfield_avatar_id',
+  ]
+  const masked = (data ?? []).map((ws) => {
+    const out: Record<string, unknown> = { ...ws }
+    for (const key of CREDENTIAL_KEYS) {
+      out[key] = ws[key] ? '••••••••saved••••••••' : null
+    }
+    return out
+  })
+
+  return NextResponse.json({ workspaces: masked })
 }
 
 export async function POST(req: NextRequest) {

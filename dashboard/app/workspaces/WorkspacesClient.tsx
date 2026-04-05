@@ -150,19 +150,27 @@ export function WorkspacesClient() {
             <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">API Credentials</p>
             <p className="text-xs text-slate-400 mb-3">Stored encrypted in Supabase Vault. Never committed to code.</p>
             <div className="space-y-3">
-              {CREDENTIAL_FIELDS.map(({ key, label, placeholder }) => (
-                <div key={key}>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
-                  <input
-                    type="password"
-                    value={(editing[key] as string) ?? ''}
-                    onChange={(e) => setEditing({ ...editing, [key]: e.target.value })}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono"
-                    placeholder={placeholder}
-                    autoComplete="off"
-                  />
-                </div>
-              ))}
+              {CREDENTIAL_FIELDS.map(({ key, label, placeholder }) => {
+                const isSaved = (editing[key] as string)?.includes('saved')
+                return (
+                  <div key={key}>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">
+                      {label}
+                      {isSaved && (
+                        <span className="ml-2 text-green-600 font-semibold">✓ Saved</span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      value={isSaved ? '' : ((editing[key] as string) ?? '')}
+                      onChange={(e) => setEditing({ ...editing, [key]: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono"
+                      placeholder={isSaved ? '(leave blank to keep existing)' : placeholder}
+                      autoComplete="off"
+                    />
+                  </div>
+                )
+              })}
             </div>
           </div>
 
