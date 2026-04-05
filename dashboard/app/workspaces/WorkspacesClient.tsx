@@ -35,6 +35,7 @@ export function WorkspacesClient() {
   const [editing, setEditing] = useState<Partial<Workspace> | null>(null)
   const [isNew, setIsNew] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchWorkspaces = () => {
@@ -50,20 +51,30 @@ export function WorkspacesClient() {
   async function saveWorkspace() {
     if (!editing) return
     setSaving(true)
-    if (isNew) {
-      const res = await fetch('/api/workspaces', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editing),
-      })
-      const data = await res.json()
-      if (data.workspace?.id) setWorkspaceId(data.workspace.id)
-    } else {
-      await fetch(`/api/workspaces/${editing.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editing),
-      })
+    setSaveError(null)
+    try {
+      if (isNew) {
+        const res = await fetch('/api/workspaces', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editing),
+        })
+        const data = await res.json()
+        if (!res.ok) { setSaveError(data.error ?? 'Save failed'); setSaving(false); return }
+        if (data.workspace?.id) setWorkspaceId(data.workspace.id)
+      } else {
+        const res = await fetch(`/api/workspaces/${editing.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editing),
+        })
+        const data = await res.json()
+        if (!res.ok) { setSaveError(data.error ?? 'Save failed'); setSaving(false); return }
+      }
+    } catch (e) {
+      setSaveError(String(e))
+      setSaving(false)
+      return
     }
     setSaving(false)
     setEditing(null)
@@ -173,6 +184,12 @@ export function WorkspacesClient() {
               })}
             </div>
           </div>
+
+          {saveError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              Error: {saveError}
+            </p>
+          )}
 
           <div className="flex gap-3 pt-2">
             <button
