@@ -5,19 +5,10 @@ import { SalesNav } from './SalesNav'
 
 export function SalesShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="fadaa-bg" style={{ display: 'flex', minHeight: '100vh' }}>
+    <div className="fadaa-bg sales-shell">
       <StarsBackground />
       <SalesNav />
-      <main
-        style={{
-          flex: 1,
-          marginLeft: '220px',
-          padding: '28px 32px',
-          position: 'relative',
-          zIndex: 1,
-          minHeight: '100vh',
-        }}
-      >
+      <main className="sales-main">
         {children}
       </main>
     </div>

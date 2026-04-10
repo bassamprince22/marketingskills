@@ -207,3 +207,100 @@ body {
   z-index: 50;
   pointer-events: none;
 }
+
+/* ─── Sales Shell — Responsive Layout ──────────────────────────────── */
+.sales-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Desktop sidebar */
+.sales-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: #0F1629;
+  border-right: 1px solid #1E2D4A;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 40;
+}
+
+/* Mobile top bar — hidden on desktop */
+.sales-topbar {
+  display: none;
+}
+
+/* Mobile drawer — hidden on desktop via CSS (JS controls transform) */
+.sales-drawer {
+  display: none;
+}
+
+/* Main content area */
+.sales-main {
+  flex: 1;
+  margin-left: 220px;
+  padding: 28px 32px;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+/* ─── Mobile (≤ 768px) ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Hide desktop sidebar */
+  .sales-sidebar {
+    display: none;
+  }
+
+  /* Show mobile top bar */
+  .sales-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #0F1629;
+    border-bottom: 1px solid #1E2D4A;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 45;
+    height: 52px;
+  }
+
+  /* Show mobile drawer */
+  .sales-drawer {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Push main content below top bar */
+  .sales-main {
+    margin-left: 0;
+    padding: 72px 16px 24px;
+  }
+
+  /* Stack grids to single column */
+  .fadaa-card table {
+    font-size: 12px;
+  }
+
+  /* Make stat cards wrap */
+  .sales-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .sales-stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .sales-main {
+    padding: 64px 12px 20px;
+  }
+}
