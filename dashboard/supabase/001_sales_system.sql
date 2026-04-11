@@ -209,3 +209,48 @@ ON CONFLICT (username) DO NOTHING;
 -- INSERT INTO storage.buckets (id, name, public)
 -- VALUES ('sales-documents', 'sales-documents', false)
 -- ON CONFLICT (id) DO NOTHING;
+
+-- ─── 8. USER PROFILES ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS sales_user_profiles (
+  user_id       UUID PRIMARY KEY REFERENCES sales_users(id) ON DELETE CASCADE,
+  job_title     TEXT,
+  phone         TEXT,
+  department    TEXT,
+  avatar_url    TEXT,
+  manager_id    UUID REFERENCES sales_users(id) ON DELETE SET NULL,
+  join_date     DATE NOT NULL DEFAULT CURRENT_DATE,
+  bio           TEXT,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_profiles_updated_at
+  BEFORE UPDATE ON sales_user_profiles
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ─── 9. PERMISSIONS ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS sales_permissions (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id    UUID NOT NULL REFERENCES sales_users(id) ON DELETE CASCADE,
+  module     TEXT NOT NULL,
+  can_view   BOOLEAN NOT NULL DEFAULT false,
+  can_create BOOLEAN NOT NULL DEFAULT false,
+  can_edit   BOOLEAN NOT NULL DEFAULT false,
+  can_delete BOOLEAN NOT NULL DEFAULT false,
+  can_manage BOOLEAN NOT NULL DEFAULT false,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, module)
+);
+
+CREATE TRIGGER trg_permissions_updated_at
+  BEFORE UPDATE ON sales_permissions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ─── 10. PASSWORD RESET TOKENS ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS sales_password_resets (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id    UUID NOT NULL REFERENCES sales_users(id) ON DELETE CASCADE,
+  token      TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '1 hour'),
+  used       BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

@@ -355,3 +355,159 @@ export async function getRepPerformance(): Promise<RepPerformance[]> {
     }
   })
 }
+
+// ─── Action Intelligence ──────────────────────────
+// These power the "Sales OS" layer: overdue, stale, at-risk, today
+
+export async function getOverdueFollowups(repId?: string): Promise<Lead[]> {
+  const db = getServiceClient()
+  const today = new Date().toISOString().slice(0, 10)
+  let q = db
+    .from('sales_leads')
+    .select('*, assigned_rep:sales_users!assigned_rep_id(id, name)')
+    .lt('next_follow_up_date', today)
+    .not('next_follow_up_date', 'is', null)
+    .not('pipeline_stage', 'in', '("won","lost")')
+    .order('next_follow_up_date', { ascending: true })
+    .limit(20)
+  if (repId) q = q.eq('assigned_rep_id', repId)
+  const { data } = await q
+  return (data ?? []) as Lead[]
+}
+
+export async function getStaleLeads(repId?: string): Promise<Lead[]> {
+  const db = getServiceClient()
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  let q = db
+    .from('sales_leads')
+    .select('*, assigned_rep:sales_users!assigned_rep_id(id, name)')
+    .lt('updated_at', sevenDaysAgo)
+    .not('pipeline_stage', 'in', '("won","lost")')
+    .order('updated_at', { ascending: true })
+    .limit(20)
+  if (repId) q = q.eq('assigned_rep_id', repId)
+  const { data } = await q
+  return (data ?? []) as Lead[]
+}
+
+export async function getMeetingsToday(repId?: string): Promise<Meeting[]> {
+  const db = getServiceClient()
+  const start = new Date(); start.setHours(0,0,0,0)
+  const end   = new Date(); end.setHours(23,59,59,999)
+  let q = db
+    .from('sales_meetings')
+    .select('*, lead:sales_leads(id, company_name, contact_person), rep:sales_users!rep_id(id, name)')
+    .gte('meeting_date', start.toISOString())
+    .lte('meeting_date', end.toISOString())
+    .order('meeting_date', { ascending: true })
+  if (repId) q = q.eq('rep_id', repId)
+  const { data } = await q
+  return (data ?? []) as Meeting[]
+}
+
+export async function getHighValueAtRisk(repId?: string): Promise<Lead[]> {
+  const db = getServiceClient()
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+  let q = db
+    .from('sales_leads')
+    .select('*, assigned_rep:sales_users!assigned_rep_id(id, name)')
+    .lt('updated_at', fourteenDaysAgo)
+    .not('pipeline_stage', 'in', '("won","lost","new_lead")')
+    .gt('estimated_value', 0)
+    .order('estimated_value', { ascending: false })
+    .limit(10)
+  if (repId) q = q.eq('assigned_rep_id', repId)
+  const { data } = await q
+  return (data ?? []) as Lead[]
+}
+
+// ─── Profiles ─────────────────────────────────────
+
+export async function getUserProfile(userId: string) {
+  const db = getServiceClient()
+  const { data } = await db
+    .from('sales_user_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+  return data
+}
+
+export async function upsertUserProfile(userId: string, profile: {
+  job_title?: string; phone?: string; department?: string
+  avatar_url?: string; manager_id?: string | null; bio?: string; join_date?: string
+}) {
+  const db = getServiceClient()
+  const { data, error } = await db
+    .from('sales_user_profiles')
+    .upsert({ user_id: userId, ...profile }, { onConflict: 'user_id' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// ─── Permissions ──────────────────────────────────
+
+export const PERMISSION_MODULES = [
+  'dashboard', 'leads', 'pipeline', 'meetings',
+  'qualified', 'documents', 'import', 'reports', 'team',
+] as const
+
+export type PermissionModule = typeof PERMISSION_MODULES[number]
+
+export interface Permission {
+  module:     PermissionModule
+  can_view:   boolean
+  can_create: boolean
+  can_edit:   boolean
+  can_delete: boolean
+  can_manage: boolean
+}
+
+export async function getUserPermissions(userId: string): Promise<Permission[]> {
+  const db = getServiceClient()
+  const { data } = await db
+    .from('sales_permissions')
+    .select('module, can_view, can_create, can_edit, can_delete, can_manage')
+    .eq('user_id', userId)
+  return (data ?? []) as Permission[]
+}
+
+export async function setUserPermissions(userId: string, permissions: Permission[]) {
+  const db = getServiceClient()
+  const rows = permissions.map(p => ({ user_id: userId, ...p }))
+  const { error } = await db
+    .from('sales_permissions')
+    .upsert(rows, { onConflict: 'user_id,module' })
+  if (error) throw error
+}
+
+// ─── Password reset tokens ────────────────────────
+
+export async function createPasswordResetToken(userId: string): Promise<string> {
+  const db = getServiceClient()
+  const token = crypto.randomUUID() + '-' + crypto.randomUUID()
+  await db.from('sales_password_resets').insert({
+    user_id: userId,
+    token,
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  })
+  return token
+}
+
+export async function validateResetToken(token: string): Promise<{ userId: string } | null> {
+  const db = getServiceClient()
+  const { data } = await db
+    .from('sales_password_resets')
+    .select('user_id, expires_at, used')
+    .eq('token', token)
+    .maybeSingle()
+  if (!data || data.used || new Date(data.expires_at) < new Date()) return null
+  return { userId: data.user_id }
+}
+
+export async function consumeResetToken(token: string) {
+  const db = getServiceClient()
+  await db.from('sales_password_resets').update({ used: true }).eq('token', token)
+}
