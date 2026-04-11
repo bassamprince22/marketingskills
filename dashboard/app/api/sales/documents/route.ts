@@ -56,10 +56,14 @@ export async function POST(req: NextRequest) {
 
     if (upErr) {
       console.error('Upload error:', upErr)
-      return NextResponse.json({ error: 'File upload failed' }, { status: 500 })
+      return NextResponse.json({ error: `Storage error: ${upErr.message}` }, { status: 500 })
     }
 
-    const { data: { publicUrl } } = db.storage.from('sales-documents').getPublicUrl(path)
+    // Use signed URL (works with both public and private buckets)
+    const { data: signedData } = await db.storage
+      .from('sales-documents')
+      .createSignedUrl(path, 60 * 60 * 24 * 365) // 1-year expiry for documents
+    const fileUrl = signedData?.signedUrl ?? ''
 
     const doc = await createDocument({
       lead_id:     leadId,
@@ -67,7 +71,7 @@ export async function POST(req: NextRequest) {
       doc_type:    docType as any,
       status:      status  as any,
       version,
-      file_url:    publicUrl,
+      file_url:    fileUrl,
       file_name:   file.name,
       file_size_kb: Math.round(file.size / 1024),
       notes: notes || null,
