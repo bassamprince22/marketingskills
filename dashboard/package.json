@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
+    "@remotion/player": "^4.0.448",
     "@supabase/supabase-js": "^2.49.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/papaparse": "^5.5.2",
@@ -22,6 +23,7 @@
     "react-dom": "^18",
     "react-hook-form": "^7.72.1",
     "recharts": "^2.12.7",
+    "remotion": "^4.0.448",
     "zod": "^4.3.6"
   },
   "devDependencies": {
