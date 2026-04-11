@@ -232,9 +232,9 @@ export default function TeamPage() {
   const [permUser, setPermUser] = useState<string | null>(null)
   const [confirmDeactivate, setConfirmDeactivate] = useState<TeamUser | null>(null)
 
-  // Guard: admin only
+  // Guard: admin and manager only
   useEffect(() => {
-    if (session && role !== 'admin') router.replace('/sales/dashboard')
+    if (session && role !== 'admin' && role !== 'manager') router.replace('/sales/dashboard')
   }, [session, role, router])
 
   function load() {
