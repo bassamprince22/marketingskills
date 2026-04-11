@@ -5,6 +5,8 @@ import {
   getManagerStats, getRepStats,
   getPipelineCounts, getRepPerformance,
   getActivities,
+  getOverdueFollowups, getStaleLeads,
+  getMeetingsToday, getHighValueAtRisk,
 } from '@/lib/sales/db'
 
 export async function GET() {
@@ -17,20 +19,28 @@ export async function GET() {
 
   try {
     if (role === 'manager' || role === 'admin') {
-      const [stats, pipeline, performance, activities] = await Promise.all([
+      const [stats, pipeline, performance, activities, overdue, stale, todayMeetings, atRisk] = await Promise.all([
         getManagerStats(),
         getPipelineCounts(),
         getRepPerformance(),
         getActivities({ limit: 15 }),
+        getOverdueFollowups(),
+        getStaleLeads(),
+        getMeetingsToday(),
+        getHighValueAtRisk(),
       ])
-      return NextResponse.json({ type: 'manager', stats, pipeline, performance, activities })
+      return NextResponse.json({ type: 'manager', stats, pipeline, performance, activities, overdue, stale, todayMeetings, atRisk })
     } else {
-      const [stats, pipeline, activities] = await Promise.all([
+      const [stats, pipeline, activities, overdue, stale, todayMeetings, atRisk] = await Promise.all([
         getRepStats(id),
         getPipelineCounts(id),
         getActivities({ userId: id, limit: 10 }),
+        getOverdueFollowups(id),
+        getStaleLeads(id),
+        getMeetingsToday(id),
+        getHighValueAtRisk(id),
       ])
-      return NextResponse.json({ type: 'rep', stats, pipeline, activities })
+      return NextResponse.json({ type: 'rep', stats, pipeline, activities, overdue, stale, todayMeetings, atRisk })
     }
   } catch (err) {
     console.error('Stats error:', err)

@@ -355,3 +355,68 @@ export async function getRepPerformance(): Promise<RepPerformance[]> {
     }
   })
 }
+
+// ─── Action Intelligence ──────────────────────────
+// These power the "Sales OS" layer: overdue, stale, at-risk, today
+
+export async function getOverdueFollowups(repId?: string): Promise<Lead[]> {
+  const db = getServiceClient()
+  const today = new Date().toISOString().slice(0, 10)
+  let q = db
+    .from('sales_leads')
+    .select('*, assigned_rep:sales_users!assigned_rep_id(id, name)')
+    .lt('next_follow_up_date', today)
+    .not('next_follow_up_date', 'is', null)
+    .not('pipeline_stage', 'in', '("won","lost")')
+    .order('next_follow_up_date', { ascending: true })
+    .limit(20)
+  if (repId) q = q.eq('assigned_rep_id', repId)
+  const { data } = await q
+  return (data ?? []) as Lead[]
+}
+
+export async function getStaleLeads(repId?: string): Promise<Lead[]> {
+  const db = getServiceClient()
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  let q = db
+    .from('sales_leads')
+    .select('*, assigned_rep:sales_users!assigned_rep_id(id, name)')
+    .lt('updated_at', sevenDaysAgo)
+    .not('pipeline_stage', 'in', '("won","lost")')
+    .order('updated_at', { ascending: true })
+    .limit(20)
+  if (repId) q = q.eq('assigned_rep_id', repId)
+  const { data } = await q
+  return (data ?? []) as Lead[]
+}
+
+export async function getMeetingsToday(repId?: string): Promise<Meeting[]> {
+  const db = getServiceClient()
+  const start = new Date(); start.setHours(0,0,0,0)
+  const end   = new Date(); end.setHours(23,59,59,999)
+  let q = db
+    .from('sales_meetings')
+    .select('*, lead:sales_leads(id, company_name, contact_person), rep:sales_users!rep_id(id, name)')
+    .gte('meeting_date', start.toISOString())
+    .lte('meeting_date', end.toISOString())
+    .order('meeting_date', { ascending: true })
+  if (repId) q = q.eq('rep_id', repId)
+  const { data } = await q
+  return (data ?? []) as Meeting[]
+}
+
+export async function getHighValueAtRisk(repId?: string): Promise<Lead[]> {
+  const db = getServiceClient()
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+  let q = db
+    .from('sales_leads')
+    .select('*, assigned_rep:sales_users!assigned_rep_id(id, name)')
+    .lt('updated_at', fourteenDaysAgo)
+    .not('pipeline_stage', 'in', '("won","lost","new_lead")')
+    .gt('estimated_value', 0)
+    .order('estimated_value', { ascending: false })
+    .limit(10)
+  if (repId) q = q.eq('assigned_rep_id', repId)
+  const { data } = await q
+  return (data ?? []) as Lead[]
+}
