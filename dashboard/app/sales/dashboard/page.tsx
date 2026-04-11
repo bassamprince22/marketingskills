@@ -208,7 +208,7 @@ function ManagerDash({ data }: { data: DashData }) {
 
       {/* Stat grid */}
       <section>
-        <h2 style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 700, marginBottom: 14, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#64748B' }}>Pipeline Overview</h2>
+        <h2 style={{ color: '#64748B', fontSize: 12, fontWeight: 700, marginBottom: 14, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Pipeline Overview</h2>
         <div className="sales-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
           <FadaaStatCard label="Total Leads"     value={s.total_leads}     icon="◎" color="blue"   delay={0}   />
           <FadaaStatCard label="New This Week"   value={s.new_leads}       icon="✦" color="cyan"   delay={60}  />
