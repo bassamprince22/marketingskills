@@ -162,6 +162,12 @@ export default function SalesLoginPage() {
               {loading ? 'Signing in…' : '→ Enter Mission Control'}
             </button>
           </form>
+
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <a href="/sales/forgot-password" style={{ color: '#4F8EF7', fontSize: 13, textDecoration: 'none', opacity: 0.8 }}>
+              Forgot your password?
+            </a>
+          </div>
         </div>
 
         <p style={{ textAlign: 'center', color: '#1E2D4A', fontSize: 11, marginTop: 24 }}>

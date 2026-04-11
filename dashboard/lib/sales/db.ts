@@ -420,3 +420,94 @@ export async function getHighValueAtRisk(repId?: string): Promise<Lead[]> {
   const { data } = await q
   return (data ?? []) as Lead[]
 }
+
+// ─── Profiles ─────────────────────────────────────
+
+export async function getUserProfile(userId: string) {
+  const db = getServiceClient()
+  const { data } = await db
+    .from('sales_user_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+  return data
+}
+
+export async function upsertUserProfile(userId: string, profile: {
+  job_title?: string; phone?: string; department?: string
+  avatar_url?: string; manager_id?: string | null; bio?: string; join_date?: string
+}) {
+  const db = getServiceClient()
+  const { data, error } = await db
+    .from('sales_user_profiles')
+    .upsert({ user_id: userId, ...profile }, { onConflict: 'user_id' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// ─── Permissions ──────────────────────────────────
+
+export const PERMISSION_MODULES = [
+  'dashboard', 'leads', 'pipeline', 'meetings',
+  'qualified', 'documents', 'import', 'reports', 'team',
+] as const
+
+export type PermissionModule = typeof PERMISSION_MODULES[number]
+
+export interface Permission {
+  module:     PermissionModule
+  can_view:   boolean
+  can_create: boolean
+  can_edit:   boolean
+  can_delete: boolean
+  can_manage: boolean
+}
+
+export async function getUserPermissions(userId: string): Promise<Permission[]> {
+  const db = getServiceClient()
+  const { data } = await db
+    .from('sales_permissions')
+    .select('module, can_view, can_create, can_edit, can_delete, can_manage')
+    .eq('user_id', userId)
+  return (data ?? []) as Permission[]
+}
+
+export async function setUserPermissions(userId: string, permissions: Permission[]) {
+  const db = getServiceClient()
+  const rows = permissions.map(p => ({ user_id: userId, ...p }))
+  const { error } = await db
+    .from('sales_permissions')
+    .upsert(rows, { onConflict: 'user_id,module' })
+  if (error) throw error
+}
+
+// ─── Password reset tokens ────────────────────────
+
+export async function createPasswordResetToken(userId: string): Promise<string> {
+  const db = getServiceClient()
+  const token = crypto.randomUUID() + '-' + crypto.randomUUID()
+  await db.from('sales_password_resets').insert({
+    user_id: userId,
+    token,
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  })
+  return token
+}
+
+export async function validateResetToken(token: string): Promise<{ userId: string } | null> {
+  const db = getServiceClient()
+  const { data } = await db
+    .from('sales_password_resets')
+    .select('user_id, expires_at, used')
+    .eq('token', token)
+    .maybeSingle()
+  if (!data || data.used || new Date(data.expires_at) < new Date()) return null
+  return { userId: data.user_id }
+}
+
+export async function consumeResetToken(token: string) {
+  const db = getServiceClient()
+  await db.from('sales_password_resets').update({ used: true }).eq('token', token)
+}

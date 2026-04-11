@@ -21,7 +21,7 @@ const NAV: NavItem[] = [
   { href: '/sales/documents', label: 'Documents',  icon: '⎗', roles: ['manager','rep','admin'] },
   { href: '/sales/import',    label: 'Import CSV', icon: '↧', roles: ['manager','admin'] },
   { href: '/sales/reports',   label: 'Reports',    icon: '▦', roles: ['manager','admin'] },
-  { href: '/sales/admin/users', label: 'Users',   icon: '⊕', roles: ['admin'] },
+  { href: '/sales/team',      label: 'Team',       icon: '◈', roles: ['admin'] },
 ]
 
 function NavLinks({ visible, pathname, onNav }: { visible: NavItem[]; pathname: string; onNav?: () => void }) {
@@ -60,11 +60,11 @@ function NavLinks({ visible, pathname, onNav }: { visible: NavItem[]; pathname: 
 }
 
 export function SalesNav() {
-  const pathname              = usePathname()
-  const { data: session }     = useSession()
+  const pathname          = usePathname()
+  const { data: session } = useSession()
   const role = (session?.user as { role?: string })?.role ?? 'rep'
   const name = session?.user?.name ?? '—'
-  const [open, setOpen]       = useState(false)
+  const [open, setOpen]   = useState(false)
 
   const visible = NAV.filter(n => n.roles.includes(role))
 
@@ -75,8 +75,14 @@ export function SalesNav() {
     </div>
   )
 
-  const userBlock = (
-    <div style={{ padding: '12px 16px', borderBottom: '1px solid #1E2D4A' }}>
+  const userBlock = (onNav?: () => void) => (
+    <Link
+      href="/sales/profile"
+      onClick={onNav}
+      style={{ textDecoration: 'none', display: 'block', padding: '12px 16px', borderBottom: '1px solid #1E2D4A', transition: 'background 0.15s' }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(79,142,247,0.06)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
           width: 32, height: 32, borderRadius: '50%',
@@ -86,12 +92,12 @@ export function SalesNav() {
         }}>
           {name.charAt(0).toUpperCase()}
         </div>
-        <div>
-          <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600 }}>{name}</p>
-          <p style={{ color: '#64748B', fontSize: 11, textTransform: 'capitalize' }}>{role}</p>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
+          <p style={{ color: '#64748B', fontSize: 11, textTransform: 'capitalize' }}>{role} · Profile</p>
         </div>
       </div>
-    </div>
+    </Link>
   )
 
   const signOutBlock = (onNav?: () => void) => (
@@ -115,7 +121,7 @@ export function SalesNav() {
       {/* ── Desktop sidebar ── */}
       <aside className="sales-sidebar">
         {logoBlock}
-        {userBlock}
+        {userBlock()}
         <NavLinks visible={visible} pathname={pathname} />
         {signOutBlock()}
       </aside>
@@ -139,10 +145,7 @@ export function SalesNav() {
       {/* ── Mobile drawer overlay ── */}
       {open && (
         <div
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(10,14,26,0.7)',
-            zIndex: 50,
-          }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(10,14,26,0.7)', zIndex: 50 }}
           onClick={() => setOpen(false)}
         />
       )}
@@ -163,7 +166,7 @@ export function SalesNav() {
         className="sales-drawer"
       >
         {logoBlock}
-        {userBlock}
+        {userBlock(() => setOpen(false))}
         <NavLinks visible={visible} pathname={pathname} onNav={() => setOpen(false)} />
         {signOutBlock(() => setOpen(false))}
       </div>
