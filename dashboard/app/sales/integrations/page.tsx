@@ -20,8 +20,13 @@ interface Log {
   payload?: Record<string, unknown>
 }
 
-function MetaCard({ onRefresh }: { onRefresh: () => void }) {
-  const sp          = useSearchParams()
+interface MetaCardProps {
+  onRefresh: () => void
+  connectedParam: string | null
+  errorParam: string | null
+}
+
+function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
   const [data, setData] = useState<{ integration: Integration | null; logs: Log[] } | null>(null)
   const [disconnecting, setDisc] = useState(false)
 
@@ -41,9 +46,6 @@ function MetaCard({ onRefresh }: { onRefresh: () => void }) {
     load(); onRefresh()
     setDisc(false)
   }
-
-  const connectedParam = sp.get('connected')
-  const errorParam     = sp.get('error')
 
   return (
     <div className="fadaa-card" style={{ padding: 24 }}>
@@ -73,16 +75,16 @@ function MetaCard({ onRefresh }: { onRefresh: () => void }) {
       </div>
 
       {/* Alerts */}
-      {connectedParam === 'meta' ? (
+      {connectedParam === 'meta' && (
         <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 8, padding: '10px 14px', color: '#4ADE80', fontSize: 13, marginBottom: 16 }}>
           ✓ Facebook connected successfully! Leads will now import automatically.
         </div>
-      ) : null}
-      {errorParam ? (
+      )}
+      {errorParam != null && (
         <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#F87171', fontSize: 13, marginBottom: 16 }}>
           ✕ Connection failed: {errorParam === 'facebook_denied' ? 'You denied the Facebook permission request.' : 'Token exchange failed. Try again.'}
         </div>
-      ) : null}
+      )}
 
       {/* Connected pages */}
       {connected && pages.length > 0 && (
@@ -178,7 +180,11 @@ function ComingSoonCard({ icon, name, desc }: { icon: string; name: string; desc
 }
 
 function IntegrationsContent() {
+  const sp             = useSearchParams()
+  const connectedParam = sp.get('connected')
+  const errorParam     = sp.get('error')
   const [tick, setTick] = useState(0)
+
   return (
     <SalesShell>
       <div style={{ maxWidth: 780, margin: '0 auto' }}>
@@ -189,7 +195,11 @@ function IntegrationsContent() {
 
         <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Lead Sources</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 28 }}>
-          <MetaCard onRefresh={() => setTick(t => t + 1)} />
+          <MetaCard
+            onRefresh={() => setTick(t => t + 1)}
+            connectedParam={connectedParam}
+            errorParam={errorParam}
+          />
         </div>
 
         <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Calendar & Meetings</p>
