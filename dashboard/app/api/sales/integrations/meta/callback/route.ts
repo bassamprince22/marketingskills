@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/sales/integrations?error=No+database+connection+string+set', req.url))
   }
 
-  const sql = postgres(connectionString, { ssl: 'require', max: 1 })
+  const sql = postgres(connectionString, { ssl: 'require', max: 1, prepare: false })
   try {
     await sql`
       INSERT INTO sales_integrations (type, is_active, config, updated_at)
