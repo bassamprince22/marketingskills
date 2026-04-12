@@ -38,6 +38,9 @@ export default withAuth(
           pathname.startsWith('/sales/reset-password') ||
           pathname.startsWith('/login') ||
           pathname.startsWith('/api/auth') ||
+          pathname.startsWith('/privacy') ||
+          pathname.startsWith('/terms') ||
+          pathname.startsWith('/data-deletion') ||
           // Meta webhook is server-to-server from Facebook — must be public
           pathname.startsWith('/api/sales/integrations/meta/webhook') ||
           // Password reset API endpoint must be public for forgot-password flow
