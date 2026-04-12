@@ -17,14 +17,19 @@ interface Log {
   status: string
   error_message?: string
   created_at: string
-  payload?: Record<string, unknown>
 }
 
-// Direct Facebook OAuth URL — bypasses server redirect to avoid NEXTAUTH_URL misconfiguration
-const META_APP_ID      = '1375549184609507'
-const META_CALLBACK    = 'https://marketingskills-3t9r.vercel.app/api/sales/integrations/meta/callback'
-const META_SCOPES      = 'pages_show_list,leads_retrieval,pages_manage_ads,pages_read_engagement'
-const META_OAUTH_URL   = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_CALLBACK)}&scope=${META_SCOPES}&response_type=code`
+interface ImportResult {
+  imported: number
+  skipped: number
+  total: number
+  error?: string
+}
+
+const META_APP_ID    = '1375549184609507'
+const META_CALLBACK  = 'https://marketingskills-3t9r.vercel.app/api/sales/integrations/meta/callback'
+const META_SCOPES    = 'pages_show_list,leads_retrieval,pages_manage_ads,pages_read_engagement'
+const META_OAUTH_URL = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_CALLBACK)}&scope=${META_SCOPES}&response_type=code`
 
 interface MetaCardProps {
   onRefresh: () => void
@@ -33,18 +38,27 @@ interface MetaCardProps {
 }
 
 function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
-  const [data, setData] = useState<{ integration: Integration | null; logs: Log[] } | null>(null)
-  const [disconnecting, setDisc] = useState(false)
+  const [data, setData]           = useState<{ integration: Integration | null; logs: Log[] } | null>(null)
+  const [loading, setLoading]     = useState(true)
+  const [disconnecting, setDisc]  = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
 
   function load() {
+    setLoading(true)
     fetch('/api/sales/integrations/meta/pages')
-      .then(r => r.json()).then(setData)
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false) })
+      .catch(() => setLoading(false))
   }
   useEffect(() => { load() }, [])
 
-  const pages: { id: string; name: string }[] =
-    (data?.integration?.config?.pages as { id: string; name: string }[] | undefined) ?? []
-  const connected: boolean = Boolean(data?.integration?.is_active && pages.length > 0)
+  // connected = is_active from DB — persists across page loads
+  const connected = Boolean(data?.integration?.is_active)
+  const pages     = (data?.integration?.config?.pages as { id: string; name: string }[] | undefined) ?? []
+  const connectedAt = data?.integration?.updated_at
+    ? new Date(data.integration.updated_at).toLocaleDateString()
+    : null
 
   async function disconnect() {
     if (!confirm('Disconnect Meta integration? Leads will stop importing.')) return
@@ -52,6 +66,19 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
     await fetch('/api/sales/integrations/meta/pages', { method: 'DELETE' })
     load(); onRefresh()
     setDisc(false)
+  }
+
+  async function importLeads() {
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const res = await fetch('/api/sales/integrations/meta/import', { method: 'POST' })
+      const result = await res.json()
+      setImportResult(result)
+    } catch {
+      setImportResult({ imported: 0, skipped: 0, total: 0, error: 'Request failed' })
+    }
+    setImporting(false)
   }
 
   return (
@@ -62,18 +89,23 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
           width: 48, height: 48, borderRadius: 12, flexShrink: 0,
           background: 'linear-gradient(135deg, #1877F2, #0C5BB5)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 22,
+          fontSize: 22, color: '#fff', fontWeight: 700,
         }}>f</div>
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <p style={{ color: '#E2E8F0', fontSize: 16, fontWeight: 700 }}>Meta Lead Ads</p>
-            <span style={{
-              fontSize: 11, padding: '2px 8px', borderRadius: 999, fontWeight: 600,
-              background: connected ? 'rgba(74,222,128,0.1)' : 'rgba(100,116,139,0.1)',
-              color: connected ? '#4ADE80' : '#64748B',
-            }}>
-              {connected ? '● Connected' : '○ Not connected'}
-            </span>
+            {!loading && (
+              <span style={{
+                fontSize: 11, padding: '2px 8px', borderRadius: 999, fontWeight: 600,
+                background: connected ? 'rgba(74,222,128,0.1)' : 'rgba(100,116,139,0.1)',
+                color: connected ? '#4ADE80' : '#64748B',
+              }}>
+                {connected ? '● Connected' : '○ Not connected'}
+              </span>
+            )}
+            {connected && connectedAt && (
+              <span style={{ fontSize: 11, color: '#475569' }}>since {connectedAt}</span>
+            )}
           </div>
           <p style={{ color: '#64748B', fontSize: 13, marginTop: 3 }}>
             Auto-import leads from Facebook & Instagram Lead Ads into your pipeline
@@ -81,10 +113,10 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
         </div>
       </div>
 
-      {/* Alerts */}
+      {/* Post-OAuth success flash */}
       {connectedParam === 'meta' && (
         <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 8, padding: '10px 14px', color: '#4ADE80', fontSize: 13, marginBottom: 16 }}>
-          ✓ Facebook connected successfully! Leads will now import automatically.
+          ✓ Facebook connected successfully! New leads will now import automatically.
         </div>
       )}
       {errorParam != null && (
@@ -93,10 +125,10 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
         </div>
       )}
 
-      {/* Connected pages */}
+      {/* Connected pages list */}
       {connected && pages.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Connected Pages</p>
+          <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Connected Pages</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {pages.map((p) => (
               <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'rgba(24,119,242,0.08)', border: '1px solid rgba(24,119,242,0.2)', borderRadius: 8 }}>
@@ -109,8 +141,48 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
         </div>
       )}
 
+      {/* Import last 30 days — only shown when connected */}
+      {connected && (
+        <div style={{ marginBottom: 20, padding: 16, background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>📥 Import last 30 days</p>
+              <p style={{ color: '#64748B', fontSize: 12 }}>Fetch all existing leads from your connected pages into the CRM. Duplicates are skipped.</p>
+            </div>
+            <button
+              onClick={importLeads}
+              disabled={importing}
+              style={{
+                padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: importing ? 'rgba(79,142,247,0.2)' : '#4F8EF7',
+                color: importing ? '#64748B' : '#fff',
+                border: 'none', cursor: importing ? 'not-allowed' : 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              {importing ? '⟳ Importing…' : 'Import Now'}
+            </button>
+          </div>
+
+          {/* Import result */}
+          {importResult && (
+            <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: importResult.error ? 'rgba(239,68,68,0.08)' : 'rgba(74,222,128,0.08)', border: `1px solid ${importResult.error ? 'rgba(239,68,68,0.2)' : 'rgba(74,222,128,0.2)'}` }}>
+              {importResult.error ? (
+                <p style={{ color: '#F87171', fontSize: 13 }}>✕ {importResult.error}</p>
+              ) : (
+                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                  <p style={{ color: '#4ADE80', fontSize: 13 }}>✓ <strong>{importResult.imported}</strong> leads imported</p>
+                  <p style={{ color: '#64748B', fontSize: 13 }}><strong>{importResult.skipped}</strong> duplicates skipped</p>
+                  <p style={{ color: '#64748B', fontSize: 13 }}><strong>{importResult.total}</strong> total found</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 10 }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {!connected ? (
           <a
             href={META_OAUTH_URL}
@@ -118,7 +190,6 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
               display: 'inline-flex', alignItems: 'center', gap: 8,
               padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
               background: '#1877F2', color: '#fff', textDecoration: 'none',
-              border: 'none', cursor: 'pointer',
             }}
           >
             <span style={{ fontSize: 16 }}>f</span>
@@ -128,7 +199,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
           <>
             <a
               href={META_OAUTH_URL}
-              style={{ padding: '9px 16px', borderRadius: 8, fontSize: 13, background: 'rgba(24,119,242,0.1)', color: '#60A5FA', border: '1px solid rgba(24,119,242,0.2)', textDecoration: 'none', cursor: 'pointer' }}
+              style={{ padding: '9px 16px', borderRadius: 8, fontSize: 13, background: 'rgba(24,119,242,0.1)', color: '#60A5FA', border: '1px solid rgba(24,119,242,0.2)', textDecoration: 'none' }}
             >
               Reconnect
             </a>
@@ -143,7 +214,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
         )}
       </div>
 
-      {/* Recent logs */}
+      {/* Recent activity logs */}
       {(data?.logs ?? []).length > 0 && (
         <div style={{ marginTop: 20 }}>
           <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Recent Activity</p>
@@ -157,7 +228,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
                   {log.event_type?.replace(/_/g, ' ')}
                   {log.error_message && <span style={{ color: '#F87171' }}> — {log.error_message}</span>}
                 </p>
-                <p style={{ color: '#1E2D4A', fontSize: 11 }}>
+                <p style={{ color: '#475569', fontSize: 11 }}>
                   {new Date(log.created_at).toLocaleString()}
                 </p>
               </div>
