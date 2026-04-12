@@ -183,7 +183,7 @@ function PermissionsModal({ userId, userName, onClose }: { userId: string; userN
   )
 }
 
-// ─── Member chip (inside a team) ──────────────────
+// ─── Member chip (draggable) ──────────────────────
 function MemberRow({ user, managers, onEdit, onPerms, onMove }: {
   user: TeamUser
   managers: TeamUser[]
@@ -192,13 +192,19 @@ function MemberRow({ user, managers, onEdit, onPerms, onMove }: {
   onMove: (managerId: string) => void
 }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '10px 14px', borderRadius: 10,
-      background: 'rgba(255,255,255,0.02)',
-      border: '1px solid #1E2D4A',
-      opacity: user.is_active ? 1 : 0.45,
-    }}>
+    <div
+      draggable
+      onDragStart={e => e.dataTransfer.setData('userId', user.id)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '10px 14px', borderRadius: 10,
+        background: 'rgba(255,255,255,0.02)',
+        border: '1px solid #1E2D4A',
+        opacity: user.is_active ? 1 : 0.45,
+        cursor: 'grab',
+      }}
+    >
+      <span style={{ color: '#2D3F5A', fontSize: 14, flexShrink: 0 }}>⠿</span>
       <Avatar name={user.name} size={32} url={user.profile?.avatar_url} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600 }}>{user.name}</p>
@@ -276,6 +282,7 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true)
   const [editUser, setEditUser] = useState<Partial<TeamUser> | null>(null)
   const [permUser, setPermUser] = useState<TeamUser | null>(null)
+  const [dragOver, setDragOver] = useState<string | null>(null) // leaderId being hovered
 
   useEffect(() => {
     if (session && role !== 'admin' && role !== 'manager') router.replace('/sales/dashboard')
@@ -306,7 +313,8 @@ export default function TeamPage() {
   // Teams = managers who have at least one rep assigned
   const teamLeaders = managers.filter(u => reps.some(r => r.profile?.manager_id === u.id))
   const unassigned  = reps.filter(u => !u.profile?.manager_id)
-  const isEmpty = users.length === 0
+  // Show example when no teams are set up yet
+  const showExample = teamLeaders.length === 0 && unassigned.length === 0
 
   if (role !== 'admin' && role !== 'manager') return null
 
@@ -329,7 +337,7 @@ export default function TeamPage() {
           </div>
         ) : (
           <>
-            {isEmpty && <EmptyExample />}
+            {showExample && <EmptyExample />}
 
             {/* ── Sales Managers ── */}
             {topLevel.length > 0 && (
@@ -363,8 +371,13 @@ export default function TeamPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {teamLeaders.map(leader => {
                     const members = reps.filter(r => r.profile?.manager_id === leader.id)
+                    const isOver = dragOver === leader.id
                     return (
-                      <div key={leader.id} className="fadaa-card" style={{ overflow: 'hidden', borderLeft: '3px solid #06B6D4' }}>
+                      <div key={leader.id} className="fadaa-card"
+                        onDragOver={e => { e.preventDefault(); setDragOver(leader.id) }}
+                        onDragLeave={() => setDragOver(null)}
+                        onDrop={e => { e.preventDefault(); setDragOver(null); const uid = e.dataTransfer.getData('userId'); if (uid) moveToTeam(uid, leader.id) }}
+                        style={{ overflow: 'hidden', borderLeft: `3px solid ${isOver ? '#4ADE80' : '#06B6D4'}`, boxShadow: isOver ? '0 0 0 2px rgba(74,222,128,0.25)' : undefined, transition: 'box-shadow 0.15s, border-color 0.15s' }}>
                         {/* Leader header */}
                         <div style={{ padding: '14px 18px', borderBottom: '1px solid #1E2D4A', display: 'flex', alignItems: 'center', gap: 12 }}>
                           <Avatar name={leader.name} size={38} url={leader.profile?.avatar_url} />
@@ -421,7 +434,11 @@ export default function TeamPage() {
                 <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
                   Unassigned Members ({unassigned.length})
                 </p>
-                <div className="fadaa-card" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="fadaa-card"
+                  onDragOver={e => { e.preventDefault(); setDragOver('unassigned') }}
+                  onDragLeave={() => setDragOver(null)}
+                  onDrop={e => { e.preventDefault(); setDragOver(null); const uid = e.dataTransfer.getData('userId'); if (uid) moveToTeam(uid, '') }}
+                  style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8, borderLeft: dragOver === 'unassigned' ? '3px solid #F59E0B' : '3px solid transparent', transition: 'border-color 0.15s' }}>
                   {unassigned.map(u => (
                     <MemberRow
                       key={u.id}
