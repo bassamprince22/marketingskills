@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getServiceClient } from '@/lib/supabase'
+import postgres from 'postgres'
 
 const APP_ID       = process.env.META_APP_ID ?? ''
 const APP_SECRET   = process.env.META_APP_SECRET ?? ''
@@ -84,25 +84,38 @@ export async function GET(req: NextRequest) {
     }),
   })
 
-  // Step 6: Save to DB via RPC (bypasses PostgREST schema cache issues)
-  const db = getServiceClient()
+  // Step 6: Save to DB using direct SQL — bypasses PostgREST schema cache entirely
+  const connectionString = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? ''
+  if (!connectionString) {
+    return NextResponse.redirect(new URL('/sales/integrations?error=No+database+connection+string+set', req.url))
+  }
 
-  const { error: upsertErr } = await db.rpc('upsert_meta_integration', {
-    p_is_active:  true,
-    p_config: {
-      user_token:        userToken,
-      token_expiry:      tokenExpiry,
-      pages,
-      page_access_token: pages[0]?.access_token ?? null,
-      connected_at:      new Date().toISOString(),
-    },
-    p_updated_at: new Date().toISOString(),
-  })
-
-  if (upsertErr) {
-    console.error('Meta integration upsert failed:', upsertErr)
-    const msg = encodeURIComponent(`DB save failed: ${upsertErr.message}`)
+  const sql = postgres(connectionString, { ssl: 'require', max: 1 })
+  try {
+    await sql`
+      INSERT INTO sales_integrations (type, is_active, config, updated_at)
+      VALUES (
+        'meta',
+        true,
+        ${JSON.stringify({
+          user_token:        userToken,
+          token_expiry:      tokenExpiry,
+          pages,
+          page_access_token: pages[0]?.access_token ?? null,
+          connected_at:      new Date().toISOString(),
+        })}::jsonb,
+        now()
+      )
+      ON CONFLICT (type) DO UPDATE
+        SET is_active  = true,
+            config     = EXCLUDED.config,
+            updated_at = now()
+    `
+  } catch (err: unknown) {
+    const msg = encodeURIComponent(`DB save failed: ${err instanceof Error ? err.message : String(err)}`)
     return NextResponse.redirect(new URL(`/sales/integrations?error=${msg}`, req.url))
+  } finally {
+    await sql.end()
   }
 
   return NextResponse.redirect(new URL('/sales/integrations?connected=meta', req.url))
