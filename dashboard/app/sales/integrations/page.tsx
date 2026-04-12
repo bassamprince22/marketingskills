@@ -43,6 +43,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
   const [disconnecting, setDisc]  = useState(false)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [selectedPageId, setSelectedPageId] = useState<string>('all')
 
   function load() {
     setLoading(true)
@@ -72,7 +73,8 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
     setImporting(true)
     setImportResult(null)
     try {
-      const res = await fetch('/api/sales/integrations/meta/import', { method: 'POST' })
+      const url = `/api/sales/integrations/meta/import?page_id=${encodeURIComponent(selectedPageId)}`
+      const res = await fetch(url, { method: 'POST' })
       const result = await res.json()
       setImportResult(result)
     } catch {
@@ -128,7 +130,14 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
       {/* Connected pages list */}
       {connected && pages.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Connected Pages</p>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+            <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              Connected Pages ({pages.length})
+            </p>
+            <p style={{ color: '#475569', fontSize: 11 }}>
+              Page missing? Click Reconnect and check it in Facebook&apos;s picker.
+            </p>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {pages.map((p) => (
               <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'rgba(24,119,242,0.08)', border: '1px solid rgba(24,119,242,0.2)', borderRadius: 8 }}>
@@ -143,15 +152,37 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
 
       {/* Import last 30 days — always visible, disabled when not connected */}
       <div style={{ marginBottom: 20, padding: 16, background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>📥 Import last 30 days</p>
-            <p style={{ color: '#64748B', fontSize: 12 }}>
-              {connected
-                ? 'Fetch all existing leads from your connected pages into the CRM. Duplicates are skipped.'
-                : 'Connect Facebook first to import your existing leads.'}
-            </p>
-          </div>
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>📥 Import last 30 days</p>
+          <p style={{ color: '#64748B', fontSize: 12 }}>
+            {connected
+              ? 'Fetch existing leads from a page (or all pages) into the CRM. Duplicates are skipped.'
+              : 'Connect Facebook first to import your existing leads.'}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select
+            value={selectedPageId}
+            onChange={(e) => setSelectedPageId(e.target.value)}
+            disabled={!connected || importing}
+            style={{
+              flex: '1 1 200px',
+              minWidth: 0,
+              padding: '8px 12px',
+              borderRadius: 8,
+              fontSize: 13,
+              background: '#0F1629',
+              color: '#E2E8F0',
+              border: '1px solid #1E2D4A',
+              cursor: (!connected || importing) ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <option value="all">All pages ({pages.length})</option>
+            {pages.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
           <button
             onClick={importLeads}
             disabled={importing || !connected}

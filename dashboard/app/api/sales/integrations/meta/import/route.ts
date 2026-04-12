@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
@@ -34,7 +34,7 @@ async function appendLog(db: ReturnType<typeof getServiceClient>, log: Record<st
   }
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { role, id: userId } = session.user as { role: string; id: string }
@@ -42,12 +42,23 @@ export async function POST() {
 
   const db = getServiceClient()
 
+  // Optional page_id filter — empty string / 'all' means import from every connected page
+  const pageFilter = req.nextUrl.searchParams.get('page_id') ?? ''
+
   // Get stored integration + page tokens from Storage
   const integration = await readJson(db, CONFIG_FILE)
   if (!integration?.is_active) return NextResponse.json({ error: 'Meta not connected' }, { status: 400 })
 
-  const pages = (integration.config?.pages as { id: string; name: string; access_token: string }[]) ?? []
-  if (pages.length === 0) return NextResponse.json({ error: 'No connected pages found' }, { status: 400 })
+  const allPages = (integration.config?.pages as { id: string; name: string; access_token: string }[]) ?? []
+  if (allPages.length === 0) return NextResponse.json({ error: 'No connected pages found' }, { status: 400 })
+
+  const pages = pageFilter && pageFilter !== 'all'
+    ? allPages.filter(p => p.id === pageFilter)
+    : allPages
+
+  if (pages.length === 0) {
+    return NextResponse.json({ error: `Selected page not found in connected pages` }, { status: 400 })
+  }
 
   const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000) // 30 days ago in unix seconds
 
