@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { SalesShell } from '@/components/sales/SalesShell'
 import type { Meeting, Lead } from '@/lib/sales/types'
@@ -113,7 +113,7 @@ function MeetingForm({
   )
 }
 
-export default function MeetingsPage() {
+function MeetingsContent() {
   const sp     = useSearchParams()
   const leadId = sp.get('leadId') ?? undefined
 
@@ -216,5 +216,13 @@ export default function MeetingsPage() {
         </div>
       )}
     </SalesShell>
+  )
+}
+
+export default function MeetingsPage() {
+  return (
+    <Suspense fallback={<SalesShell><div style={{ color: '#64748B', padding: 40 }}>Loading…</div></SalesShell>}>
+      <MeetingsContent />
+    </Suspense>
   )
 }

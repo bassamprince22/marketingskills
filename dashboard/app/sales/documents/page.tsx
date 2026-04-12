@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { SalesShell } from '@/components/sales/SalesShell'
 import type { Document as Doc, Lead } from '@/lib/sales/types'
@@ -138,7 +138,7 @@ function UploadForm({ leadId: defaultLeadId, onSaved, onCancel }: { leadId?: str
   )
 }
 
-export default function DocumentsPage() {
+function DocumentsContent() {
   const sp     = useSearchParams()
   const leadId = sp.get('leadId') ?? undefined
 
@@ -249,5 +249,13 @@ export default function DocumentsPage() {
         </div>
       )}
     </SalesShell>
+  )
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={<SalesShell><div style={{ color: '#64748B', padding: 40 }}>Loading…</div></SalesShell>}>
+      <DocumentsContent />
+    </Suspense>
   )
 }
