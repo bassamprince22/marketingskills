@@ -84,21 +84,20 @@ export async function GET(req: NextRequest) {
     }),
   })
 
-  // Step 6: Save to DB — page tokens from long-lived user token never expire
+  // Step 6: Save to DB via RPC (bypasses PostgREST schema cache issues)
   const db = getServiceClient()
 
-  const { error: upsertErr } = await db.from('sales_integrations').upsert({
-    type:      'meta',
-    is_active: true,
-    config: {
+  const { error: upsertErr } = await db.rpc('upsert_meta_integration', {
+    p_is_active:  true,
+    p_config: {
       user_token:        userToken,
       token_expiry:      tokenExpiry,
       pages,
       page_access_token: pages[0]?.access_token ?? null,
       connected_at:      new Date().toISOString(),
     },
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'type' })
+    p_updated_at: new Date().toISOString(),
+  })
 
   if (upsertErr) {
     console.error('Meta integration upsert failed:', upsertErr)
