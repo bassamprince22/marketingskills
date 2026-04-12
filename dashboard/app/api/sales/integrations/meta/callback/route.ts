@@ -5,9 +5,9 @@ import { getServiceClient } from '@/lib/supabase'
 
 const APP_ID      = process.env.META_APP_ID ?? ''
 const APP_SECRET  = process.env.META_APP_SECRET ?? ''
-const REDIRECT_URI = process.env.NEXTAUTH_URL
-  ? `${process.env.NEXTAUTH_URL}/api/sales/integrations/meta/callback`
-  : ''
+// Hardcoded to exactly match the OAuth dialog redirect_uri — NEXTAUTH_URL trailing-slash causes mismatch
+const REDIRECT_URI = 'https://marketingskills-3t9r.vercel.app/api/sales/integrations/meta/callback'
+const WEBHOOK_URL  = 'https://marketingskills-3t9r.vercel.app/api/sales/integrations/meta/webhook'
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? 'fadaa_meta_verify'
 
 export async function GET(req: NextRequest) {
@@ -39,7 +39,6 @@ export async function GET(req: NextRequest) {
   const pages     = pagesData.data ?? []
 
   // Subscribe each page to leadgen webhook
-  const WEBHOOK_URL = `${process.env.NEXTAUTH_URL}/api/sales/integrations/meta/webhook`
   for (const page of pages) {
     // Subscribe page to webhook
     await fetch(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`, {
