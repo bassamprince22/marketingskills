@@ -34,8 +34,14 @@ export default withAuth(
         // Public paths
         if (
           pathname.startsWith('/sales/login') ||
+          pathname.startsWith('/sales/forgot-password') ||
+          pathname.startsWith('/sales/reset-password') ||
           pathname.startsWith('/login') ||
-          pathname.startsWith('/api/auth')
+          pathname.startsWith('/api/auth') ||
+          // Meta webhook is server-to-server from Facebook — must be public
+          pathname.startsWith('/api/sales/integrations/meta/webhook') ||
+          // Password reset API endpoint must be public for forgot-password flow
+          pathname === '/api/sales/password'
         ) return true
         // All other paths require auth
         return !!token
