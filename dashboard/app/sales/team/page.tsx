@@ -272,17 +272,137 @@ function EmptyExample() {
   )
 }
 
+// ─── Role Permissions Tab ─────────────────────────
+const ROLE_OPTIONS = [
+  { value: 'rep',     label: 'Sales Rep',     color: '#60A5FA' },
+  { value: 'manager', label: 'Manager',        color: '#A78BFA' },
+]
+
+const ROLE_PRESETS: Record<string, Partial<Permission>> = {
+  rep:     { can_view: true,  can_create: true,  can_edit: true,  can_delete: false, can_manage: false },
+  manager: { can_view: true,  can_create: true,  can_edit: true,  can_delete: true,  can_manage: true  },
+}
+
+function RolePermissionsTab() {
+  const [selectedRole, setSelectedRole] = useState('rep')
+  const [perms, setPerms] = useState<Permission[]>([])
+  const [loadingPerms, setLoadingPerms] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [applied, setApplied] = useState('')
+
+  useEffect(() => {
+    setLoadingPerms(true)
+    fetch(`/api/sales/role-permissions?role=${selectedRole}`)
+      .then(r => r.json())
+      .then(d => { setPerms(d.permissions ?? []); setLoadingPerms(false) })
+  }, [selectedRole])
+
+  async function handleSave(permissions: Permission[]) {
+    await fetch('/api/sales/role-permissions', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: selectedRole, permissions }),
+    })
+  }
+
+  async function applyToAll(permissions: Permission[]) {
+    setApplying(true)
+    const res = await fetch('/api/sales/role-permissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: selectedRole, permissions }),
+    })
+    const d = await res.json()
+    setApplying(false)
+    setApplied(`Applied to ${d.applied ?? 0} ${selectedRole}(s)`)
+    setTimeout(() => setApplied(''), 3000)
+  }
+
+  function applyPreset() {
+    const preset = ROLE_PRESETS[selectedRole]
+    const modules = ['dashboard','leads','pipeline','meetings','qualified','documents','import','reports','team'] as const
+    setPerms(modules.map(m => ({ module: m, can_view: false, can_create: false, can_edit: false, can_delete: false, can_manage: false, ...preset } as Permission)))
+  }
+
+  return (
+    <div>
+      <p style={{ color: '#64748B', fontSize: 13, marginBottom: 20 }}>
+        Define default permissions for each role. Save them, then apply to all existing users of that role at once.
+      </p>
+
+      {/* Role selector */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        {ROLE_OPTIONS.map(r => (
+          <button
+            key={r.value}
+            onClick={() => { setSelectedRole(r.value); setApplied('') }}
+            style={{
+              padding: '8px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', border: '1px solid',
+              borderColor: selectedRole === r.value ? r.color : '#1E2D4A',
+              background: selectedRole === r.value ? `${r.color}18` : 'transparent',
+              color: selectedRole === r.value ? r.color : '#64748B',
+              transition: 'all 0.15s',
+            }}
+          >{r.label}</button>
+        ))}
+        <button
+          onClick={applyPreset}
+          style={{ marginLeft: 'auto', padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', border: '1px solid #1E2D4A', background: 'transparent', color: '#64748B' }}
+        >
+          Load Preset
+        </button>
+      </div>
+
+      {/* Permission tree */}
+      <div className="fadaa-card" style={{ padding: 20, marginBottom: 16 }}>
+        {loadingPerms
+          ? <div style={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>Loading…</div>
+          : <PermissionTree
+              key={selectedRole}
+              initialPermissions={perms}
+              onSave={handleSave}
+            />
+        }
+      </div>
+
+      {/* Apply to all */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button
+          onClick={async () => {
+            // get current perms from tree via save then apply
+            await fetch('/api/sales/role-permissions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ role: selectedRole, permissions: perms }),
+            }).then(r => r.json()).then(d => {
+              setApplied(`Applied to ${d.applied ?? 0} ${selectedRole}(s)`)
+              setTimeout(() => setApplied(''), 3000)
+            })
+          }}
+          disabled={applying}
+          style={{ padding: '9px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: '#4F8EF7', color: '#fff', opacity: applying ? 0.6 : 1 }}
+        >
+          {applying ? 'Applying…' : `Apply to all ${selectedRole === 'rep' ? 'Reps' : 'Managers'}`}
+        </button>
+        {applied && <span style={{ color: '#4ADE80', fontSize: 13 }}>✓ {applied}</span>}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────
 export default function TeamPage() {
   const { data: session } = useSession()
   const router = useRouter()
   const role = (session?.user as { role?: string })?.role ?? 'rep'
 
+  const [tab, setTab] = useState<'teams' | 'roles'>('teams')
   const [users, setUsers] = useState<TeamUser[]>([])
   const [loading, setLoading] = useState(true)
   const [editUser, setEditUser] = useState<Partial<TeamUser> | null>(null)
   const [permUser, setPermUser] = useState<TeamUser | null>(null)
-  const [dragOver, setDragOver] = useState<string | null>(null) // leaderId being hovered
+  const [dragOver, setDragOver] = useState<string | null>(null)
 
   useEffect(() => {
     if (session && role !== 'admin' && role !== 'manager') router.replace('/sales/dashboard')
@@ -323,15 +443,32 @@ export default function TeamPage() {
       <div style={{ maxWidth: 860, margin: '0 auto' }}>
 
         {/* Header */}
-        <div style={{ marginBottom: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ color: '#E2E8F0', fontSize: 22, fontWeight: 700 }}>◈ Team</h1>
             <p style={{ color: '#64748B', fontSize: 13, marginTop: 4 }}>{users.length} members · {teamLeaders.length} teams</p>
           </div>
-          <button className="fadaa-btn" onClick={() => setEditUser({})}>+ Add Member</button>
+          {tab === 'teams' && <button className="fadaa-btn" onClick={() => setEditUser({})}>+ Add Member</button>}
         </div>
 
-        {loading ? (
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #1E2D4A', paddingBottom: 0 }}>
+          {([['teams', '◈ Teams'], ['roles', '⚙ Role Permissions']] as const).map(([t, label]) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                padding: '8px 18px', fontSize: 13, fontWeight: tab === t ? 700 : 400,
+                color: tab === t ? '#4F8EF7' : '#64748B',
+                background: 'none', border: 'none', cursor: 'pointer',
+                borderBottom: tab === t ? '2px solid #4F8EF7' : '2px solid transparent',
+                marginBottom: -1, transition: 'all 0.15s',
+              }}
+            >{label}</button>
+          ))}
+        </div>
+
+        {tab === 'roles' ? <RolePermissionsTab /> : loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {[1,2,3].map(i => <div key={i} className="fadaa-card" style={{ height: 80 }} />)}
           </div>
