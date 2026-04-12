@@ -36,8 +36,9 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
   }
   useEffect(() => { load() }, [])
 
-  const connected = data?.integration?.is_active && data.integration.config?.pages
-  const pages     = (data?.integration?.config?.pages as { id: string; name: string }[]) ?? []
+  const pages: { id: string; name: string }[] =
+    (data?.integration?.config?.pages as { id: string; name: string }[] | undefined) ?? []
+  const connected: boolean = Boolean(data?.integration?.is_active && pages.length > 0)
 
   async function disconnect() {
     if (!confirm('Disconnect Meta integration? Leads will stop importing.')) return
