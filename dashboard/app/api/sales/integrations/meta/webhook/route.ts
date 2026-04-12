@@ -2,13 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/supabase'
 
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? 'fadaa_meta_verify'
-const APP_SECRET   = process.env.META_APP_SECRET ?? ''
+const BUCKET       = 'sales-config'
+const CONFIG_FILE  = 'meta-integration.json'
+const LOGS_FILE    = 'meta-logs.json'
+
+async function readJson(db: ReturnType<typeof getServiceClient>, file: string) {
+  const { data, error } = await db.storage.from(BUCKET).download(file)
+  if (error || !data) return null
+  try {
+    const text = await data.text()
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+async function appendLog(db: ReturnType<typeof getServiceClient>, log: Record<string, unknown>) {
+  try {
+    const existing = (await readJson(db, LOGS_FILE)) ?? []
+    const updated = [
+      { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...log },
+      ...existing,
+    ].slice(0, 100)
+    const blob = new Blob([JSON.stringify(updated)], { type: 'application/json' })
+    await db.storage
+      .from(BUCKET)
+      .upload(LOGS_FILE, blob, { upsert: true, contentType: 'application/json' })
+  } catch {
+    // non-critical
+  }
+}
 
 // ── GET: Facebook webhook verification ───────────
 export async function GET(req: NextRequest) {
-  const sp       = req.nextUrl.searchParams
-  const mode     = sp.get('hub.mode')
-  const token    = sp.get('hub.verify_token')
+  const sp        = req.nextUrl.searchParams
+  const mode      = sp.get('hub.mode')
+  const token     = sp.get('hub.verify_token')
   const challenge = sp.get('hub.challenge')
 
   if (mode === 'subscribe' && token === VERIFY_TOKEN && challenge) {
@@ -27,15 +56,10 @@ export async function POST(req: NextRequest) {
   const db   = getServiceClient()
   const body = await req.json()
 
-  // Log every incoming event
-  await db.from('sales_integration_logs').insert({
-    integration_type: 'meta',
-    event_type: 'webhook_received',
-    payload: body,
-    status: 'processing',
-  })
-
   if (body.object !== 'page') return NextResponse.json({ ok: true })
+
+  // Load integration config from Storage
+  const integration = await readJson(db, CONFIG_FILE)
 
   for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
@@ -43,22 +67,16 @@ export async function POST(req: NextRequest) {
 
       const { leadgen_id, page_id } = change.value
 
-      // Get the stored page access token
-      const { data: integration } = await db
-        .from('sales_integrations')
-        .select('config')
-        .eq('type', 'meta')
-        .single()
-
-      const pageToken = integration?.config?.pages?.find(
-        (p: { id: string }) => p.id === page_id
-      )?.access_token ?? integration?.config?.page_access_token
+      const pages = integration?.config?.pages as { id: string; access_token: string }[] | undefined
+      const pageToken =
+        pages?.find((p) => p.id === page_id)?.access_token ??
+        integration?.config?.page_access_token
 
       if (!pageToken) {
-        await db.from('sales_integration_logs').insert({
+        await appendLog(db, {
           integration_type: 'meta', event_type: 'lead_fetch_failed',
-          payload: { leadgen_id, page_id }, status: 'error',
-          error_message: 'No page access token found',
+          status: 'error', error_message: 'No page access token found',
+          payload: { leadgen_id, page_id },
         })
         continue
       }
@@ -70,9 +88,9 @@ export async function POST(req: NextRequest) {
       const leadData = await leadRes.json()
 
       if (leadData.error) {
-        await db.from('sales_integration_logs').insert({
+        await appendLog(db, {
           integration_type: 'meta', event_type: 'lead_fetch_failed',
-          payload: leadData, status: 'error', error_message: leadData.error.message,
+          status: 'error', error_message: leadData.error.message, payload: leadData,
         })
         continue
       }
@@ -106,16 +124,17 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (leadErr) {
-        await db.from('sales_integration_logs').insert({
+        await appendLog(db, {
           integration_type: 'meta', event_type: 'lead_insert_failed',
-          payload: { fields }, status: 'error', error_message: leadErr.message,
+          status: 'error', error_message: leadErr.message, payload: { fields },
         })
         continue
       }
 
-      await db.from('sales_integration_logs').insert({
+      await appendLog(db, {
         integration_type: 'meta', event_type: 'lead_created',
-        payload: { lead_id: lead.id, name, email, phone }, status: 'success',
+        status: 'success', error_message: null,
+        payload: { lead_id: lead.id, name, email, phone },
       })
     }
   }

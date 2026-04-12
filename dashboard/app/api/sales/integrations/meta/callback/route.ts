@@ -8,6 +8,29 @@ const APP_SECRET   = process.env.META_APP_SECRET ?? ''
 const REDIRECT_URI = 'https://marketingskills-3t9r.vercel.app/api/sales/integrations/meta/callback'
 const WEBHOOK_URL  = 'https://marketingskills-3t9r.vercel.app/api/sales/integrations/meta/webhook'
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? 'fadaa_meta_verify'
+const BUCKET       = 'sales-config'
+const CONFIG_FILE  = 'meta-integration.json'
+
+async function saveToStorage(db: ReturnType<typeof getServiceClient>, data: object): Promise<string | null> {
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' })
+
+  // Try upload — if bucket missing, create it first
+  const { error: e1 } = await db.storage
+    .from(BUCKET)
+    .upload(CONFIG_FILE, blob, { upsert: true, contentType: 'application/json' })
+
+  if (e1) {
+    // Bucket might not exist yet — create it and retry
+    await db.storage.createBucket(BUCKET, { public: false })
+
+    const { error: e2 } = await db.storage
+      .from(BUCKET)
+      .upload(CONFIG_FILE, blob, { upsert: true, contentType: 'application/json' })
+
+    if (e2) return e2.message
+  }
+  return null
+}
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -75,10 +98,10 @@ export async function GET(req: NextRequest) {
     }),
   })
 
-  // Step 6: Save to DB
+  // Step 6: Save to Supabase Storage (bypasses PostgREST schema cache)
   const db = getServiceClient()
 
-  const { error: upsertErr } = await db.from('sales_integrations').upsert({
+  const integrationData = {
     type:      'meta',
     is_active: true,
     config: {
@@ -89,10 +112,11 @@ export async function GET(req: NextRequest) {
       connected_at:      new Date().toISOString(),
     },
     updated_at: new Date().toISOString(),
-  }, { onConflict: 'type' })
+  }
 
-  if (upsertErr) {
-    const msg = encodeURIComponent(`DB save failed: ${upsertErr.message}`)
+  const saveErr = await saveToStorage(db, integrationData)
+  if (saveErr) {
+    const msg = encodeURIComponent(`Storage save failed: ${saveErr}`)
     return NextResponse.redirect(new URL(`/sales/integrations?error=${msg}`, req.url))
   }
 
