@@ -86,9 +86,8 @@ export async function GET(req: NextRequest) {
 
   // Step 6: Save to DB — page tokens from long-lived user token never expire
   const db = getServiceClient()
-  const { id: userId } = session.user as { id: string }
 
-  await db.from('sales_integrations').upsert({
+  const { error: upsertErr } = await db.from('sales_integrations').upsert({
     type:      'meta',
     is_active: true,
     config: {
@@ -98,9 +97,14 @@ export async function GET(req: NextRequest) {
       page_access_token: pages[0]?.access_token ?? null,
       connected_at:      new Date().toISOString(),
     },
-    created_by: userId,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'type' })
+
+  if (upsertErr) {
+    console.error('Meta integration upsert failed:', upsertErr)
+    const msg = encodeURIComponent(`DB save failed: ${upsertErr.message}`)
+    return NextResponse.redirect(new URL(`/sales/integrations?error=${msg}`, req.url))
+  }
 
   return NextResponse.redirect(new URL('/sales/integrations?connected=meta', req.url))
 }
