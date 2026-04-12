@@ -85,12 +85,21 @@ export async function GET(req: NextRequest) {
   })
 
   // Step 6: Save to DB using direct SQL — bypasses PostgREST schema cache entirely
-  const connectionString = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? ''
-  if (!connectionString) {
-    return NextResponse.redirect(new URL('/sales/integrations?error=No+database+connection+string+set', req.url))
-  }
+  // Build connection from individual env vars to avoid URL-encoding issues with special chars in password
+  const sql = postgres({
+    host:     process.env.POSTGRES_HOST     ?? '',
+    port:     parseInt(process.env.POSTGRES_PORT ?? '6543'),
+    user:     process.env.POSTGRES_USER     ?? '',
+    password: process.env.POSTGRES_PASSWORD ?? '',
+    database: process.env.POSTGRES_DB       ?? 'postgres',
+    ssl:      'require',
+    max:      1,
+    prepare:  false,
+  })
 
-  const sql = postgres(connectionString, { ssl: 'require', max: 1, prepare: false })
+  if (!process.env.POSTGRES_HOST) {
+    return NextResponse.redirect(new URL('/sales/integrations?error=No+database+connection+configured', req.url))
+  }
   try {
     await sql`
       INSERT INTO sales_integrations (type, is_active, config, updated_at)
