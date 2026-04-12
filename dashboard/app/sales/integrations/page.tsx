@@ -141,45 +141,47 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
         </div>
       )}
 
-      {/* Import last 30 days — only shown when connected */}
-      {connected && (
-        <div style={{ marginBottom: 20, padding: 16, background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>📥 Import last 30 days</p>
-              <p style={{ color: '#64748B', fontSize: 12 }}>Fetch all existing leads from your connected pages into the CRM. Duplicates are skipped.</p>
-            </div>
-            <button
-              onClick={importLeads}
-              disabled={importing}
-              style={{
-                padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                background: importing ? 'rgba(79,142,247,0.2)' : '#4F8EF7',
-                color: importing ? '#64748B' : '#fff',
-                border: 'none', cursor: importing ? 'not-allowed' : 'pointer',
-                flexShrink: 0,
-              }}
-            >
-              {importing ? '⟳ Importing…' : 'Import Now'}
-            </button>
+      {/* Import last 30 days — always visible, disabled when not connected */}
+      <div style={{ marginBottom: 20, padding: 16, background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>📥 Import last 30 days</p>
+            <p style={{ color: '#64748B', fontSize: 12 }}>
+              {connected
+                ? 'Fetch all existing leads from your connected pages into the CRM. Duplicates are skipped.'
+                : 'Connect Facebook first to import your existing leads.'}
+            </p>
           </div>
-
-          {/* Import result */}
-          {importResult && (
-            <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: importResult.error ? 'rgba(239,68,68,0.08)' : 'rgba(74,222,128,0.08)', border: `1px solid ${importResult.error ? 'rgba(239,68,68,0.2)' : 'rgba(74,222,128,0.2)'}` }}>
-              {importResult.error ? (
-                <p style={{ color: '#F87171', fontSize: 13 }}>✕ {importResult.error}</p>
-              ) : (
-                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-                  <p style={{ color: '#4ADE80', fontSize: 13 }}>✓ <strong>{importResult.imported}</strong> leads imported</p>
-                  <p style={{ color: '#64748B', fontSize: 13 }}><strong>{importResult.skipped}</strong> duplicates skipped</p>
-                  <p style={{ color: '#64748B', fontSize: 13 }}><strong>{importResult.total}</strong> total found</p>
-                </div>
-              )}
-            </div>
-          )}
+          <button
+            onClick={importLeads}
+            disabled={importing || !connected}
+            style={{
+              padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              background: !connected ? 'rgba(100,116,139,0.1)' : importing ? 'rgba(79,142,247,0.2)' : '#4F8EF7',
+              color: !connected ? '#475569' : importing ? '#64748B' : '#fff',
+              border: 'none', cursor: (!connected || importing) ? 'not-allowed' : 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            {importing ? '⟳ Importing…' : 'Import Now'}
+          </button>
         </div>
-      )}
+
+        {/* Import result */}
+        {importResult && (
+          <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: importResult.error ? 'rgba(239,68,68,0.08)' : 'rgba(74,222,128,0.08)', border: `1px solid ${importResult.error ? 'rgba(239,68,68,0.2)' : 'rgba(74,222,128,0.2)'}` }}>
+            {importResult.error ? (
+              <p style={{ color: '#F87171', fontSize: 13 }}>✕ {importResult.error}</p>
+            ) : (
+              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                <p style={{ color: '#4ADE80', fontSize: 13 }}>✓ <strong>{importResult.imported}</strong> leads imported</p>
+                <p style={{ color: '#64748B', fontSize: 13 }}><strong>{importResult.skipped}</strong> duplicates skipped</p>
+                <p style={{ color: '#64748B', fontSize: 13 }}><strong>{importResult.total}</strong> total found</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
