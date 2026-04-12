@@ -27,7 +27,8 @@ export async function GET(req: NextRequest) {
   )
   const tokenData = await tokenRes.json()
   if (tokenData.error) {
-    return NextResponse.redirect(new URL('/sales/integrations?error=token_exchange', req.url))
+    const msg = encodeURIComponent(tokenData.error.message ?? tokenData.error.type ?? 'token_exchange')
+    return NextResponse.redirect(new URL(`/sales/integrations?error=${msg}`, req.url))
   }
   const userToken = tokenData.access_token
 

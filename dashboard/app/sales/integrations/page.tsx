@@ -89,7 +89,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
       )}
       {errorParam != null && (
         <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#F87171', fontSize: 13, marginBottom: 16 }}>
-          ✕ Connection failed: {errorParam === 'facebook_denied' ? 'You denied the Facebook permission request.' : 'Token exchange failed. Try again.'}
+          ✕ Connection failed: {errorParam === 'facebook_denied' ? 'You denied the Facebook permission request.' : decodeURIComponent(errorParam)}
         </div>
       )}
 
