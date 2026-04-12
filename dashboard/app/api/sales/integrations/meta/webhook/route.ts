@@ -11,10 +11,14 @@ export async function GET(req: NextRequest) {
   const token    = sp.get('hub.verify_token')
   const challenge = sp.get('hub.challenge')
 
-  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+  if (mode === 'subscribe' && token === VERIFY_TOKEN && challenge) {
     console.log('Meta webhook verified')
-    return new NextResponse(challenge, { status: 200 })
+    return new NextResponse(challenge, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain' },
+    })
   }
+  console.log('Meta webhook verification failed', { mode, token, expected: VERIFY_TOKEN })
   return NextResponse.json({ error: 'Verification failed' }, { status: 403 })
 }
 
