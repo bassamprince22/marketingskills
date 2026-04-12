@@ -20,6 +20,12 @@ interface Log {
   payload?: Record<string, unknown>
 }
 
+// Direct Facebook OAuth URL — bypasses server redirect to avoid NEXTAUTH_URL misconfiguration
+const META_APP_ID      = '1375549184609507'
+const META_CALLBACK    = 'https://marketingskills-3t9r.vercel.app/api/sales/integrations/meta/callback'
+const META_SCOPES      = 'pages_show_list,leads_retrieval,pages_manage_ads,pages_read_engagement'
+const META_OAUTH_URL   = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_CALLBACK)}&scope=${META_SCOPES}&response_type=code`
+
 interface MetaCardProps {
   onRefresh: () => void
   connectedParam: string | null
@@ -107,7 +113,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
       <div style={{ display: 'flex', gap: 10 }}>
         {!connected ? (
           <a
-            href="/api/sales/integrations/meta/connect"
+            href={META_OAUTH_URL}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
               padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
@@ -121,7 +127,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
         ) : (
           <>
             <a
-              href="/api/sales/integrations/meta/connect"
+              href={META_OAUTH_URL}
               style={{ padding: '9px 16px', borderRadius: 8, fontSize: 13, background: 'rgba(24,119,242,0.1)', color: '#60A5FA', border: '1px solid rgba(24,119,242,0.2)', textDecoration: 'none', cursor: 'pointer' }}
             >
               Reconnect
