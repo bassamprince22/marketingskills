@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
@@ -39,6 +39,28 @@ export async function GET() {
   return NextResponse.json({ integration: integration ?? null, logs: logs ?? [] })
 }
 
+// PATCH — set default auto-import page
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { role } = session.user as { role: string }
+  if (role !== 'admin' && role !== 'manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const db = getServiceClient()
+  const { default_page_id } = await req.json() as { default_page_id: string }
+
+  const current = await readJson(db, CONFIG_FILE)
+  if (!current) return NextResponse.json({ error: 'Not connected' }, { status: 400 })
+
+  await writeJson(db, CONFIG_FILE, {
+    ...current,
+    config: { ...current.config, default_page_id },
+    updated_at: new Date().toISOString(),
+  })
+
+  return NextResponse.json({ ok: true })
+}
+
 // DELETE — disconnect Meta (set is_active = false)
 export async function DELETE() {
   const session = await getServerSession(authOptions)
@@ -57,6 +79,10 @@ export async function DELETE() {
       updated_at: new Date().toISOString(),
     })
   }
+
+  // Clear logs too
+  const blob = new Blob([JSON.stringify([])], { type: 'application/json' })
+  await db.storage.from(BUCKET).upload(LOGS_FILE, blob, { upsert: true, contentType: 'application/json' })
 
   return NextResponse.json({ ok: true })
 }
