@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
 import { ActivityFeed } from '@/components/sales/ActivityFeed'
-import { ContractModal } from '@/components/sales/ContractModal'
+import { ContractEditor } from '@/components/sales/ContractEditor'
 import type { Lead, Meeting, Document as Doc, Activity, Qualification } from '@/lib/sales/types'
 import { STAGE_LABELS, PIPELINE_STAGES, SERVICE_LABELS, SOURCE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
 
@@ -304,7 +304,7 @@ export default function LeadDetailPage() {
       )}
 
       {showContract && lead && (
-        <ContractModal lead={lead} onClose={() => setShowContract(false)} />
+        <ContractEditor lead={lead} onClose={() => setShowContract(false)} onSaved={() => { setShowContract(false); /* reload docs tab */ }} />
       )}
     </SalesShell>
   )
