@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
@@ -34,7 +34,7 @@ async function appendLog(db: ReturnType<typeof getServiceClient>, log: Record<st
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { role, id: userId } = session.user as { role: string; id: string }
@@ -42,23 +42,12 @@ export async function POST(req: NextRequest) {
 
   const db = getServiceClient()
 
-  // Optional page_id filter — empty string / 'all' means import from every connected page
-  const pageFilter = req.nextUrl.searchParams.get('page_id') ?? ''
-
   // Get stored integration + page tokens from Storage
   const integration = await readJson(db, CONFIG_FILE)
   if (!integration?.is_active) return NextResponse.json({ error: 'Meta not connected' }, { status: 400 })
 
-  const allPages = (integration.config?.pages as { id: string; name: string; access_token: string }[]) ?? []
-  if (allPages.length === 0) return NextResponse.json({ error: 'No connected pages found' }, { status: 400 })
-
-  const pages = pageFilter && pageFilter !== 'all'
-    ? allPages.filter(p => p.id === pageFilter)
-    : allPages
-
-  if (pages.length === 0) {
-    return NextResponse.json({ error: `Selected page not found in connected pages` }, { status: 400 })
-  }
+  const pages = (integration.config?.pages as { id: string; name: string; access_token: string }[]) ?? []
+  if (pages.length === 0) return NextResponse.json({ error: 'No connected pages found' }, { status: 400 })
 
   const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000) // 30 days ago in unix seconds
 
@@ -89,7 +78,6 @@ export async function POST(req: NextRequest) {
       total += leads.length
 
       for (const lead of leads) {
-        // Parse field_data
         const fields: Record<string, string> = {}
         for (const f of lead.field_data ?? []) {
           fields[f.name] = f.values?.[0] ?? ''
@@ -99,10 +87,9 @@ export async function POST(req: NextRequest) {
         const email = fields.email || ''
         const phone = fields.phone_number || fields.phone || ''
 
-        // Skip if no contact info
         if (!email && !phone) { skipped++; continue }
 
-        // Duplicate check by email or phone
+        // Duplicate check
         const { data: existing } = await db
           .from('sales_leads')
           .select('id')
@@ -114,7 +101,6 @@ export async function POST(req: NextRequest) {
 
         if (existing) { skipped++; continue }
 
-        // Insert lead
         const { error: insertErr } = await db.from('sales_leads').insert({
           contact_person:  name,
           email,
@@ -135,7 +121,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Log the import
   await appendLog(db, {
     integration_type: 'meta',
     event_type:       'manual_import',

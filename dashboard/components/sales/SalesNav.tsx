@@ -20,9 +20,10 @@ const NAV: NavItem[] = [
   { href: '/sales/qualified', label: 'Qualified',  icon: '✦', roles: ['manager','rep','admin'] },
   { href: '/sales/documents', label: 'Documents',  icon: '⎗', roles: ['manager','rep','admin'] },
   { href: '/sales/import',    label: 'Import CSV', icon: '↧', roles: ['manager','admin'] },
-  { href: '/sales/reports',        label: 'Reports',       icon: '▦', roles: ['manager','admin'] },
-  { href: '/sales/integrations',   label: 'Integrations',  icon: '⚡', roles: ['admin','manager'] },
-  { href: '/sales/team',           label: 'Team',          icon: '◈', roles: ['admin','manager'] },
+  { href: '/sales/reports',       label: 'Reports',      icon: '▦', roles: ['manager','admin'] },
+  { href: '/sales/integrations',  label: 'Integrations', icon: '⚡', roles: ['manager','admin'] },
+  { href: '/sales/team',          label: 'Team',         icon: '◈', roles: ['admin','manager'] },
+  { href: '/sales/settings',      label: 'Settings',     icon: '⚙', roles: ['manager','admin'] },
 ]
 
 function NavLinks({ visible, pathname, onNav }: { visible: NavItem[]; pathname: string; onNav?: () => void }) {

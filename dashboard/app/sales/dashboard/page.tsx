@@ -8,6 +8,7 @@ import { FadaaStatCard } from '@/components/sales/FadaaStatCard'
 import { PipelineFunnelChart } from '@/components/sales/PipelineFunnelChart'
 import { RepPerformanceTable } from '@/components/sales/RepPerformanceTable'
 import { ActivityFeed } from '@/components/sales/ActivityFeed'
+import { AutoAssignCard } from '@/components/sales/AutoAssignCard'
 import type { ManagerStats, RepStats, PipelineCount, RepPerformance, Activity, Lead, Meeting } from '@/lib/sales/types'
 
 interface DashData {
@@ -241,6 +242,11 @@ function ManagerDash({ data }: { data: DashData }) {
           <p style={{ color: '#64748B', fontSize: 12, marginBottom: 16 }}>Performance across the team</p>
           <RepPerformanceTable data={data.performance} />
         </div>
+      </section>
+
+      {/* Auto-assignment settings */}
+      <section>
+        <AutoAssignCard />
       </section>
 
       {/* Activity */}

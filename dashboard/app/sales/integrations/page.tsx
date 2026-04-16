@@ -58,10 +58,10 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
   }
   useEffect(() => { load() }, [])
 
-  const connected    = Boolean(data?.integration?.is_active)
-  const pages        = (data?.integration?.config?.pages as { id: string; name: string }[] | undefined) ?? []
+  const connected     = Boolean(data?.integration?.is_active)
+  const pages         = (data?.integration?.config?.pages as { id: string; name: string }[] | undefined) ?? []
   const defaultPageId = (data?.integration?.config?.default_page_id as string | undefined) ?? null
-  const connectedAt  = data?.integration?.updated_at
+  const connectedAt   = data?.integration?.updated_at
     ? new Date(data.integration.updated_at).toLocaleDateString()
     : null
 
@@ -167,11 +167,9 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
       {/* Connected pages list with default-page selector */}
       {connected && (
         <div style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-            <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-              Connected Pages ({pages.length})
-            </p>
-          </div>
+          <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+            Connected Pages ({pages.length})
+          </p>
 
           {pages.length === 0 ? (
             <div style={{ padding: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8 }}>
@@ -179,11 +177,10 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
                 ⚠ No pages returned from Facebook
               </p>
               <p style={{ color: '#94A3B8', fontSize: 12, lineHeight: 1.6 }}>
-                During the Facebook OAuth screen, you must click <strong style={{ color: '#E2E8F0' }}>&quot;Edit access&quot;</strong> and check each page you want to connect — Facebook does not pre-select them.
+                During the Facebook OAuth screen, click <strong style={{ color: '#E2E8F0' }}>&quot;Edit access&quot;</strong> and check each page you want to connect — Facebook does not pre-select them.
               </p>
               <p style={{ color: '#94A3B8', fontSize: 12, lineHeight: 1.6, marginTop: 6 }}>
-                If &quot;Fadaa Marketing&quot; still doesn&apos;t appear, it may be managed through <strong style={{ color: '#E2E8F0' }}>Meta Business Suite</strong>. Go to:{' '}
-                <strong style={{ color: '#60A5FA' }}>Business Settings → Apps → find this app → Add Assets → select Fadaa Marketing</strong>
+                If your page is managed via <strong style={{ color: '#E2E8F0' }}>Meta Business Suite</strong>, add it manually below using its Page ID.
               </p>
               <a
                 href={META_OAUTH_URL}
@@ -206,12 +203,11 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
                   }}>
                     <span style={{ fontSize: 14 }}>📄</span>
                     <p style={{ color: '#E2E8F0', fontSize: 13, flex: 1, fontWeight: isDefault ? 600 : 400 }}>{p.name}</p>
-                    {isDefault && (
+                    {isDefault ? (
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(79,142,247,0.15)', color: '#60A5FA', fontWeight: 600 }}>
                         ● Auto-import
                       </span>
-                    )}
-                    {!isDefault && (
+                    ) : (
                       <button
                         onClick={() => setDefaultPage(p.id)}
                         disabled={!!settingDefault}
@@ -230,7 +226,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
             </div>
           )}
 
-          {connected && pages.length > 0 && !defaultPageId && (
+          {pages.length > 0 && !defaultPageId && (
             <p style={{ color: '#F59E0B', fontSize: 12, marginTop: 8 }}>
               ⚠ No auto-import page set — click &quot;Set as auto-import&quot; on your main page so new leads come in automatically.
             </p>
@@ -238,7 +234,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
         </div>
       )}
 
-      {/* Manually add a page by ID (Business Manager pages) */}
+      {/* Manually add a page by ID */}
       {connected && (
         <div style={{ marginBottom: 20, padding: 14, background: 'rgba(100,116,139,0.06)', border: '1px solid rgba(100,116,139,0.15)', borderRadius: 8 }}>
           <p style={{ color: '#94A3B8', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Add page by ID (Business Manager pages)</p>
@@ -412,7 +408,7 @@ function IntegrationsContent() {
   const sp             = useSearchParams()
   const connectedParam = sp.get('connected')
   const errorParam     = sp.get('error')
-  const [, setTick] = useState(0)
+  const [, setTick]    = useState(0)
 
   return (
     <SalesShell>

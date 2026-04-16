@@ -20,7 +20,7 @@ async function saveToStorage(db: ReturnType<typeof getServiceClient>, data: obje
     .upload(CONFIG_FILE, blob, { upsert: true, contentType: 'application/json' })
 
   if (e1) {
-    // Bucket might not exist yet — create it and retry
+    // Bucket might not exist yet — create it
     await db.storage.createBucket(BUCKET, { public: false })
 
     const { error: e2 } = await db.storage
@@ -72,17 +72,12 @@ export async function GET(req: NextRequest) {
     ? new Date(Date.now() + longTokenData.expires_in * 1000).toISOString()
     : null
 
-  // Step 3: Get ALL pages using long-lived token (follow pagination; page tokens are permanent)
-  const pages: Array<{ id: string; name: string; access_token: string }> = []
-  let nextUrl: string | null =
-    `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token&limit=100&access_token=${userToken}`
-
-  while (nextUrl) {
-    const pageRes: Response = await fetch(nextUrl)
-    const pageJson: { data?: typeof pages; paging?: { next?: string } } = await pageRes.json()
-    if (Array.isArray(pageJson.data)) pages.push(...pageJson.data)
-    nextUrl = pageJson.paging?.next ?? null
-  }
+  // Step 3: Get pages using long-lived token (page tokens are permanent)
+  const pagesRes = await fetch(
+    `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token&access_token=${userToken}`
+  )
+  const pagesData = await pagesRes.json()
+  const pages = pagesData.data ?? []
 
   // Step 4: Subscribe each page to leadgen webhook
   for (const page of pages) {
