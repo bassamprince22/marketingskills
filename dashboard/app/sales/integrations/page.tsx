@@ -38,12 +38,16 @@ interface MetaCardProps {
 }
 
 function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
-  const [data, setData]           = useState<{ integration: Integration | null; logs: Log[] } | null>(null)
-  const [loading, setLoading]     = useState(true)
-  const [disconnecting, setDisc]  = useState(false)
-  const [importing, setImporting] = useState(false)
+  const [data, setData]               = useState<{ integration: Integration | null; logs: Log[] } | null>(null)
+  const [loading, setLoading]         = useState(true)
+  const [disconnecting, setDisc]      = useState(false)
+  const [importing, setImporting]     = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [selectedPageId, setSelectedPageId] = useState<string>('all')
+  const [settingDefault, setSettingDefault] = useState<string | null>(null)
+  const [addPageId, setAddPageId]     = useState('')
+  const [addingPage, setAddingPage]   = useState(false)
+  const [addResult, setAddResult]     = useState<{ ok?: boolean; error?: string; hint?: string } | null>(null)
 
   function load() {
     setLoading(true)
@@ -54,10 +58,10 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
   }
   useEffect(() => { load() }, [])
 
-  // connected = is_active from DB — persists across page loads
-  const connected = Boolean(data?.integration?.is_active)
-  const pages     = (data?.integration?.config?.pages as { id: string; name: string }[] | undefined) ?? []
-  const connectedAt = data?.integration?.updated_at
+  const connected    = Boolean(data?.integration?.is_active)
+  const pages        = (data?.integration?.config?.pages as { id: string; name: string }[] | undefined) ?? []
+  const defaultPageId = (data?.integration?.config?.default_page_id as string | undefined) ?? null
+  const connectedAt  = data?.integration?.updated_at
     ? new Date(data.integration.updated_at).toLocaleDateString()
     : null
 
@@ -81,6 +85,39 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
       setImportResult({ imported: 0, skipped: 0, total: 0, error: 'Request failed' })
     }
     setImporting(false)
+  }
+
+  async function setDefaultPage(pageId: string) {
+    setSettingDefault(pageId)
+    await fetch('/api/sales/integrations/meta/pages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ default_page_id: pageId }),
+    })
+    load()
+    setSettingDefault(null)
+  }
+
+  async function addPageManually() {
+    if (!addPageId.trim()) return
+    setAddingPage(true)
+    setAddResult(null)
+    try {
+      const res = await fetch('/api/sales/integrations/meta/pages/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page_id: addPageId.trim() }),
+      })
+      const result = await res.json()
+      setAddResult(result)
+      if (result.ok) {
+        setAddPageId('')
+        load()
+      }
+    } catch {
+      setAddResult({ error: 'Request failed' })
+    }
+    setAddingPage(false)
   }
 
   return (
@@ -118,7 +155,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
       {/* Post-OAuth success flash */}
       {connectedParam === 'meta' && (
         <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 8, padding: '10px 14px', color: '#4ADE80', fontSize: 13, marginBottom: 16 }}>
-          ✓ Facebook connected successfully! New leads will now import automatically.
+          ✓ Facebook connected successfully! Select your auto-import page below.
         </div>
       )}
       {errorParam != null && (
@@ -127,36 +164,124 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
         </div>
       )}
 
-      {/* Connected pages list */}
-      {connected && pages.length > 0 && (
+      {/* Connected pages list with default-page selector */}
+      {connected && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
             <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
               Connected Pages ({pages.length})
             </p>
-            <p style={{ color: '#475569', fontSize: 11 }}>
-              Page missing? Click Reconnect and check it in Facebook&apos;s picker.
+          </div>
+
+          {pages.length === 0 ? (
+            <div style={{ padding: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8 }}>
+              <p style={{ color: '#FCD34D', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                ⚠ No pages returned from Facebook
+              </p>
+              <p style={{ color: '#94A3B8', fontSize: 12, lineHeight: 1.6 }}>
+                During the Facebook OAuth screen, you must click <strong style={{ color: '#E2E8F0' }}>&quot;Edit access&quot;</strong> and check each page you want to connect — Facebook does not pre-select them.
+              </p>
+              <p style={{ color: '#94A3B8', fontSize: 12, lineHeight: 1.6, marginTop: 6 }}>
+                If &quot;Fadaa Marketing&quot; still doesn&apos;t appear, it may be managed through <strong style={{ color: '#E2E8F0' }}>Meta Business Suite</strong>. Go to:{' '}
+                <strong style={{ color: '#60A5FA' }}>Business Settings → Apps → find this app → Add Assets → select Fadaa Marketing</strong>
+              </p>
+              <a
+                href={META_OAUTH_URL}
+                style={{ display: 'inline-block', marginTop: 10, padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: '#1877F2', color: '#fff', textDecoration: 'none' }}
+              >
+                Reconnect &amp; select pages
+              </a>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {pages.map((p) => {
+                const isDefault = p.id === defaultPageId
+                const isSetting = settingDefault === p.id
+                return (
+                  <div key={p.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                    background: isDefault ? 'rgba(79,142,247,0.12)' : 'rgba(24,119,242,0.06)',
+                    border: `1px solid ${isDefault ? 'rgba(79,142,247,0.4)' : 'rgba(24,119,242,0.2)'}`,
+                    borderRadius: 8,
+                  }}>
+                    <span style={{ fontSize: 14 }}>📄</span>
+                    <p style={{ color: '#E2E8F0', fontSize: 13, flex: 1, fontWeight: isDefault ? 600 : 400 }}>{p.name}</p>
+                    {isDefault && (
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(79,142,247,0.15)', color: '#60A5FA', fontWeight: 600 }}>
+                        ● Auto-import
+                      </span>
+                    )}
+                    {!isDefault && (
+                      <button
+                        onClick={() => setDefaultPage(p.id)}
+                        disabled={!!settingDefault}
+                        style={{
+                          fontSize: 11, padding: '3px 10px', borderRadius: 999,
+                          background: 'rgba(100,116,139,0.1)', color: '#94A3B8',
+                          border: '1px solid rgba(100,116,139,0.2)', cursor: 'pointer',
+                        }}
+                      >
+                        {isSetting ? '…' : 'Set as auto-import'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {connected && pages.length > 0 && !defaultPageId && (
+            <p style={{ color: '#F59E0B', fontSize: 12, marginTop: 8 }}>
+              ⚠ No auto-import page set — click &quot;Set as auto-import&quot; on your main page so new leads come in automatically.
             </p>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {pages.map((p) => (
-              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'rgba(24,119,242,0.08)', border: '1px solid rgba(24,119,242,0.2)', borderRadius: 8 }}>
-                <span style={{ fontSize: 14 }}>📄</span>
-                <p style={{ color: '#E2E8F0', fontSize: 13, flex: 1 }}>{p.name}</p>
-                <span style={{ color: '#4ADE80', fontSize: 11 }}>● Subscribed to leadgen</span>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
       )}
 
-      {/* Import last 30 days — always visible, disabled when not connected */}
+      {/* Manually add a page by ID (Business Manager pages) */}
+      {connected && (
+        <div style={{ marginBottom: 20, padding: 14, background: 'rgba(100,116,139,0.06)', border: '1px solid rgba(100,116,139,0.15)', borderRadius: 8 }}>
+          <p style={{ color: '#94A3B8', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Add page by ID (Business Manager pages)</p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              className="fadaa-input"
+              style={{ flex: '1 1 200px', minWidth: 0, fontSize: 13 }}
+              placeholder="Facebook Page ID (numbers only)"
+              value={addPageId}
+              onChange={e => setAddPageId(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addPageManually() }}
+            />
+            <button
+              onClick={addPageManually}
+              disabled={addingPage || !addPageId.trim()}
+              className="fadaa-btn"
+              style={{ flexShrink: 0, fontSize: 12, padding: '8px 16px' }}
+            >
+              {addingPage ? '…' : 'Add Page'}
+            </button>
+          </div>
+          {addResult && (
+            <div style={{ marginTop: 8 }}>
+              {addResult.ok ? (
+                <p style={{ color: '#4ADE80', fontSize: 12 }}>✓ Page added and subscribed to leadgen.</p>
+              ) : (
+                <div>
+                  <p style={{ color: '#F87171', fontSize: 12 }}>✕ {addResult.error}</p>
+                  {addResult.hint && <p style={{ color: '#94A3B8', fontSize: 11, marginTop: 4 }}>{addResult.hint}</p>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Import last 30 days */}
       <div style={{ marginBottom: 20, padding: 16, background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 10 }}>
         <div style={{ marginBottom: 12 }}>
           <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600, marginBottom: 2 }}>📥 Import last 30 days</p>
           <p style={{ color: '#64748B', fontSize: 12 }}>
             {connected
-              ? 'Fetch existing leads from a page (or all pages) into the CRM. Duplicates are skipped.'
+              ? 'Fetch existing leads from a specific page into the CRM. Duplicates are skipped.'
               : 'Connect Facebook first to import your existing leads.'}
           </p>
         </div>
@@ -167,20 +292,15 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
             onChange={(e) => setSelectedPageId(e.target.value)}
             disabled={!connected || importing}
             style={{
-              flex: '1 1 200px',
-              minWidth: 0,
-              padding: '8px 12px',
-              borderRadius: 8,
-              fontSize: 13,
-              background: '#0F1629',
-              color: '#E2E8F0',
-              border: '1px solid #1E2D4A',
+              flex: '1 1 200px', minWidth: 0,
+              padding: '8px 12px', borderRadius: 8, fontSize: 13,
+              background: '#0F1629', color: '#E2E8F0', border: '1px solid #1E2D4A',
               cursor: (!connected || importing) ? 'not-allowed' : 'pointer',
             }}
           >
             <option value="all">All pages ({pages.length})</option>
             {pages.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>{p.name}{p.id === defaultPageId ? ' (auto-import)' : ''}</option>
             ))}
           </select>
           <button
@@ -190,15 +310,13 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
               padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
               background: !connected ? 'rgba(100,116,139,0.1)' : importing ? 'rgba(79,142,247,0.2)' : '#4F8EF7',
               color: !connected ? '#475569' : importing ? '#64748B' : '#fff',
-              border: 'none', cursor: (!connected || importing) ? 'not-allowed' : 'pointer',
-              flexShrink: 0,
+              border: 'none', cursor: (!connected || importing) ? 'not-allowed' : 'pointer', flexShrink: 0,
             }}
           >
             {importing ? '⟳ Importing…' : 'Import Now'}
           </button>
         </div>
 
-        {/* Import result */}
         {importResult && (
           <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: importResult.error ? 'rgba(239,68,68,0.08)' : 'rgba(74,222,128,0.08)', border: `1px solid ${importResult.error ? 'rgba(239,68,68,0.2)' : 'rgba(74,222,128,0.2)'}` }}>
             {importResult.error ? (
@@ -294,7 +412,7 @@ function IntegrationsContent() {
   const sp             = useSearchParams()
   const connectedParam = sp.get('connected')
   const errorParam     = sp.get('error')
-  const [tick, setTick] = useState(0)
+  const [, setTick] = useState(0)
 
   return (
     <SalesShell>

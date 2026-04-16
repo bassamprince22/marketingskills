@@ -60,12 +60,16 @@ export async function POST(req: NextRequest) {
 
   // Load integration config from Storage
   const integration = await readJson(db, CONFIG_FILE)
+  const defaultPageId = (integration?.config?.default_page_id as string | undefined) ?? null
 
   for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
       if (change.field !== 'leadgen') continue
 
       const { leadgen_id, page_id } = change.value
+
+      // If a default page is configured, only process events from that page
+      if (defaultPageId && page_id !== defaultPageId) continue
 
       const pages = integration?.config?.pages as { id: string; access_token: string }[] | undefined
       const pageToken =
