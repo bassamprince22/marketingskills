@@ -47,7 +47,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
   const [settingDefault, setSettingDefault] = useState<string | null>(null)
   const [addPageId, setAddPageId]     = useState('')
   const [addingPage, setAddingPage]   = useState(false)
-  const [addResult, setAddResult]     = useState<{ ok?: boolean; error?: string; hint?: string } | null>(null)
+  const [addResult, setAddResult]     = useState<{ ok?: boolean; page?: { id: string; name: string }; error?: string; hint?: string } | null>(null)
 
   function load() {
     setLoading(true)
@@ -263,7 +263,7 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
           {addResult && (
             <div style={{ marginTop: 8 }}>
               {addResult.ok ? (
-                <p style={{ color: '#4ADE80', fontSize: 12 }}>✓ Page added and subscribed to leadgen.</p>
+                <p style={{ color: '#4ADE80', fontSize: 12 }}>✓ Added <strong>{addResult.page?.name}</strong> (ID: {addResult.page?.id}) and subscribed to leadgen.</p>
               ) : (
                 <div>
                   <p style={{ color: '#F87171', fontSize: 12 }}>✕ {addResult.error}</p>
