@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createLead, logActivity } from '@/lib/sales/db'
 import { getServiceClient } from '@/lib/supabase'
+import { getNextAssignee } from '@/lib/sales/autoAssign'
 
 interface ImportRow {
   company_name?:   string
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
           service_type:    (row.service_type as any) ?? 'marketing',
           lead_source:     (row.lead_source  as any) ?? 'meta',
           pipeline_stage:  'new_lead',
-          assigned_rep_id: assignedRepId || null,
+          assigned_rep_id: assignedRepId || (await getNextAssignee()),
           created_by:      userId,
         })
         await logActivity({

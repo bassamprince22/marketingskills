@@ -5,8 +5,66 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import type { Lead } from '@/lib/sales/types'
 import { PIPELINE_STAGES, STAGE_LABELS, SERVICE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
+
+interface Rep { id: string; name: string }
+
+function RepPicker({ lead, reps, onAssign }: { lead: Lead; reps: Rep[]; onAssign: (leadId: string, repId: string | null) => void }) {
+  const [open, setOpen] = useState(false)
+  const current = lead.assigned_rep?.name
+
+  return (
+    <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        title="Reassign lead"
+        style={{
+          background: 'rgba(79,142,247,0.08)', border: '1px solid rgba(79,142,247,0.2)',
+          borderRadius: 999, padding: '2px 8px', fontSize: 10, color: '#60A5FA',
+          cursor: 'pointer', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}
+      >
+        {current ? `↳ ${current}` : '+ Assign'}
+      </button>
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, marginTop: 4,
+            background: '#0F1629', border: '1px solid #1E2D4A', borderRadius: 10,
+            zIndex: 50, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            overflow: 'hidden',
+          }}>
+            {reps.map(r => (
+              <button
+                key={r.id}
+                onClick={() => { onAssign(lead.id, r.id); setOpen(false) }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '9px 14px', fontSize: 13, color: lead.assigned_rep_id === r.id ? '#60A5FA' : '#E2E8F0',
+                  background: lead.assigned_rep_id === r.id ? 'rgba(79,142,247,0.1)' : 'transparent',
+                  border: 'none', cursor: 'pointer',
+                }}
+              >
+                {lead.assigned_rep_id === r.id ? '✓ ' : ''}{r.name}
+              </button>
+            ))}
+            {lead.assigned_rep_id && (
+              <button
+                onClick={() => { onAssign(lead.id, null); setOpen(false) }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: 12, color: '#F87171', background: 'transparent', border: 'none', borderTop: '1px solid #1E2D4A', cursor: 'pointer' }}
+              >
+                Remove assignment
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 type Board = Record<string, Lead[]>
 
@@ -24,7 +82,11 @@ const STAGE_ACCENT: Record<string, string> = {
   lost:              '#F87171',
 }
 
-function KanbanCard({ lead, index }: { lead: Lead; index: number }) {
+function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
+  lead: Lead; index: number; reps: Rep[]
+  onAssign: (leadId: string, repId: string | null) => void
+  canAssign: boolean
+}) {
   return (
     <Draggable draggableId={lead.id} index={index}>
       {(provided, snapshot) => (
@@ -62,9 +124,13 @@ function KanbanCard({ lead, index }: { lead: Lead; index: number }) {
               </span>
             ) : null}
           </div>
-          {lead.assigned_rep?.name && (
+          {canAssign ? (
+            <div style={{ marginTop: 8 }}>
+              <RepPicker lead={lead} reps={reps} onAssign={onAssign} />
+            </div>
+          ) : lead.assigned_rep?.name ? (
             <p style={{ color: '#64748B', fontSize: 10, marginTop: 6 }}>↳ {lead.assigned_rep.name}</p>
-          )}
+          ) : null}
         </div>
       )}
     </Draggable>
@@ -72,27 +138,52 @@ function KanbanCard({ lead, index }: { lead: Lead; index: number }) {
 }
 
 export default function PipelinePage() {
+  const { data: session } = useSession()
+  const role = (session?.user as { role?: string })?.role ?? 'rep'
+  const canAssign = role === 'admin' || role === 'manager'
+
   const [board,   setBoard]   = useState<Board>({})
+  const [reps,    setReps]    = useState<Rep[]>([])
   const [loading, setLoading] = useState(true)
   const [view,    setView]    = useState<'kanban' | 'list'>('kanban')
 
   const loadLeads = useCallback(() => {
     setLoading(true)
-    fetch('/api/sales/leads?limit=500')
-      .then(r => r.json())
-      .then(d => {
-        const leads: Lead[] = d.leads ?? []
-        const b: Board = {}
-        PIPELINE_STAGES.forEach(s => { b[s] = [] })
-        leads.forEach(l => {
-          if (b[l.pipeline_stage]) b[l.pipeline_stage].push(l)
-        })
-        setBoard(b)
-        setLoading(false)
-      })
-  }, [])
+    Promise.all([
+      fetch('/api/sales/leads?limit=500').then(r => r.json()),
+      canAssign ? fetch('/api/sales/users?role=rep').then(r => r.json()) : Promise.resolve({ users: [] }),
+    ]).then(([ld, ud]) => {
+      const leads: Lead[] = ld.leads ?? []
+      const b: Board = {}
+      PIPELINE_STAGES.forEach(s => { b[s] = [] })
+      leads.forEach(l => { if (b[l.pipeline_stage]) b[l.pipeline_stage].push(l) })
+      setBoard(b)
+      setReps(ud.users ?? [])
+      setLoading(false)
+    })
+  }, [canAssign])
 
   useEffect(() => { loadLeads() }, [loadLeads])
+
+  const handleAssign = useCallback(async (leadId: string, repId: string | null) => {
+    // Optimistic update
+    setBoard(prev => {
+      const next = { ...prev }
+      for (const stage of PIPELINE_STAGES) {
+        next[stage] = (prev[stage] ?? []).map(l => {
+          if (l.id !== leadId) return l
+          const rep = repId ? (reps.find(r => r.id === repId) ?? null) : null
+          return { ...l, assigned_rep_id: repId, assigned_rep: rep as any }
+        })
+      }
+      return next
+    })
+    await fetch(`/api/sales/leads/${leadId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assigned_rep_id: repId }),
+    })
+  }, [reps])
 
   const onDragEnd = useCallback(async (result: DropResult) => {
     const { source, destination, draggableId } = result
@@ -213,7 +304,7 @@ export default function PipelinePage() {
                         }}
                       >
                         {cards.map((lead, i) => (
-                          <KanbanCard key={lead.id} lead={lead} index={i} />
+                          <KanbanCard key={lead.id} lead={lead} index={i} reps={reps} onAssign={handleAssign} canAssign={canAssign} />
                         ))}
                         {provided.placeholder}
                         {cards.length === 0 && !snapshot.isDraggingOver && (

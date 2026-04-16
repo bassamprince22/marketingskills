@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/supabase'
+import { getNextAssignee } from '@/lib/sales/autoAssign'
 
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? 'fadaa_meta_verify'
 const BUCKET       = 'sales-config'
@@ -110,12 +111,15 @@ export async function POST(req: NextRequest) {
       const phone = fields.phone_number || fields.phone || ''
       const notes = `Source: Meta Lead Ad\nAd: ${leadData.ad_name ?? '—'}\nForm ID: ${leadData.form_id ?? '—'}`
 
+      const assignedRepId = await getNextAssignee()
+
       const { data: lead, error: leadErr } = await db
         .from('sales_leads')
         .insert({
           contact_person: name, email, phone, company_name: name,
           lead_source: 'meta', pipeline_stage: 'new_lead',
           service_type: 'marketing', notes, priority: 'medium',
+          ...(assignedRepId ? { assigned_rep_id: assignedRepId } : {}),
         })
         .select('id')
         .single()
