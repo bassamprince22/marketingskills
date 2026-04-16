@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
 import { ActivityFeed } from '@/components/sales/ActivityFeed'
+import { ContractModal } from '@/components/sales/ContractModal'
 import type { Lead, Meeting, Document as Doc, Activity, Qualification } from '@/lib/sales/types'
 import { STAGE_LABELS, PIPELINE_STAGES, SERVICE_LABELS, SOURCE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
 
@@ -37,7 +38,8 @@ export default function LeadDetailPage() {
   const [tab,     setTab]     = useState<Tab>('overview')
   const [stage,   setStage]   = useState('')
   const [updatingStage, setUpdatingStage] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loading,  setLoading]  = useState(true)
+  const [showContract, setShowContract] = useState(false)
 
   const id = params.id as string
 
@@ -131,7 +133,15 @@ export default function LeadDetailPage() {
             </span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+          {(role === 'manager' || role === 'admin') && (
+            <button
+              onClick={() => setShowContract(true)}
+              style={{ background: 'rgba(79,142,247,0.1)', border: '1px solid rgba(79,142,247,0.3)', color: '#60A5FA', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              📄 Generate Contract
+            </button>
+          )}
           <Link href={`/sales/leads/${id}/edit`} className="fadaa-btn-ghost" style={{ textDecoration: 'none' }}>
             ✎ Edit
           </Link>
@@ -291,6 +301,10 @@ export default function LeadDetailPage() {
         <div className="fadaa-card" style={{ padding: 24 }}>
           <ActivityFeed activities={activities} />
         </div>
+      )}
+
+      {showContract && lead && (
+        <ContractModal lead={lead} onClose={() => setShowContract(false)} />
       )}
     </SalesShell>
   )
