@@ -27,6 +27,10 @@ export default withAuth(
       if (pathname.startsWith('/sales/integrations') && token.role === 'rep') {
         return NextResponse.redirect(new URL('/sales/dashboard', req.url))
       }
+      // Settings requires manager or admin
+      if (pathname.startsWith('/sales/settings') && token.role === 'rep') {
+        return NextResponse.redirect(new URL('/sales/dashboard', req.url))
+      }
     }
 
     return NextResponse.next()

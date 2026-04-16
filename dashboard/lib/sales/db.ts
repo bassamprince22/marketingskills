@@ -53,7 +53,8 @@ export async function getLeads(opts: {
     .select('*, assigned_rep:sales_users!assigned_rep_id(id, name, avatar_url)')
     .order('updated_at', { ascending: false })
 
-  if (opts.repId)       q = q.eq('assigned_rep_id', opts.repId)
+  if (opts.repId === 'unassigned') q = q.is('assigned_rep_id', null)
+  else if (opts.repId)            q = q.eq('assigned_rep_id', opts.repId)
   if (opts.stage)       q = q.eq('pipeline_stage', opts.stage)
   if (opts.serviceType) q = q.eq('service_type', opts.serviceType)
   if (opts.source)      q = q.eq('lead_source', opts.source)

@@ -23,6 +23,7 @@ const NAV: NavItem[] = [
   { href: '/sales/reports',       label: 'Reports',      icon: '▦', roles: ['manager','admin'] },
   { href: '/sales/integrations',  label: 'Integrations', icon: '⚡', roles: ['manager','admin'] },
   { href: '/sales/team',          label: 'Team',         icon: '◈', roles: ['admin'] },
+  { href: '/sales/settings',      label: 'Settings',     icon: '⚙', roles: ['manager','admin'] },
 ]
 
 function NavLinks({ visible, pathname, onNav }: { visible: NavItem[]; pathname: string; onNav?: () => void }) {
