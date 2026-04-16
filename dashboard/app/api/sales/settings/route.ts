@@ -8,18 +8,25 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const db  = getServiceClient()
-  const cfg = await readSettings(db)
+  try {
+    const db  = getServiceClient()
+    const cfg = await readSettings(db)
 
-  // Also return the full rep list for the settings UI
-  const { data: reps } = await db
-    .from('sales_users')
-    .select('id, name, role, avatar_url')
-    .eq('is_active', true)
-    .in('role', ['rep', 'manager'])
-    .order('name')
+    const { data: reps } = await db
+      .from('sales_users')
+      .select('id, name, role, avatar_url')
+      .eq('is_active', true)
+      .in('role', ['rep', 'manager'])
+      .order('name')
 
-  return NextResponse.json({ settings: cfg, reps: reps ?? [] })
+    return NextResponse.json({ settings: cfg, reps: reps ?? [] })
+  } catch (err) {
+    console.error('Settings GET error:', err)
+    return NextResponse.json({
+      settings: { auto_assign: { enabled: false, rep_pool: [], last_assigned_rep_id: null } },
+      reps: [],
+    })
+  }
 }
 
 export async function PATCH(req: NextRequest) {

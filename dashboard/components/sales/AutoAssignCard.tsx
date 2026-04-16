@@ -10,15 +10,33 @@ interface ApiData {
   reps:     Rep[]
 }
 
+const DEFAULT_SETTINGS: ApiData = {
+  settings: { auto_assign: { enabled: false, rep_pool: [], last_assigned_rep_id: null } },
+  reps: [],
+}
+
 export function AutoAssignCard() {
   const [data,    setData]    = useState<ApiData | null>(null)
+  const [loadErr, setLoadErr] = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
 
   function load() {
+    setLoadErr(false)
     fetch('/api/sales/settings')
       .then(r => r.json())
-      .then(setData)
+      .then(d => {
+        if (d && d.settings?.auto_assign) {
+          setData(d)
+        } else {
+          // API returned an error shape — use safe defaults so card still renders
+          setData(DEFAULT_SETTINGS)
+        }
+      })
+      .catch(() => {
+        setData(DEFAULT_SETTINGS)
+        setLoadErr(true)
+      })
   }
   useEffect(() => { load() }, [])
 
@@ -40,7 +58,9 @@ export function AutoAssignCard() {
     })
     if (res.ok) {
       const d = await res.json()
-      setData(prev => prev ? { ...prev, settings: d.settings } : prev)
+      if (d.settings?.auto_assign) {
+        setData(prev => prev ? { ...prev, settings: d.settings } : prev)
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     }
@@ -53,7 +73,14 @@ export function AutoAssignCard() {
     patch({ rep_pool: newPool })
   }
 
-  if (!data) return null
+  if (!data) {
+    return (
+      <div className="fadaa-card" style={{ padding: 24 }}>
+        <h3 style={{ color: '#E2E8F0', fontSize: 15, fontWeight: 700 }}>◈ Lead Auto-Assignment</h3>
+        <p style={{ color: '#64748B', fontSize: 12, marginTop: 8 }}>Loading settings…</p>
+      </div>
+    )
+  }
 
   const { auto_assign } = data.settings
   const enabled = auto_assign.enabled
@@ -68,6 +95,11 @@ export function AutoAssignCard() {
 
   return (
     <div className="fadaa-card" style={{ padding: 24 }}>
+      {loadErr && (
+        <div style={{ marginBottom: 16, padding: '8px 12px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, fontSize: 12, color: '#FCD34D' }}>
+          Could not reach settings API — showing defaults. Changes will be saved once the connection is restored.
+        </div>
+      )}
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
