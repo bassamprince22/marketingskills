@@ -9,6 +9,7 @@ import { PipelineFunnelChart } from '@/components/sales/PipelineFunnelChart'
 import { RepPerformanceTable } from '@/components/sales/RepPerformanceTable'
 import { ActivityFeed } from '@/components/sales/ActivityFeed'
 import { AutoAssignCard } from '@/components/sales/AutoAssignCard'
+import { NotificationPanel } from '@/components/sales/NotificationPanel'
 import type { ManagerStats, RepStats, PipelineCount, RepPerformance, Activity, Lead, Meeting } from '@/lib/sales/types'
 
 interface DashData {
@@ -203,6 +204,9 @@ function ManagerDash({ data }: { data: DashData }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* Live notification panel */}
+      <NotificationPanel />
 
       {/* Action Alert Banners */}
       <AlertBanner overdue={data.overdue} stale={data.stale} atRisk={data.atRisk} todayMeetings={data.todayMeetings} />

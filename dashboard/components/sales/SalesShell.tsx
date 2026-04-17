@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { StarsBackground } from './StarsBackground'
 import { SalesNav } from './SalesNav'
+import { NotificationToast } from './NotificationToast'
 
 const BOTTOM_NAV = [
   { href: '/sales/dashboard', icon: '⬡', label: 'Home' },
@@ -23,6 +24,8 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
       <main className="sales-main">
         {children}
       </main>
+
+      <NotificationToast />
 
       {/* Mobile bottom nav */}
       <nav className="sales-bottom-nav">
