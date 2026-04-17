@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { SalesShell } from '@/components/sales/SalesShell'
+import { AvatarUpload } from '@/components/sales/AvatarUpload'
 import Link from 'next/link'
 
 const DEPT_OPTIONS = ['Sales', 'Marketing', 'Operations', 'Management', 'Technical', 'Finance', 'Other']
@@ -91,7 +92,10 @@ export default function ProfilePage() {
             {/* Identity card */}
             <div className="fadaa-card" style={{ padding: 28 }}>
               <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                <Avatar name={user.name} size={72} url={profile?.avatar_url} />
+                <AvatarUpload
+                  currentUrl={profile?.avatar_url}
+                  onUploaded={url => setProfile(p => p ? { ...p, avatar_url: url } : { avatar_url: url })}
+                />
                 <div style={{ flex: 1, minWidth: 200 }}>
                   <p style={{ color: '#E2E8F0', fontSize: 22, fontWeight: 700 }}>{user.name}</p>
                   <p style={{ color: '#4F8EF7', fontSize: 13, marginTop: 2 }}>{profile?.job_title || '—'}</p>
