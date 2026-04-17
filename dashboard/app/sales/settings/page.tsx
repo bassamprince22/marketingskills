@@ -1,15 +1,17 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { AutoAssignCard } from '@/components/sales/AutoAssignCard'
+import { NotificationSettingsCard } from '@/components/sales/NotificationSettingsCard'
 
 function Flash({ msg, type }: { msg: string; type: 'ok' | 'err' }) {
   if (!msg) return null
   return (
     <span style={{
       fontSize: 12, fontWeight: 500,
-      color: type === 'ok' ? '#4ADE80' : '#F87171',
+      color: type === 'ok' ? 'var(--brand-green-text)' : 'var(--brand-red-text)',
       display: 'flex', alignItems: 'center', gap: 5,
     }}>
       {type === 'ok' ? '✓' : '⚠'} {msg}
@@ -89,12 +91,7 @@ function ContractTemplateCard() {
               : hasTemplate ? '↺ Replace' : '↑ Upload'}
           </button>
           {hasTemplate && (
-            <button
-              onClick={handleDelete}
-              className="fadaa-btn-danger fadaa-btn-sm"
-            >
-              Remove
-            </button>
+            <button onClick={handleDelete} className="fadaa-btn-danger fadaa-btn-sm">Remove</button>
           )}
         </div>
       </div>
@@ -137,8 +134,8 @@ function ContractTemplateCard() {
       )}
 
       {hasTemplate && placeholders.length === 0 && status === 'ready' && (
-        <p className="t-caption" style={{ color: '#F59E0B' }}>
-          No placeholders detected. Make sure your template uses <code style={{ color: '#FCD34D' }}>{'{placeholder_name}'}</code> syntax.
+        <p className="t-caption" style={{ color: 'var(--brand-amber-text)' }}>
+          No placeholders detected. Make sure your template uses <code style={{ color: 'var(--brand-amber-text)' }}>{'{placeholder_name}'}</code> syntax.
         </p>
       )}
     </div>
@@ -146,18 +143,29 @@ function ContractTemplateCard() {
 }
 
 export default function SettingsPage() {
+  const { data: session } = useSession()
+  const role = (session?.user as { role?: string })?.role ?? 'rep'
+  const isPrivileged = role === 'manager' || role === 'admin'
+
   return (
     <SalesShell>
       <div className="page-header" style={{ marginBottom: 32 }}>
         <div className="page-header-left">
           <h1 className="t-page-title">Settings</h1>
-          <p className="t-caption">Lead assignment rules and system preferences</p>
+          <p className="t-caption">
+            {isPrivileged ? 'System configuration and your personal preferences' : 'Your personal notification preferences'}
+          </p>
         </div>
       </div>
 
       <div style={{ maxWidth: 700, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <AutoAssignCard />
-        <ContractTemplateCard />
+        <NotificationSettingsCard role={role} />
+        {isPrivileged && (
+          <>
+            <AutoAssignCard />
+            <ContractTemplateCard />
+          </>
+        )}
       </div>
     </SalesShell>
   )

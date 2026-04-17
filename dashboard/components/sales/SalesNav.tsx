@@ -109,7 +109,7 @@ const NAV: NavItem[] = [
   { href: '/sales/reports',      label: 'Reports',      icon: Icons.Reports,      roles: ['manager','admin'] },
   { href: '/sales/integrations', label: 'Integrations', icon: Icons.Integrations, roles: ['manager','admin'] },
   { href: '/sales/team',         label: 'Team',         icon: Icons.Team,         roles: ['admin','manager'] },
-  { href: '/sales/settings',     label: 'Settings',     icon: Icons.Settings,     roles: ['manager','admin'] },
+  { href: '/sales/settings',     label: 'Settings',     icon: Icons.Settings,     roles: ['manager','admin','rep'] },
 ]
 
 function NavLinks({ visible, pathname, onNav }: { visible: NavItem[]; pathname: string; onNav?: () => void }) {

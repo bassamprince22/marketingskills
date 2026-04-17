@@ -41,10 +41,14 @@ export async function PATCH(req: NextRequest) {
 
   const updated = {
     ...current,
-    auto_assign: {
-      ...current.auto_assign,
-      ...body.auto_assign,
-    },
+    ...(body.auto_assign ? {
+      auto_assign: { ...current.auto_assign, ...body.auto_assign },
+    } : {}),
+    ...(body.notifications ? {
+      notifications: {
+        system: { ...current.notifications.system, ...body.notifications.system },
+      },
+    } : {}),
   }
 
   await writeSettings(db, updated)

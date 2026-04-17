@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Notification } from '@/app/api/sales/notifications/route'
+import { getNotifPrefs } from './NotificationSettingsCard'
 
 const SEVERITY: Record<string, { bg: string; border: string; icon: string; color: string }> = {
   critical: { bg: 'rgba(220,38,38,0.07)',  border: 'rgba(220,38,38,0.2)',  icon: '⚠', color: '#F87171' },
@@ -50,6 +51,7 @@ export function NotificationPanel() {
   const visible = notifications.filter(n => (dismissed[n.id] ?? -1) < n.count)
 
   if (!loaded || visible.length === 0) return null
+  if (typeof window !== 'undefined' && !getNotifPrefs().panel_enabled) return null
 
   return (
     <div style={{ marginBottom: 24, animation: 'slideUp 0.3s var(--ease-out) both' }}>

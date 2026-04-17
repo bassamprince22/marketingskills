@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Notification } from '@/app/api/sales/notifications/route'
+import { getNotifPrefs } from './NotificationSettingsCard'
 
 interface Toast extends Notification {
   toastId:   string
@@ -72,6 +73,7 @@ export function NotificationToast() {
   }, [poll])
 
   if (toasts.length === 0) return null
+  if (typeof window !== 'undefined' && !getNotifPrefs().toast_enabled) return null
 
   return (
     <div style={{
