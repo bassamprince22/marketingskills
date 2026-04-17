@@ -17,13 +17,14 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { payl
   const d = payload[0].payload
   return (
     <div style={{
-      background: '#131B2E', border: '1px solid #1E2D4A',
+      background: 'rgba(8,12,24,0.96)', border: '1px solid var(--border-default)',
       borderRadius: 8, padding: '10px 14px',
+      backdropFilter: 'blur(8px)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
     }}>
-      <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600 }}>{STAGE_LABELS[d.stage]}</p>
-      <p style={{ color: '#4F8EF7', fontSize: 12 }}>{d.count} leads</p>
+      <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{STAGE_LABELS[d.stage]}</p>
+      <p style={{ color: 'var(--brand-primary)', fontSize: 12 }}>{d.count} leads</p>
       {d.value > 0 && (
-        <p style={{ color: '#4ADE80', fontSize: 12 }}>${(d.value / 1000).toFixed(1)}k value</p>
+        <p style={{ color: '#4ADE80', fontSize: 12, marginTop: 2 }}>${(d.value / 1000).toFixed(1)}k value</p>
       )}
     </div>
   )
@@ -44,11 +45,11 @@ export function PipelineFunnelChart({ data }: Props) {
         <XAxis
           dataKey="stage"
           tick={false}
-          axisLine={{ stroke: '#1E2D4A' }}
+          axisLine={{ stroke: 'var(--border-subtle)' }}
           tickLine={false}
         />
         <YAxis
-          tick={{ fill: '#64748B', fontSize: 11 }}
+          tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
           axisLine={false}
           tickLine={false}
           allowDecimals={false}

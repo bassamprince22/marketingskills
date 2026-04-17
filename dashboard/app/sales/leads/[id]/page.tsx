@@ -124,12 +124,7 @@ export default function LeadDetailPage() {
   return (
     <SalesShell>
       {/* Back link */}
-      <Link href="/sales/leads" style={{ color: 'var(--text-muted)', fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 20, transition: 'color 0.15s' }}
-        onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
-        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-      >
-        ← All Leads
-      </Link>
+      <Link href="/sales/leads" className="back-link">← All Leads</Link>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -181,26 +176,12 @@ export default function LeadDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 20, display: 'flex', gap: 0 }}>
+      <div className="tab-underline-bar">
         {TABS.map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            style={{
-              padding: '9px 18px',
-              fontSize: 13,
-              fontWeight: tab === t.key ? 600 : 400,
-              color: tab === t.key ? 'var(--brand-primary)' : 'var(--text-muted)',
-              borderBottom: tab === t.key ? '2px solid var(--brand-primary)' : '2px solid transparent',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: tab === t.key ? '2px solid var(--brand-primary)' : '2px solid transparent',
-              cursor: 'pointer',
-              transition: 'color 0.15s',
-              marginBottom: -1,
-            }}
-            onMouseEnter={e => { if (tab !== t.key) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)' }}
-            onMouseLeave={e => { if (tab !== t.key) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}
+            className={`tab-underline${tab === t.key ? ' active' : ''}`}
           >
             {t.label}
           </button>
@@ -209,7 +190,7 @@ export default function LeadDetailPage() {
 
       {/* Overview tab */}
       {tab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div className="fadaa-card">
             <div className="card-header">
               <h3 className="t-label" style={{ color: 'var(--brand-primary)' }}>Contact</h3>

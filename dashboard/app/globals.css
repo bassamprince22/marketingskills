@@ -858,6 +858,10 @@ textarea:focus-visible {
   -webkit-backdrop-filter: blur(6px);
   z-index: 100;
   animation: fadeIn 0.2s var(--ease-smooth);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
 .fadaa-modal {
   background: var(--surface-raised);
@@ -865,7 +869,11 @@ textarea:focus-visible {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-modal);
   animation: modalIn 0.22s var(--ease-spring);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 90vh;
+  width: 100%;
+  padding: 28px 32px;
 }
 @keyframes modalIn {
   from { opacity: 0; transform: scale(0.96) translateY(8px); }
@@ -1051,4 +1059,96 @@ textarea:focus-visible {
 /* ─── Scroll table wrapper ───────────────────────────────────────────── */
 @media (max-width: 768px) {
   .fadaa-table-wrapper { border-radius: var(--radius-md); }
+}
+
+/* ─── Underline tabs (lead detail style) ────────────────────────────── */
+.tab-underline-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 20px;
+  gap: 0;
+}
+.tab-underline {
+  padding: 9px 18px;
+  font-size: var(--text-base);
+  font-weight: 400;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+.tab-underline:hover { color: var(--text-secondary); }
+.tab-underline.active {
+  color: var(--brand-primary);
+  border-bottom-color: var(--brand-primary);
+  font-weight: 600;
+}
+
+/* ─── Back link utility ──────────────────────────────────────────────── */
+.back-link {
+  color: var(--text-muted);
+  font-size: var(--text-base);
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding: 0;
+  transition: color 0.15s;
+  text-decoration: none;
+}
+.back-link:hover { color: var(--text-secondary); }
+
+/* ─── Responsive 2-col chart grids ──────────────────────────────────── */
+@media (max-width: 900px) {
+  .grid-2col { grid-template-columns: 1fr !important; }
+}
+
+/* ─── Input focus glow ───────────────────────────────────────────────── */
+.fadaa-input:focus {
+  border-color: var(--brand-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.12);
+}
+
+/* ─── Custom scrollbar ───────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--border-subtle); filter: brightness(1.3); }
+
+/* ─── Kanban column ──────────────────────────────────────────────────── */
+.kanban-col {
+  width: 220px;
+  min-width: 220px;
+}
+@media (max-width: 640px) {
+  .kanban-col { width: 180px; min-width: 180px; }
+}
+
+/* ─── Activity dot ───────────────────────────────────────────────────── */
+.activity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Outcome / next-action inline text ──────────────────────────────── */
+.outcome-text  { color: #4ADE80; font-size: var(--text-base); }
+.next-act-text { color: #F59E0B; font-size: var(--text-base); }
+
+/* ─── Responsive modal on small screens ─────────────────────────────── */
+@media (max-width: 600px) {
+  .fadaa-modal { padding: 20px 16px; }
+  .fadaa-overlay { padding: 12px; }
 }

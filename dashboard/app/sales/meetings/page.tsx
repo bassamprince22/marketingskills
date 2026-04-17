@@ -194,9 +194,9 @@ function MeetingsContent() {
                     {new Date(m.meeting_date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     {m.rep?.name ? ` · ${m.rep.name}` : ''}
                   </p>
-                  {m.notes      && <p className="t-body" style={{ marginTop: 8 }}>📝 {m.notes}</p>}
-                  {m.outcome    && <p style={{ color: '#4ADE80', fontSize: 13, marginTop: 6 }}>✓ {m.outcome}</p>}
-                  {m.next_action && <p style={{ color: '#F59E0B', fontSize: 13, marginTop: 4 }}>→ {m.next_action}</p>}
+                  {m.notes       && <p className="t-body" style={{ marginTop: 8 }}>{m.notes}</p>}
+                  {m.outcome     && <p className="outcome-text"  style={{ marginTop: 6 }}>✓ {m.outcome}</p>}
+                  {m.next_action && <p className="next-act-text" style={{ marginTop: 4 }}>→ {m.next_action}</p>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
                   <StatusBadge status={m.status} />
