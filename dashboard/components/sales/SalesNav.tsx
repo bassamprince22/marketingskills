@@ -175,10 +175,10 @@ export function SalesNav() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
           width: 32, height: 32, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #4F8EF7, #7C3AED)',
+          background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#fff', fontSize: 13, fontWeight: 700, flexShrink: 0,
-          boxShadow: '0 2px 8px rgba(79,142,247,0.3)',
+          boxShadow: '0 2px 8px var(--brand-primary-dim)',
         }}>
           {name.charAt(0).toUpperCase()}
         </div>
@@ -201,7 +201,7 @@ export function SalesNav() {
           display: 'flex', alignItems: 'center', gap: 9,
           transition: 'color 0.15s, background 0.15s',
         }}
-        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#F87171'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.06)' }}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--brand-red-text)'; (e.currentTarget as HTMLButtonElement).style.background = 'var(--brand-red-dim)' }}
         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
       >
         {Icons.SignOut}
