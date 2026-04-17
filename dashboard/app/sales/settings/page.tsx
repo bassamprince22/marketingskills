@@ -4,13 +4,26 @@ import { useEffect, useRef, useState } from 'react'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { AutoAssignCard } from '@/components/sales/AutoAssignCard'
 
+function Flash({ msg, type }: { msg: string; type: 'ok' | 'err' }) {
+  if (!msg) return null
+  return (
+    <span style={{
+      fontSize: 12, fontWeight: 500,
+      color: type === 'ok' ? '#4ADE80' : '#F87171',
+      display: 'flex', alignItems: 'center', gap: 5,
+    }}>
+      {type === 'ok' ? '✓' : '⚠'} {msg}
+    </span>
+  )
+}
+
 function ContractTemplateCard() {
-  const [status, setStatus]     = useState<'loading' | 'ready'>('loading')
-  const [hasTemplate, setHas]   = useState(false)
-  const [placeholders, setPh]   = useState<string[]>([])
+  const [status,    setStatus]    = useState<'loading' | 'ready'>('loading')
+  const [hasTemplate, setHas]     = useState(false)
+  const [placeholders, setPh]     = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
-  const [msg, setMsg]           = useState('')
-  const [msgType, setMsgType]   = useState<'ok' | 'err'>('ok')
+  const [msg,       setMsg]       = useState('')
+  const [msgType,   setMsgType]   = useState<'ok' | 'err'>('ok')
   const fileRef = useRef<HTMLInputElement>(null)
 
   function load() {
@@ -20,6 +33,11 @@ function ContractTemplateCard() {
       .catch(() => setStatus('ready'))
   }
   useEffect(() => { load() }, [])
+
+  function flash(text: string, type: 'ok' | 'err') {
+    setMsg(text); setMsgType(type)
+    setTimeout(() => setMsg(''), 3500)
+  }
 
   async function handleUpload(file: File) {
     if (!file.name.endsWith('.docx')) { flash('Only .docx files supported', 'err'); return }
@@ -42,44 +60,38 @@ function ContractTemplateCard() {
     flash('Template removed', 'ok')
   }
 
-  function flash(text: string, type: 'ok' | 'err') {
-    setMsg(text); setMsgType(type)
-    setTimeout(() => setMsg(''), 3500)
-  }
-
   return (
-    <div className="fadaa-card" style={{ padding: 24 }}>
+    <div className="fadaa-card" style={{ padding: '20px 24px' }}>
       <input
         ref={fileRef} type="file" accept=".docx" style={{ display: 'none' }}
         onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }}
       />
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div className="card-header" style={{ marginBottom: 20 }}>
         <div>
-          <h3 style={{ color: '#E2E8F0', fontSize: 15, fontWeight: 700 }}>📄 Contract Template</h3>
-          <p style={{ color: '#64748B', fontSize: 12, marginTop: 3 }}>
+          <h3 className="t-section-title">Contract Template</h3>
+          <p className="t-caption" style={{ marginTop: 3 }}>
             {hasTemplate
               ? 'Template is active — contracts generate from this file.'
-              : 'No template uploaded — upload a .docx to enable contract generation.'}
+              : 'Upload a .docx to enable contract generation.'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {msg && (
-            <span style={{ fontSize: 12, color: msgType === 'ok' ? '#4ADE80' : '#F87171' }}>{msg}</span>
-          )}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <Flash msg={msg} type={msgType} />
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            className="fadaa-btn"
-            style={{ fontSize: 12 }}
+            className="fadaa-btn fadaa-btn-sm"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            {uploading ? '…' : hasTemplate ? '↺ Replace Template' : '↑ Upload Template'}
+            {uploading
+              ? <><span className="spinner spinner-sm" style={{ borderTopColor: '#fff' }} /> Uploading…</>
+              : hasTemplate ? '↺ Replace' : '↑ Upload'}
           </button>
           {hasTemplate && (
             <button
               onClick={handleDelete}
-              style={{ fontSize: 12, color: '#F87171', background: 'none', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}
+              className="fadaa-btn-danger fadaa-btn-sm"
             >
               Remove
             </button>
@@ -87,25 +99,28 @@ function ContractTemplateCard() {
         </div>
       </div>
 
-      {/* How to use */}
       {!hasTemplate && status === 'ready' && (
-        <div style={{ padding: '14px 16px', background: 'rgba(79,142,247,0.05)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8, marginBottom: 16 }}>
-          <p style={{ color: '#94A3B8', fontSize: 12, lineHeight: 1.7 }}>
-            <strong style={{ color: '#E2E8F0' }}>How it works:</strong><br />
+        <div style={{
+          padding: '14px 18px', borderRadius: 10,
+          background: 'rgba(79,142,247,0.05)', border: '1px solid rgba(79,142,247,0.15)',
+          marginBottom: 4,
+        }}>
+          <p className="t-body" style={{ lineHeight: 1.8 }}>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>How it works</span><br />
             1. Create your contract in Word (.docx)<br />
-            2. Add placeholders like <code style={{ color: '#60A5FA', background: 'rgba(96,165,250,0.1)', padding: '1px 5px', borderRadius: 4 }}>{'{company_name}'}</code>, <code style={{ color: '#60A5FA', background: 'rgba(96,165,250,0.1)', padding: '1px 5px', borderRadius: 4 }}>{'{contact_person}'}</code>, <code style={{ color: '#60A5FA', background: 'rgba(96,165,250,0.1)', padding: '1px 5px', borderRadius: 4 }}>{'{value}'}</code>, <code style={{ color: '#60A5FA', background: 'rgba(96,165,250,0.1)', padding: '1px 5px', borderRadius: 4 }}>{'{date}'}</code><br />
-            3. Upload here — lead data fills in automatically on generation
+            2. Add placeholders like{' '}
+            {['{company_name}', '{contact_person}', '{value}', '{date}'].map(p => (
+              <code key={p} style={{ color: '#60A5FA', background: 'rgba(96,165,250,0.1)', padding: '1px 5px', borderRadius: 4, margin: '0 3px', fontSize: 11 }}>{p}</code>
+            ))}<br />
+            3. Upload here — lead data fills in automatically when generating
           </p>
         </div>
       )}
 
-      {/* Detected placeholders */}
       {hasTemplate && placeholders.length > 0 && (
         <div>
-          <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-            Detected Placeholders ({placeholders.length})
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 8px' }}>
+          <p className="t-label" style={{ marginBottom: 10 }}>Detected Placeholders ({placeholders.length})</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 8px', marginBottom: 12 }}>
             {placeholders.map(p => (
               <code
                 key={p}
@@ -115,14 +130,14 @@ function ContractTemplateCard() {
               </code>
             ))}
           </div>
-          <p style={{ color: '#475569', fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
-            These are automatically filled from lead data when you click "Generate Contract" on any lead. You can edit any value before downloading.
+          <p className="t-caption">
+            These are automatically filled from lead data when you click "Generate Contract" on any lead.
           </p>
         </div>
       )}
 
       {hasTemplate && placeholders.length === 0 && status === 'ready' && (
-        <p style={{ color: '#F59E0B', fontSize: 12 }}>
+        <p className="t-caption" style={{ color: '#F59E0B' }}>
           No placeholders detected. Make sure your template uses <code style={{ color: '#FCD34D' }}>{'{placeholder_name}'}</code> syntax.
         </p>
       )}
@@ -133,14 +148,14 @@ function ContractTemplateCard() {
 export default function SettingsPage() {
   return (
     <SalesShell>
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ color: '#E2E8F0', fontSize: 22, fontWeight: 700 }}>⚙ Settings</h1>
-        <p style={{ color: '#64748B', fontSize: 13, marginTop: 4 }}>
-          Lead assignment rules and system preferences
-        </p>
+      <div className="page-header" style={{ marginBottom: 32 }}>
+        <div className="page-header-left">
+          <h1 className="t-page-title">Settings</h1>
+          <p className="t-caption">Lead assignment rules and system preferences</p>
+        </div>
       </div>
 
-      <div style={{ maxWidth: 700, display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ maxWidth: 700, display: 'flex', flexDirection: 'column', gap: 20 }}>
         <AutoAssignCard />
         <ContractTemplateCard />
       </div>
