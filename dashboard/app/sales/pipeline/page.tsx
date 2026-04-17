@@ -96,6 +96,9 @@ function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
   onAssign: (leadId: string, repId: string | null) => void
   canAssign: boolean
 }) {
+  const today      = new Date().toISOString().slice(0, 10)
+  const isNewToday = lead.created_at.slice(0, 10) === today && lead.pipeline_stage === 'new_lead'
+
   return (
     <Draggable draggableId={lead.id} index={index}>
       {(provided, snapshot) => (
@@ -106,7 +109,7 @@ function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
           style={{
             ...provided.draggableProps.style,
             background: snapshot.isDragging ? '#1E2D4A' : '#131B2E',
-            border: `1px solid ${snapshot.isDragging ? '#4F8EF7' : '#1E2D4A'}`,
+            border: `1px solid ${snapshot.isDragging ? '#4F8EF7' : isNewToday ? '#4F8EF740' : '#1E2D4A'}`,
             borderRadius: 10,
             padding: '12px 14px',
             marginBottom: 8,
@@ -118,10 +121,19 @@ function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
           }}
         >
           <Link href={`/sales/leads/${lead.id}`} style={{ textDecoration: 'none' }} onClick={e => e.stopPropagation()}>
-            <p style={{ color: '#E2E8F0', fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>
-              {lead.company_name}
-            </p>
-            <p style={{ color: '#64748B', fontSize: 11, marginTop: 3 }}>{lead.contact_person}</p>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ color: '#E2E8F0', fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>
+                  {lead.company_name}
+                </p>
+                <p style={{ color: '#64748B', fontSize: 11, marginTop: 3 }}>{lead.contact_person}</p>
+              </div>
+              {isNewToday && (
+                <span style={{ flexShrink: 0, background: 'rgba(79,142,247,0.18)', color: '#60A5FA', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 999, letterSpacing: '0.08em', marginTop: 1 }}>
+                  ✦ NEW
+                </span>
+              )}
+            </div>
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
             <span className={`service-${lead.service_type}`} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999 }}>

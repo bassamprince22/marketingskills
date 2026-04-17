@@ -113,8 +113,9 @@ export function LeadCard({ lead, canAssign, reps, onAssign }: Props) {
   const today      = new Date().toISOString().slice(0, 10)
   const isOverdue  = lead.next_follow_up_date && lead.next_follow_up_date < today && !['won','lost'].includes(lead.pipeline_stage)
   const overdueDays = isOverdue ? daysSince(lead.next_follow_up_date!) : 0
+  const isNewToday  = lead.created_at.slice(0, 10) === today && lead.pipeline_stage === 'new_lead'
 
-  const borderColor = isOverdue ? '#EF4444' : isStale ? '#475569' : `${pColor}40`
+  const borderColor = isOverdue ? '#EF4444' : isNewToday ? '#4F8EF7' : isStale ? '#475569' : `${pColor}40`
 
   return (
     <div
@@ -126,19 +127,24 @@ export function LeadCard({ lead, canAssign, reps, onAssign }: Props) {
       }}
     >
       <Link href={`/sales/leads/${lead.id}`} style={{ textDecoration: 'none', padding: '14px 16px', flex: 1 }}>
-        {/* Urgency ribbon */}
-        {isOverdue && (
+        {/* Urgency / status ribbon */}
+        {isNewToday && (
+          <div style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(79,142,247,0.18)', color: '#60A5FA', fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: '0 8px 0 6px', letterSpacing: '0.08em' }}>
+            ✦ NEW
+          </div>
+        )}
+        {!isNewToday && isOverdue && (
           <div style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(239,68,68,0.15)', color: '#F87171', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: '0 8px 0 6px', letterSpacing: '0.05em' }}>
             {overdueDays}D OVERDUE
           </div>
         )}
-        {!isOverdue && isStale && (
+        {!isNewToday && !isOverdue && isStale && (
           <div style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(100,116,139,0.15)', color: '#94A3B8', fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: '0 8px 0 6px' }}>
             {idleDays}D IDLE
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10, paddingRight: isOverdue || isStale ? 64 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10, paddingRight: isNewToday || isOverdue || isStale ? 56 : 0 }}>
           <div style={{ minWidth: 0 }}>
             <p style={{ color: '#E2E8F0', fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {lead.company_name}
