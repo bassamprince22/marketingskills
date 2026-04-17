@@ -14,12 +14,12 @@ interface Props {
 }
 
 const COLOR_MAP = {
-  blue:   { accent: '#4F8EF7', glow: 'rgba(79,142,247,0.12)',  text: '#7CB9FC', bg: 'rgba(79,142,247,0.06)',  border: 'rgba(79,142,247,0.18)' },
-  purple: { accent: '#7C3AED', glow: 'rgba(124,58,237,0.12)',  text: '#A78BFA', bg: 'rgba(124,58,237,0.06)', border: 'rgba(124,58,237,0.18)' },
-  cyan:   { accent: '#06B6D4', glow: 'rgba(6,182,212,0.12)',   text: '#22D3EE', bg: 'rgba(6,182,212,0.06)',  border: 'rgba(6,182,212,0.18)' },
-  amber:  { accent: '#D97706', glow: 'rgba(217,119,6,0.12)',   text: '#F59E0B', bg: 'rgba(217,119,6,0.06)',  border: 'rgba(217,119,6,0.18)' },
-  red:    { accent: '#DC2626', glow: 'rgba(220,38,38,0.12)',   text: '#F87171', bg: 'rgba(220,38,38,0.06)',  border: 'rgba(220,38,38,0.18)' },
-  green:  { accent: '#16A34A', glow: 'rgba(22,163,74,0.12)',   text: '#4ADE80', bg: 'rgba(22,163,74,0.06)',  border: 'rgba(22,163,74,0.18)' },
+  blue:   { text: 'var(--brand-blue-text)',   bg: 'var(--brand-primary-dim)',    border: 'var(--brand-primary-glow)' },
+  purple: { text: 'var(--brand-purple-text)', bg: 'var(--brand-secondary-dim)',  border: 'var(--brand-secondary-glow)' },
+  cyan:   { text: 'var(--brand-cyan-text)',   bg: 'var(--brand-cyan-dim)',        border: 'var(--brand-cyan-glow)' },
+  amber:  { text: 'var(--brand-amber-text)',  bg: 'var(--brand-amber-dim)',       border: 'var(--brand-amber-glow)' },
+  red:    { text: 'var(--brand-red-text)',    bg: 'var(--brand-red-dim)',         border: 'var(--brand-red-glow)' },
+  green:  { text: 'var(--brand-green-text)',  bg: 'var(--brand-green-dim)',       border: 'var(--brand-green-glow)' },
 }
 
 export function FadaaStatCard({ label, value, icon, color = 'blue', suffix = '', prefix = '', delay = 0, isCurrency = false }: Props) {

@@ -1,4 +1,5 @@
 'use client'
+
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
@@ -11,7 +12,6 @@ function StarField() {
     x: Math.random() * 100,
     y: Math.random() * 100,
     size: Math.random() * 2 + 0.5,
-    opacity: Math.random() * 0.6 + 0.2,
     duration: Math.random() * 3 + 2,
   }))
   return (
@@ -21,9 +21,8 @@ function StarField() {
           position: 'absolute',
           left: `${s.x}%`, top: `${s.y}%`,
           width: s.size, height: s.size,
-          borderRadius: '50%',
-          background: '#fff',
-          opacity: s.opacity,
+          borderRadius: '50%', background: '#fff',
+          opacity: 0.15,
           animation: `twinkle ${s.duration}s ease-in-out infinite`,
         }} />
       ))}
@@ -33,13 +32,13 @@ function StarField() {
 
 export default function SalesLoginPage() {
   const router = useRouter()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [username,    setUsername]    = useState('')
+  const [password,    setPassword]    = useState('')
+  const [showPass,    setShowPass]    = useState(false)
+  const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState('')
 
-  // Remotion spring entrance
-  const frame = useAnimationFrame(100)
+  const frame      = useAnimationFrame(100)
   const logoSpring = useRemotionSpring({ frame, config: { stiffness: 80, damping: 14 }, from: 0, to: 1 })
   const cardSpring = useRemotionSpring({ frame: Math.max(0, frame - 8), config: { stiffness: 100, damping: 16 }, from: 0, to: 1 })
 
@@ -60,47 +59,53 @@ export default function SalesLoginPage() {
       minHeight: '100vh',
       background: 'radial-gradient(ellipse at 30% 20%, #0F1E4A 0%, #0A0E1A 60%, #050810 100%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 20,
-      position: 'relative',
+      padding: 20, position: 'relative',
+      fontFamily: 'var(--font-inter, Inter, system-ui, sans-serif)',
+      WebkitFontSmoothing: 'antialiased',
     }}>
       <StarField />
 
       {/* Nebula glows */}
-      <div style={{ position: 'fixed', top: '10%', left: '5%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,142,247,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
-      <div style={{ position: 'fixed', bottom: '15%', right: '5%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'fixed', top: '10%',    left: '5%',  width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, var(--brand-primary-dim) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'fixed', bottom: '15%', right: '5%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, var(--brand-secondary-dim) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
       <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 10 }}>
-        {/* Logo section */}
+
+        {/* Logo */}
         <div style={{
-          textAlign: 'center', marginBottom: 40,
+          textAlign: 'center', marginBottom: 36,
           opacity: logoSpring,
-          transform: `translateY(${(1 - logoSpring) * -20}px) scale(${0.85 + logoSpring * 0.15})`,
+          transform: `translateY(${(1 - logoSpring) * -18}px) scale(${0.88 + logoSpring * 0.12})`,
         }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
             <FadaaLogo size={52} showWordmark={true} showArabic={true} />
           </div>
-          <p style={{ color: '#4F8EF7', fontSize: 12, letterSpacing: '0.25em', textTransform: 'uppercase', fontWeight: 600 }}>
+          <p style={{ color: 'var(--brand-primary)', fontSize: 11, letterSpacing: '0.28em', textTransform: 'uppercase', fontWeight: 600 }}>
             Sales Operating System
           </p>
         </div>
 
         {/* Card */}
         <div style={{
-          background: 'rgba(15,22,41,0.85)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(79,142,247,0.15)',
+          background: 'rgba(13, 20, 40, 0.88)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          border: '1px solid rgba(79,142,247,0.14)',
           borderRadius: 20,
           padding: 36,
-          boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 60px rgba(79,142,247,0.06)',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.65), 0 1px 0 rgba(255,255,255,0.05) inset, 0 0 60px rgba(79,142,247,0.05)',
           opacity: cardSpring,
           transform: `translateY(${(1 - cardSpring) * 24}px)`,
         }}>
-          <h2 style={{ color: '#E2E8F0', fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Welcome back</h2>
-          <p style={{ color: '#64748B', fontSize: 13, marginBottom: 28 }}>Sign in to your mission control</p>
+          {/* Top-edge shine */}
+          <div style={{ position: 'absolute', top: 0, left: 40, right: 40, height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)', borderRadius: '0 0 4px 4px', pointerEvents: 'none' }} />
+
+          <h2 className="t-page-title" style={{ fontSize: 20, marginBottom: 4 }}>Welcome back</h2>
+          <p className="t-caption" style={{ marginBottom: 28 }}>Sign in to your mission control</p>
 
           {error && (
             <div style={{
-              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+              background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.22)',
               borderRadius: 10, padding: '10px 14px', color: '#F87171',
               fontSize: 13, marginBottom: 20,
               display: 'flex', alignItems: 'center', gap: 8,
@@ -110,67 +115,87 @@ export default function SalesLoginPage() {
           )}
 
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={{ color: '#64748B', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
-                Username
-              </label>
+            <div className="form-field">
+              <label className="form-label" htmlFor="username">Username</label>
               <input
+                id="username"
                 className="fadaa-input"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 placeholder="your.username"
                 autoComplete="username"
                 required
-                style={{ width: '100%' }}
               />
             </div>
-            <div>
-              <label style={{ color: '#64748B', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
-                Password
-              </label>
-              <input
-                className="fadaa-input"
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                required
-                style={{ width: '100%' }}
-              />
+
+            <div className="form-field">
+              <label className="form-label" htmlFor="password">Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="password"
+                  className="fadaa-input"
+                  type={showPass ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  required
+                  style={{ paddingRight: 44 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(v => !v)}
+                  style={{
+                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--text-muted)', fontSize: 13, padding: '2px 4px',
+                    transition: 'color 0.15s', lineHeight: 1,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                  tabIndex={-1}
+                  aria-label={showPass ? 'Hide password' : 'Show password'}
+                >
+                  {showPass ? '🙈' : '👁'}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
+              className="fadaa-btn"
               style={{
-                marginTop: 8,
-                width: '100%',
-                padding: '14px',
-                background: loading ? 'rgba(79,142,247,0.3)' : 'linear-gradient(135deg, #4F8EF7, #7C3AED)',
-                border: 'none',
+                marginTop: 8, width: '100%',
+                padding: '13px',
+                fontSize: 14, fontWeight: 700,
+                letterSpacing: '0.03em',
                 borderRadius: 12,
-                color: '#fff',
-                fontSize: 15,
-                fontWeight: 700,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                letterSpacing: '0.04em',
-                boxShadow: loading ? 'none' : '0 4px 24px rgba(79,142,247,0.35)',
-                transition: 'all 0.2s',
+                justifyContent: 'center',
+                display: 'flex', alignItems: 'center', gap: 8,
               }}
             >
-              {loading ? 'Signing in…' : '→ Enter Mission Control'}
+              {loading ? (
+                <><span className="spinner" style={{ borderTopColor: '#fff' }} /> Signing in…</>
+              ) : (
+                '→ Enter Mission Control'
+              )}
             </button>
           </form>
 
-          <div style={{ textAlign: 'center', marginTop: 16 }}>
-            <a href="/sales/forgot-password" style={{ color: '#4F8EF7', fontSize: 13, textDecoration: 'none', opacity: 0.8 }}>
+          <div style={{ textAlign: 'center', marginTop: 18 }}>
+            <a
+              href="/sales/forgot-password"
+              style={{ color: 'var(--brand-primary)', fontSize: 13, textDecoration: 'none', opacity: 0.75, transition: 'opacity 0.15s' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '0.75')}
+            >
               Forgot your password?
             </a>
           </div>
         </div>
 
-        <p style={{ textAlign: 'center', color: '#1E2D4A', fontSize: 11, marginTop: 24 }}>
+        <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: 10, marginTop: 24, letterSpacing: '0.18em' }}>
           FADAA SALES · INTERNAL SYSTEM
         </p>
       </div>
