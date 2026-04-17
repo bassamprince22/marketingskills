@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Notification } from '@/app/api/sales/notifications/route'
 
-const SEVERITY_STYLE: Record<string, { bg: string; border: string; icon: string; color: string }> = {
-  critical: { bg: 'rgba(239,68,68,0.07)',   border: 'rgba(239,68,68,0.25)',   icon: '⚠', color: '#F87171' },
-  warning:  { bg: 'rgba(245,158,11,0.07)',  border: 'rgba(245,158,11,0.25)',  icon: '◈', color: '#FCD34D' },
-  info:     { bg: 'rgba(79,142,247,0.07)',  border: 'rgba(79,142,247,0.25)',  icon: '✦', color: '#60A5FA' },
+const SEVERITY: Record<string, { bg: string; border: string; icon: string; color: string }> = {
+  critical: { bg: 'rgba(220,38,38,0.07)',  border: 'rgba(220,38,38,0.2)',  icon: '⚠', color: '#F87171' },
+  warning:  { bg: 'rgba(217,119,6,0.07)',  border: 'rgba(217,119,6,0.2)',  icon: '◈', color: '#F59E0B' },
+  info:     { bg: 'rgba(79,142,247,0.07)', border: 'rgba(79,142,247,0.2)', icon: '✦', color: '#7CB9FC' },
 }
 
 const DISMISS_KEY = 'fadaa_notif_dismissed'
@@ -30,10 +30,7 @@ export function NotificationPanel() {
     setDismissed(d)
     fetch('/api/sales/notifications')
       .then(r => r.json())
-      .then(data => {
-        setNotifications(data.notifications ?? [])
-        setLoaded(true)
-      })
+      .then(data => { setNotifications(data.notifications ?? []); setLoaded(true) })
       .catch(() => setLoaded(true))
   }, [])
 
@@ -50,60 +47,57 @@ export function NotificationPanel() {
     saveDismissed(next)
   }
 
-  // Only show notifications where count changed since last dismiss
   const visible = notifications.filter(n => (dismissed[n.id] ?? -1) < n.count)
 
   if (!loaded || visible.length === 0) return null
 
   return (
-    <div style={{ marginBottom: 28 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+    <div style={{ marginBottom: 24, animation: 'slideUp 0.3s var(--ease-out) both' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: '#F87171', fontSize: 14 }}>⚠</span>
-          <h2 style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 700 }}>
-            Needs Your Attention
-          </h2>
-          <span style={{
-            background: 'rgba(239,68,68,0.15)', color: '#F87171',
-            fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
-          }}>
-            {visible.length}
-          </span>
+          <span style={{ color: '#F87171', fontSize: 13 }}>⚠</span>
+          <h2 className="t-section-title">Needs Your Attention</h2>
+          <span className="badge badge-red">{visible.length}</span>
         </div>
         <button
           onClick={dismissAll}
-          style={{ fontSize: 11, color: '#475569', background: 'none', border: 'none', cursor: 'pointer' }}
+          className="t-caption"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
         >
           Dismiss all
         </button>
       </div>
 
-      {/* Notification rows */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {visible.map(n => {
-          const s = SEVERITY_STYLE[n.severity]
+          const s = SEVERITY[n.severity]
           return (
             <div
               key={n.id}
               style={{
                 display: 'flex', alignItems: 'center', gap: 14,
-                padding: '12px 16px', borderRadius: 10,
+                padding: '11px 16px', borderRadius: 10,
                 background: s.bg, border: `1px solid ${s.border}`,
-                cursor: 'pointer', transition: 'opacity 0.15s',
+                cursor: 'pointer', transition: 'opacity 0.15s, transform 0.15s',
               }}
               onClick={() => router.push(n.filterUrl)}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.opacity = '0.85'; (e.currentTarget as HTMLDivElement).style.transform = 'translateX(2px)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; (e.currentTarget as HTMLDivElement).style.transform = '' }}
             >
-              <span style={{ fontSize: 18, flexShrink: 0, color: s.color }}>{s.icon}</span>
+              <span style={{ fontSize: 16, flexShrink: 0, color: s.color }}>{s.icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600 }}>{n.title}</p>
-                <p style={{ color: '#64748B', fontSize: 11, marginTop: 2 }}>{n.message}</p>
+                <p className="t-card-title">{n.title}</p>
+                <p className="t-caption" style={{ marginTop: 2 }}>{n.message}</p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                <span style={{ fontSize: 11, color: s.color, fontWeight: 700 }}>→ View</span>
+                <span style={{ fontSize: 11, color: s.color, fontWeight: 600 }}>→ View</span>
                 <button
                   onClick={e => { e.stopPropagation(); dismiss(n.id, n.count) }}
-                  style={{ color: '#334155', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '2px 4px' }}
+                  style={{ color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '2px 4px', transition: 'color 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
                   title="Dismiss"
                 >
                   ✕

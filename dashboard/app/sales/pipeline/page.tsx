@@ -13,50 +13,44 @@ interface Rep { id: string; name: string }
 
 function RepPicker({ lead, reps, onAssign }: { lead: Lead; reps: Rep[]; onAssign: (leadId: string, repId: string | null) => void }) {
   const [open, setOpen] = useState(false)
-  const current = lead.assigned_rep?.name
 
   return (
     <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
       <button
         onClick={() => setOpen(o => !o)}
-        title="Reassign lead"
         style={{
-          background: 'rgba(79,142,247,0.08)', border: '1px solid rgba(79,142,247,0.2)',
-          borderRadius: 999, padding: '2px 8px', fontSize: 10, color: '#60A5FA',
+          background: 'rgba(79,142,247,0.07)', border: '1px solid rgba(79,142,247,0.18)',
+          borderRadius: 999, padding: '2px 8px', fontSize: 10, color: '#7CB9FC',
           cursor: 'pointer', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          transition: 'background 0.15s',
         }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(79,142,247,0.14)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(79,142,247,0.07)')}
       >
-        {current ? `↳ ${current}` : '+ Assign'}
+        {lead.assigned_rep?.name ? `↳ ${lead.assigned_rep.name}` : '+ Assign'}
       </button>
       {open && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
-          <div style={{
-            position: 'absolute', top: '100%', left: 0, marginTop: 4,
-            background: '#0F1629', border: '1px solid #1E2D4A', borderRadius: 10,
-            zIndex: 50, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-            overflow: 'hidden',
-          }}>
+          <div className="fadaa-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 50 }}>
+            <p className="fadaa-dropdown-label">Assign rep</p>
             {reps.map(r => (
               <button
                 key={r.id}
                 onClick={() => { onAssign(lead.id, r.id); setOpen(false) }}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  padding: '9px 14px', fontSize: 13, color: lead.assigned_rep_id === r.id ? '#60A5FA' : '#E2E8F0',
-                  background: lead.assigned_rep_id === r.id ? 'rgba(79,142,247,0.1)' : 'transparent',
-                  border: 'none', cursor: 'pointer',
-                }}
+                className={`fadaa-dropdown-item${lead.assigned_rep_id === r.id ? ' active' : ''}`}
               >
+                <div className="avatar avatar-xs">{r.name.charAt(0).toUpperCase()}</div>
                 {lead.assigned_rep_id === r.id ? '✓ ' : ''}{r.name}
               </button>
             ))}
             {lead.assigned_rep_id && (
               <button
                 onClick={() => { onAssign(lead.id, null); setOpen(false) }}
-                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: 12, color: '#F87171', background: 'transparent', border: 'none', borderTop: '1px solid #1E2D4A', cursor: 'pointer' }}
+                className="fadaa-dropdown-item"
+                style={{ color: '#F87171', borderTop: '1px solid var(--border-subtle)' }}
               >
-                Remove assignment
+                Remove
               </button>
             )}
           </div>
@@ -68,10 +62,10 @@ function RepPicker({ lead, reps, onAssign }: { lead: Lead; reps: Rep[]; onAssign
 
 function timeAgo(date: string) {
   const secs = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
-  if (secs < 60)    return 'just now'
-  if (secs < 3600)  return `${Math.floor(secs / 60)}m ago`
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
-  if (secs < 7 * 86400) return `${Math.floor(secs / 86400)}d ago`
+  if (secs < 60)         return 'just now'
+  if (secs < 3600)       return `${Math.floor(secs / 60)}m ago`
+  if (secs < 86400)      return `${Math.floor(secs / 3600)}h ago`
+  if (secs < 7 * 86400)  return `${Math.floor(secs / 86400)}d ago`
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
@@ -108,55 +102,54 @@ function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
           {...provided.dragHandleProps}
           style={{
             ...provided.draggableProps.style,
-            background: snapshot.isDragging ? '#1E2D4A' : '#131B2E',
-            border: `1px solid ${snapshot.isDragging ? '#4F8EF7' : isNewToday ? '#4F8EF740' : '#1E2D4A'}`,
+            background: snapshot.isDragging ? '#1A2840' : 'rgba(16,24,44,0.9)',
+            border: `1px solid ${snapshot.isDragging ? 'rgba(79,142,247,0.5)' : isNewToday ? 'rgba(79,142,247,0.25)' : 'var(--border-subtle)'}`,
             borderRadius: 10,
-            padding: '12px 14px',
-            marginBottom: 8,
-            cursor: 'grab',
+            padding: '11px 13px',
+            marginBottom: 7,
+            cursor: snapshot.isDragging ? 'grabbing' : 'grab',
             boxShadow: snapshot.isDragging
-              ? '0 8px 32px rgba(79,142,247,0.3)'
-              : '0 2px 8px rgba(0,0,0,0.3)',
-            transition: snapshot.isDragging ? 'none' : 'box-shadow 0.15s',
+              ? '0 12px 40px rgba(79,142,247,0.25), 0 4px 16px rgba(0,0,0,0.4)'
+              : '0 1px 4px rgba(0,0,0,0.3)',
+            transition: snapshot.isDragging ? 'none' : 'box-shadow 0.15s, border-color 0.15s',
           }}
         >
           <Link href={`/sales/leads/${lead.id}`} style={{ textDecoration: 'none' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
               <div style={{ minWidth: 0 }}>
-                <p style={{ color: '#E2E8F0', fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>
-                  {lead.company_name}
-                </p>
-                <p style={{ color: '#64748B', fontSize: 11, marginTop: 3 }}>{lead.contact_person}</p>
+                <p className="t-card-title t-truncate">{lead.company_name}</p>
+                <p className="t-caption" style={{ marginTop: 2 }}>{lead.contact_person}</p>
               </div>
               {isNewToday && (
-                <span style={{ flexShrink: 0, background: 'rgba(79,142,247,0.18)', color: '#60A5FA', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 999, letterSpacing: '0.08em', marginTop: 1 }}>
-                  ✦ NEW
-                </span>
+                <span className="badge badge-new" style={{ fontSize: 9, flexShrink: 0, marginTop: 1 }}>NEW</span>
               )}
             </div>
           </Link>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-            <span className={`service-${lead.service_type}`} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999 }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 9 }}>
+            <span className={`badge service-${lead.service_type}`} style={{ fontSize: 10 }}>
               {SERVICE_LABELS[lead.service_type]}
             </span>
             {lead.estimated_value ? (
-              <span style={{ color: '#4ADE80', fontSize: 11, fontWeight: 600 }}>
+              <span className="t-mono" style={{ color: '#4ADE80', fontSize: 11, fontWeight: 600 }}>
                 ${(lead.estimated_value / 1000).toFixed(1)}k
               </span>
             ) : null}
           </div>
+
           {canAssign ? (
             <div style={{ marginTop: 8 }}>
               <RepPicker lead={lead} reps={reps} onAssign={onAssign} />
             </div>
           ) : lead.assigned_rep?.name ? (
-            <p style={{ color: '#64748B', fontSize: 10, marginTop: 6 }}>↳ {lead.assigned_rep.name}</p>
+            <p className="t-caption" style={{ marginTop: 6, fontSize: 10 }}>↳ {lead.assigned_rep.name}</p>
           ) : null}
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 7 }}>
-            <span style={{ color: lead.lead_source === 'meta' ? '#60A5FA' : '#334155', fontSize: 9 }}>
+            <span style={{ fontSize: 9, color: lead.lead_source === 'meta' ? '#7CB9FC' : 'var(--text-faint)' }}>
               {lead.lead_source === 'meta' ? '⚡' : '◎'}
             </span>
-            <span style={{ color: '#334155', fontSize: 9 }}>
+            <span style={{ fontSize: 9, color: 'var(--text-faint)' }}>
               {lead.lead_source === 'meta' ? 'Meta · ' : ''}{timeAgo(lead.created_at)}
             </span>
           </div>
@@ -168,7 +161,7 @@ function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
 
 export default function PipelinePage() {
   const { data: session } = useSession()
-  const role = (session?.user as { role?: string })?.role ?? 'rep'
+  const role     = (session?.user as { role?: string })?.role ?? 'rep'
   const canAssign = role === 'admin' || role === 'manager'
 
   const [board,   setBoard]   = useState<Board>({})
@@ -195,7 +188,6 @@ export default function PipelinePage() {
   useEffect(() => { loadLeads() }, [loadLeads])
 
   const handleAssign = useCallback(async (leadId: string, repId: string | null) => {
-    // Optimistic update
     setBoard(prev => {
       const next = { ...prev }
       for (const stage of PIPELINE_STAGES) {
@@ -217,13 +209,11 @@ export default function PipelinePage() {
   const onDragEnd = useCallback(async (result: DropResult) => {
     const { source, destination, draggableId } = result
     if (!destination || destination.droppableId === source.droppableId) return
-
     const srcStage  = source.droppableId
     const destStage = destination.droppableId
     const lead      = board[srcStage]?.[source.index]
     if (!lead) return
 
-    // Optimistic update
     setBoard(prev => {
       const next = { ...prev }
       next[srcStage]  = prev[srcStage].filter(l => l.id !== draggableId)
@@ -236,7 +226,6 @@ export default function PipelinePage() {
       return next
     })
 
-    // Persist
     await fetch(`/api/sales/leads/${draggableId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -249,44 +238,31 @@ export default function PipelinePage() {
 
   return (
     <SalesShell>
-      {/* Header */}
-      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{ color: '#E2E8F0', fontSize: 22, fontWeight: 700 }}>⟿ Pipeline</h1>
-          <p style={{ color: '#64748B', fontSize: 13, marginTop: 4 }}>
-            {totalLeads} leads · ${(totalValue / 1000).toFixed(1)}k total value
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1 className="t-page-title">Pipeline</h1>
+          <p className="t-caption">
+            {totalLeads} leads · <span className="t-mono" style={{ color: '#4ADE80' }}>${(totalValue / 1000).toFixed(1)}k</span> total value
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => setView('kanban')}
-            className={view === 'kanban' ? 'fadaa-btn' : 'fadaa-btn-ghost'}
-            style={{ fontSize: 12 }}
-          >
-            ⊞ Kanban
-          </button>
-          <button
-            onClick={() => setView('list')}
-            className={view === 'list' ? 'fadaa-btn' : 'fadaa-btn-ghost'}
-            style={{ fontSize: 12 }}
-          >
-            ≡ List
-          </button>
-          <Link href="/sales/leads/new" className="fadaa-btn" style={{ textDecoration: 'none' }}>
-            + Lead
-          </Link>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="tab-bar">
+            <button className={`tab${view === 'kanban' ? ' active' : ''}`} onClick={() => setView('kanban')}>⊞ Kanban</button>
+            <button className={`tab${view === 'list' ? ' active' : ''}`}   onClick={() => setView('list')}>≡ List</button>
+          </div>
+          <Link href="/sales/leads/new" className="fadaa-btn fadaa-btn-sm" style={{ textDecoration: 'none' }}>+ Lead</Link>
         </div>
       </div>
 
       {loading ? (
-        <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16 }}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="fadaa-card kanban-col" style={{ height: 300 }} />
+            <div key={i} className="kanban-col skeleton" style={{ height: 280, borderRadius: 10, flexShrink: 0 }} />
           ))}
         </div>
       ) : view === 'kanban' ? (
         <DragDropContext onDragEnd={onDragEnd}>
-          <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
             {PIPELINE_STAGES.map(stage => {
               const cards  = board[stage] ?? []
               const accent = STAGE_ACCENT[stage]
@@ -295,23 +271,23 @@ export default function PipelinePage() {
                 <div key={stage} className="kanban-col" style={{ flexShrink: 0 }}>
                   {/* Column header */}
                   <div style={{
-                    padding: '10px 14px',
+                    padding: '9px 12px',
                     borderRadius: '10px 10px 0 0',
-                    background: '#0F1629',
-                    border: `1px solid ${accent}30`,
+                    background: 'rgba(10,14,26,0.85)',
+                    border: `1px solid ${accent}22`,
                     borderBottom: `2px solid ${accent}`,
-                    marginBottom: 8,
+                    marginBottom: 6,
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <p style={{ color: accent, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      <p style={{ color: accent, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                         {STAGE_LABELS[stage]}
                       </p>
-                      <span style={{ background: `${accent}20`, color: accent, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>
+                      <span className="badge" style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}28`, fontSize: 10 }}>
                         {cards.length}
                       </span>
                     </div>
                     {colVal > 0 && (
-                      <p style={{ color: '#64748B', fontSize: 10, marginTop: 3 }}>
+                      <p className="t-caption t-mono" style={{ marginTop: 2, fontSize: 10 }}>
                         ${(colVal / 1000).toFixed(1)}k
                       </p>
                     )}
@@ -327,8 +303,8 @@ export default function PipelinePage() {
                         style={{
                           minHeight: 80,
                           borderRadius: 10,
-                          padding: 4,
-                          border: snapshot.isDraggingOver ? '1px dashed #4F8EF740' : '1px solid transparent',
+                          padding: 3,
+                          border: snapshot.isDraggingOver ? '1px dashed rgba(79,142,247,0.35)' : '1px solid transparent',
                           transition: 'border-color 0.15s, background 0.15s',
                         }}
                       >
@@ -337,7 +313,7 @@ export default function PipelinePage() {
                         ))}
                         {provided.placeholder}
                         {cards.length === 0 && !snapshot.isDraggingOver && (
-                          <p style={{ color: '#1E2D4A', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>
+                          <p style={{ color: 'var(--text-faint)', fontSize: 11, textAlign: 'center', padding: '18px 0', letterSpacing: '0.04em' }}>
                             Drop here
                           </p>
                         )}
@@ -351,39 +327,33 @@ export default function PipelinePage() {
         </DragDropContext>
       ) : (
         /* List view */
-        <div className="fadaa-card" style={{ overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div className="fadaa-card fadaa-table-wrapper">
+          <table className="fadaa-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid #1E2D4A' }}>
+              <tr>
                 {['Company', 'Contact', 'Stage', 'Service', 'Value', 'Rep', 'Priority'].map(h => (
-                  <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: '#64748B', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                    {h}
-                  </th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {PIPELINE_STAGES.flatMap(stage =>
-                (board[stage] ?? []).map((lead, i) => (
-                  <tr
-                    key={lead.id}
-                    style={{ borderBottom: '1px solid #1E2D4A20', cursor: 'pointer' }}
-                    onClick={() => window.location.href = `/sales/leads/${lead.id}`}
-                  >
-                    <td style={{ padding: '10px 16px', color: '#E2E8F0', fontWeight: 500 }}>{lead.company_name}</td>
-                    <td style={{ padding: '10px 16px', color: '#94A3B8' }}>{lead.contact_person}</td>
-                    <td style={{ padding: '10px 16px' }}><StageBadge stage={lead.pipeline_stage} size="sm" /></td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <span className={`service-${lead.service_type}`} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999 }}>
+                (board[stage] ?? []).map(lead => (
+                  <tr key={lead.id} onClick={() => window.location.href = `/sales/leads/${lead.id}`}>
+                    <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{lead.company_name}</td>
+                    <td>{lead.contact_person}</td>
+                    <td><StageBadge stage={lead.pipeline_stage} size="sm" /></td>
+                    <td>
+                      <span className={`badge service-${lead.service_type}`} style={{ fontSize: 11 }}>
                         {SERVICE_LABELS[lead.service_type]}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#4ADE80', fontWeight: 600 }}>
-                      {lead.estimated_value ? `$${(lead.estimated_value/1000).toFixed(1)}k` : '—'}
+                    <td className="t-mono" style={{ color: '#4ADE80', fontWeight: 600 }}>
+                      {lead.estimated_value ? `$${(lead.estimated_value / 1000).toFixed(1)}k` : '—'}
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#94A3B8' }}>{lead.assigned_rep?.name ?? '—'}</td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <span className={`priority-${lead.priority}`} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999 }}>
+                    <td>{lead.assigned_rep?.name ?? '—'}</td>
+                    <td>
+                      <span className={`badge priority-${lead.priority}`} style={{ fontSize: 10 }}>
                         {PRIORITY_LABELS[lead.priority]}
                       </span>
                     </td>

@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation'
 import type { Notification } from '@/app/api/sales/notifications/route'
 
 interface Toast extends Notification {
-  toastId: string
+  toastId:   string
   expiresAt: number
 }
 
-const POLL_INTERVAL = 60_000   // check every 60s
-const TOAST_LIFE   = 30_000   // auto-dismiss after 30s
-const SEEN_KEY     = 'fadaa_notif_seen'
+const POLL_INTERVAL = 60_000
+const TOAST_LIFE    = 30_000
+const SEEN_KEY      = 'fadaa_notif_seen'
 
 function getSeenCounts(): Record<string, number> {
   try { return JSON.parse(sessionStorage.getItem(SEEN_KEY) ?? '{}') } catch { return {} }
@@ -20,17 +20,17 @@ function saveSeenCounts(d: Record<string, number>) {
   sessionStorage.setItem(SEEN_KEY, JSON.stringify(d))
 }
 
-const SEVERITY_STYLE: Record<string, { border: string; icon: string; color: string; bar: string }> = {
-  critical: { border: '#EF4444', icon: '⚠', color: '#F87171', bar: '#EF4444' },
-  warning:  { border: '#F59E0B', icon: '◈', color: '#FCD34D', bar: '#F59E0B' },
-  info:     { border: '#4F8EF7', icon: '✦', color: '#60A5FA', bar: '#4F8EF7' },
+const SEVERITY: Record<string, { border: string; icon: string; color: string; bar: string }> = {
+  critical: { border: '#DC2626', icon: '⚠', color: '#F87171', bar: '#DC2626' },
+  warning:  { border: '#D97706', icon: '◈', color: '#F59E0B', bar: '#D97706' },
+  info:     { border: '#4F8EF7', icon: '✦', color: '#7CB9FC', bar: '#4F8EF7' },
 }
 
 export function NotificationToast() {
-  const router     = useRouter()
+  const router   = useRouter()
   const [toasts, setToasts] = useState<Toast[]>([])
-  const seenRef    = useRef<Record<string, number>>(getSeenCounts())
-  const timerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const seenRef  = useRef<Record<string, number>>(getSeenCounts())
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.toastId !== id))
@@ -47,11 +47,7 @@ export function NotificationToast() {
       for (const n of notifications) {
         const prevCount = seen[n.id] ?? 0
         if (n.count > prevCount) {
-          newToasts.push({
-            ...n,
-            toastId:   `${n.id}_${Date.now()}`,
-            expiresAt: Date.now() + TOAST_LIFE,
-          })
+          newToasts.push({ ...n, toastId: `${n.id}_${Date.now()}`, expiresAt: Date.now() + TOAST_LIFE })
           seen[n.id] = n.count
         }
       }
@@ -59,16 +55,12 @@ export function NotificationToast() {
       if (newToasts.length > 0) {
         saveSeenCounts(seen)
         setToasts(prev => [...newToasts, ...prev].slice(0, 5))
-        // auto-dismiss each toast after TOAST_LIFE
-        newToasts.forEach(t => {
-          setTimeout(() => removeToast(t.toastId), TOAST_LIFE)
-        })
+        newToasts.forEach(t => { setTimeout(() => removeToast(t.toastId), TOAST_LIFE) })
       }
-    } catch { /* silent — polling is best-effort */ }
+    } catch { /* silent */ }
   }, [removeToast])
 
   useEffect(() => {
-    // Initial check after 5s (let dashboard load first)
     const init = setTimeout(() => {
       poll()
       timerRef.current = setInterval(poll, POLL_INTERVAL)
@@ -84,43 +76,46 @@ export function NotificationToast() {
   return (
     <div style={{
       position: 'fixed', bottom: 24, right: 24, zIndex: 200,
-      display: 'flex', flexDirection: 'column-reverse', gap: 10,
+      display: 'flex', flexDirection: 'column-reverse', gap: 8,
       pointerEvents: 'none',
     }}>
       {toasts.map(t => {
-        const s = SEVERITY_STYLE[t.severity]
-        const remaining = Math.max(0, t.expiresAt - Date.now())
+        const s = SEVERITY[t.severity]
         return (
           <div
             key={t.toastId}
             style={{
               pointerEvents: 'auto',
-              width: 340, background: '#0F1629',
-              border: `1px solid ${s.border}40`,
+              width: 320,
+              background: 'rgba(8,12,24,0.97)',
+              border: `1px solid ${s.border}30`,
               borderLeft: `3px solid ${s.border}`,
-              borderRadius: 10,
-              boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px ${s.border}20`,
+              borderRadius: 12,
+              boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px ${s.border}15`,
               overflow: 'hidden',
-              animation: 'fadeSlideIn 0.25s ease',
+              animation: 'fadeSlideIn 0.22s var(--ease-spring)',
               cursor: 'pointer',
+              backdropFilter: 'blur(20px)',
             }}
             onClick={() => { removeToast(t.toastId); router.push(t.filterUrl) }}
           >
             <div style={{ padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 16, color: s.color, flexShrink: 0, marginTop: 1 }}>{s.icon}</span>
+              <span style={{ fontSize: 15, color: s.color, flexShrink: 0, marginTop: 1 }}>{s.icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{t.title}</p>
-                <p style={{ color: '#64748B', fontSize: 11, marginTop: 3 }}>{t.message}</p>
+                <p className="t-card-title">{t.title}</p>
+                <p className="t-caption" style={{ marginTop: 2 }}>{t.message}</p>
               </div>
               <button
                 onClick={e => { e.stopPropagation(); removeToast(t.toastId) }}
-                style={{ color: '#334155', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, flexShrink: 0, padding: '0 2px' }}
+                style={{ color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, flexShrink: 0, padding: '0 2px', transition: 'color 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-faint)')}
               >
                 ✕
               </button>
             </div>
-            {/* countdown bar */}
-            <div style={{ height: 2, background: '#1E2D4A' }}>
+            {/* Countdown bar */}
+            <div style={{ height: 2, background: 'rgba(255,255,255,0.06)' }}>
               <div style={{
                 height: '100%', background: s.bar,
                 animation: `shrink ${TOAST_LIFE}ms linear forwards`,
@@ -129,17 +124,6 @@ export function NotificationToast() {
           </div>
         )
       })}
-
-      <style>{`
-        @keyframes fadeSlideIn {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes shrink {
-          from { width: 100%; }
-          to   { width: 0%; }
-        }
-      `}</style>
     </div>
   )
 }

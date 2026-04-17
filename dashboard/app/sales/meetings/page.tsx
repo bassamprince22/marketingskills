@@ -6,33 +6,23 @@ import { SalesShell } from '@/components/sales/SalesShell'
 import type { Meeting, Lead } from '@/lib/sales/types'
 import { MEETING_TYPE_LABELS } from '@/lib/sales/types'
 
-function MeetingForm({
-  leadId,
-  onSaved,
-  onCancel,
-}: {
-  leadId?: string
-  onSaved: () => void
-  onCancel: () => void
+function FormLabel({ children }: { children: React.ReactNode }) {
+  return <label className="form-label" style={{ display: 'block', marginBottom: 6 }}>{children}</label>
+}
+
+function MeetingForm({ leadId, onSaved, onCancel }: {
+  leadId?: string; onSaved: () => void; onCancel: () => void
 }) {
-  const [leads, setLeads] = useState<Lead[]>([])
+  const [leads,  setLeads]  = useState<Lead[]>([])
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({
-    lead_id:          leadId ?? '',
-    meeting_date:     '',
-    meeting_type:     'discovery',
-    status:           'scheduled',
-    notes:            '',
-    outcome:          '',
-    next_action:      '',
-    next_action_date: '',
+  const [form,   setForm]   = useState({
+    lead_id: leadId ?? '', meeting_date: '', meeting_type: 'discovery',
+    status: 'scheduled', notes: '', outcome: '', next_action: '', next_action_date: '',
   })
 
   useEffect(() => {
     if (!leadId) {
-      fetch('/api/sales/leads?limit=200')
-        .then(r => r.json())
-        .then(d => setLeads(d.leads ?? []))
+      fetch('/api/sales/leads?limit=200').then(r => r.json()).then(d => setLeads(d.leads ?? []))
     }
   }, [leadId])
 
@@ -50,67 +40,78 @@ function MeetingForm({
     if (res.ok) { onSaved() } else { setSaving(false) }
   }
 
-  const label = (l: string) => (
-    <label style={{ color: '#94A3B8', fontSize: 11, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>{l}</label>
-  )
-
   return (
-    <div className="fadaa-card" style={{ padding: 28, maxWidth: 640, margin: '0 auto' }}>
-      <h2 style={{ color: '#E2E8F0', fontWeight: 700, fontSize: 16, marginBottom: 24 }}>◷ Log Meeting</h2>
-      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        {!leadId && (
-          <div>
-            {label('Lead *')}
-            <select className="fadaa-input" value={form.lead_id} onChange={set('lead_id')} required>
-              <option value="">— Select a lead —</option>
-              {leads.map(l => <option key={l.id} value={l.id}>{l.company_name} · {l.contact_person}</option>)}
-            </select>
+    <div className="fadaa-card" style={{ maxWidth: 640, margin: '0 auto' }}>
+      <div className="card-header">
+        <h2 className="t-section-title">Log Meeting</h2>
+        <button className="fadaa-btn-ghost fadaa-btn-sm" onClick={onCancel}>Cancel</button>
+      </div>
+      <div style={{ padding: '20px 24px' }}>
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {!leadId && (
+            <div className="form-field">
+              <FormLabel>Lead *</FormLabel>
+              <select className="fadaa-input" value={form.lead_id} onChange={set('lead_id')} required>
+                <option value="">— Select a lead —</option>
+                {leads.map(l => <option key={l.id} value={l.id}>{l.company_name} · {l.contact_person}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="form-grid-2">
+            <div className="form-field">
+              <FormLabel>Date & Time *</FormLabel>
+              <input className="fadaa-input" type="datetime-local" value={form.meeting_date} onChange={set('meeting_date')} required />
+            </div>
+            <div className="form-field">
+              <FormLabel>Meeting Type</FormLabel>
+              <select className="fadaa-input" value={form.meeting_type} onChange={set('meeting_type')}>
+                {Object.entries(MEETING_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+            <div className="form-field">
+              <FormLabel>Status</FormLabel>
+              <select className="fadaa-input" value={form.status} onChange={set('status')}>
+                <option value="scheduled">Scheduled</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="no_show">No Show</option>
+              </select>
+            </div>
+            <div className="form-field">
+              <FormLabel>Next Action Date</FormLabel>
+              <input className="fadaa-input" type="date" value={form.next_action_date} onChange={set('next_action_date')} />
+            </div>
           </div>
-        )}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div>
-            {label('Meeting Date & Time *')}
-            <input className="fadaa-input" type="datetime-local" value={form.meeting_date} onChange={set('meeting_date')} required />
+          <div className="form-field">
+            <FormLabel>Meeting Notes</FormLabel>
+            <textarea className="fadaa-input" value={form.notes} onChange={set('notes')} rows={3} placeholder="What was discussed?" style={{ resize: 'vertical' }} />
           </div>
-          <div>
-            {label('Meeting Type')}
-            <select className="fadaa-input" value={form.meeting_type} onChange={set('meeting_type')}>
-              {Object.entries(MEETING_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
+          <div className="form-field">
+            <FormLabel>Outcome</FormLabel>
+            <input className="fadaa-input" value={form.outcome} onChange={set('outcome')} placeholder="e.g. Client interested, sending proposal" />
           </div>
-          <div>
-            {label('Status')}
-            <select className="fadaa-input" value={form.status} onChange={set('status')}>
-              <option value="scheduled">Scheduled</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="no_show">No Show</option>
-            </select>
+          <div className="form-field">
+            <FormLabel>Next Action</FormLabel>
+            <input className="fadaa-input" value={form.next_action} onChange={set('next_action')} placeholder="e.g. Send proposal by Friday" />
           </div>
-          <div>
-            {label('Next Action Date')}
-            <input className="fadaa-input" type="date" value={form.next_action_date} onChange={set('next_action_date')} />
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
+            <button type="button" className="fadaa-btn-ghost" onClick={onCancel}>Cancel</button>
+            <button type="submit" disabled={saving} className="fadaa-btn" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {saving ? <><span className="spinner spinner-sm" /> Saving…</> : 'Save Meeting'}
+            </button>
           </div>
-        </div>
-        <div>
-          {label('Meeting Notes')}
-          <textarea className="fadaa-input" value={form.notes} onChange={set('notes')} rows={3} placeholder="What was discussed?" style={{ resize: 'vertical' }} />
-        </div>
-        <div>
-          {label('Outcome')}
-          <input className="fadaa-input" value={form.outcome} onChange={set('outcome')} placeholder="e.g. Client interested, sending proposal" />
-        </div>
-        <div>
-          {label('Next Action')}
-          <input className="fadaa-input" value={form.next_action} onChange={set('next_action')} placeholder="e.g. Send proposal by Friday" />
-        </div>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-          <button type="button" className="fadaa-btn-ghost" onClick={onCancel}>Cancel</button>
-          <button type="submit" disabled={saving} className="fadaa-btn">{saving ? 'Saving…' : 'Save Meeting'}</button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cls = status === 'completed' ? 'badge-completed'
+    : status === 'cancelled' ? 'badge-cancelled'
+    : status === 'no_show'   ? 'badge-no_show'
+    : 'badge-scheduled'
+  return <span className={`badge ${cls}`}>{status.replace('_', ' ')}</span>
 }
 
 function MeetingsContent() {
@@ -118,7 +119,7 @@ function MeetingsContent() {
   const leadId = sp.get('leadId') ?? undefined
 
   const [meetings, setMeetings] = useState<Meeting[]>([])
-  const [loading, setLoading]   = useState(true)
+  const [loading,  setLoading]  = useState(true)
   const [showForm, setShowForm] = useState(!!leadId)
 
   const load = useCallback(() => {
@@ -143,70 +144,71 @@ function MeetingsContent() {
   if (showForm) {
     return (
       <SalesShell>
-        <MeetingForm
-          leadId={leadId}
-          onSaved={() => { setShowForm(false); load() }}
-          onCancel={() => setShowForm(false)}
-        />
+        <Link_back onClick={() => setShowForm(false)} />
+        <MeetingForm leadId={leadId} onSaved={() => { setShowForm(false); load() }} onCancel={() => setShowForm(false)} />
       </SalesShell>
     )
   }
 
   return (
     <SalesShell>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ color: '#E2E8F0', fontSize: 22, fontWeight: 700 }}>◷ Meetings</h1>
-          <p style={{ color: '#64748B', fontSize: 13, marginTop: 4 }}>{meetings.length} meetings logged</p>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1 className="t-page-title">Meetings</h1>
+          <p className="t-caption">{meetings.length} meeting{meetings.length !== 1 ? 's' : ''} logged</p>
         </div>
         <button className="fadaa-btn" onClick={() => setShowForm(true)}>+ Log Meeting</button>
       </div>
 
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="fadaa-card" style={{ height: 80 }} />)}
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="fadaa-card skeleton" style={{ height: 90 }} />
+          ))}
         </div>
       ) : meetings.length === 0 ? (
-        <div className="fadaa-card" style={{ padding: 48, textAlign: 'center', color: '#64748B' }}>
-          <p style={{ fontSize: 32, marginBottom: 12 }}>◷</p>
-          <p>No meetings logged yet</p>
+        <div className="fadaa-card">
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+              </svg>
+            </div>
+            <p className="empty-state-title">No meetings logged yet</p>
+            <p className="empty-state-desc">Log your first meeting to start tracking your sales conversations.</p>
+            <button className="fadaa-btn" onClick={() => setShowForm(true)}>+ Log Meeting</button>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {meetings.map(m => (
-            <div key={m.id} className="fadaa-card" style={{ padding: 20 }}>
+            <div key={m.id} className="fadaa-card" style={{ padding: '16px 20px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <p style={{ color: '#E2E8F0', fontWeight: 600, fontSize: 14 }}>
-                      {m.lead?.company_name ?? 'Unknown Lead'}
-                    </p>
-                    <span style={{ color: '#64748B', fontSize: 12 }}>·</span>
-                    <span style={{ color: '#94A3B8', fontSize: 12 }}>
-                      {MEETING_TYPE_LABELS[m.meeting_type]}
-                    </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+                    <p className="t-card-title">{m.lead?.company_name ?? 'Unknown Lead'}</p>
+                    <span className="t-caption">·</span>
+                    <span className="t-caption">{MEETING_TYPE_LABELS[m.meeting_type]}</span>
                   </div>
-                  <p style={{ color: '#64748B', fontSize: 12, marginTop: 4 }}>
-                    {new Date(m.meeting_date).toLocaleString()} · {m.rep?.name}
+                  <p className="t-caption">
+                    {new Date(m.meeting_date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    {m.rep?.name ? ` · ${m.rep.name}` : ''}
                   </p>
-                  {m.notes && <p style={{ color: '#94A3B8', fontSize: 13, marginTop: 8 }}>📝 {m.notes}</p>}
-                  {m.outcome && <p style={{ color: '#34D399', fontSize: 13, marginTop: 4 }}>✓ {m.outcome}</p>}
-                  {m.next_action && <p style={{ color: '#FCD34D', fontSize: 13, marginTop: 4 }}>→ {m.next_action}</p>}
+                  {m.notes      && <p className="t-body" style={{ marginTop: 8 }}>📝 {m.notes}</p>}
+                  {m.outcome    && <p style={{ color: '#4ADE80', fontSize: 13, marginTop: 6 }}>✓ {m.outcome}</p>}
+                  {m.next_action && <p style={{ color: '#F59E0B', fontSize: 13, marginTop: 4 }}>→ {m.next_action}</p>}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-                  <span style={{
-                    fontSize: 11, padding: '4px 10px', borderRadius: 999,
-                    background: m.status === 'completed' ? 'rgba(74,222,128,0.1)' : m.status === 'cancelled' || m.status === 'no_show' ? 'rgba(239,68,68,0.1)' : 'rgba(79,142,247,0.1)',
-                    color:      m.status === 'completed' ? '#4ADE80'              : m.status === 'cancelled' || m.status === 'no_show' ? '#F87171'              : '#60A5FA',
-                  }}>
-                    {m.status}
-                  </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
+                  <StatusBadge status={m.status} />
                   {m.status === 'scheduled' && (
                     <button
                       onClick={() => updateStatus(m.id, 'completed')}
-                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: 'rgba(74,222,128,0.1)', color: '#4ADE80', border: '1px solid rgba(74,222,128,0.2)', cursor: 'pointer' }}
+                      className="badge badge-completed"
+                      style={{ cursor: 'pointer', border: 'none', transition: 'opacity 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.opacity = '0.75')}
+                      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                     >
-                      Mark Done
+                      ✓ Mark Done
                     </button>
                   )}
                 </div>
@@ -219,9 +221,22 @@ function MeetingsContent() {
   )
 }
 
+function Link_back({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{ color: 'var(--text-muted)', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 20, transition: 'color 0.15s', padding: 0 }}
+      onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+      onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+    >
+      ← All Meetings
+    </button>
+  )
+}
+
 export default function MeetingsPage() {
   return (
-    <Suspense fallback={<SalesShell><div style={{ color: '#64748B', padding: 40 }}>Loading…</div></SalesShell>}>
+    <Suspense fallback={<SalesShell><div className="t-caption" style={{ padding: 40 }}>Loading…</div></SalesShell>}>
       <MeetingsContent />
     </Suspense>
   )
