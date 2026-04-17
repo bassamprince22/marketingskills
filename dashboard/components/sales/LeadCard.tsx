@@ -23,6 +23,15 @@ function daysSince(date: string) {
   return Math.floor((Date.now() - new Date(date).getTime()) / 86400000)
 }
 
+function timeAgo(date: string) {
+  const secs = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  if (secs < 60)   return 'just now'
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
+  if (secs < 7 * 86400) return `${Math.floor(secs / 86400)}d ago`
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 function InlineRepPicker({ lead, reps, onAssign }: { lead: Lead; reps: Rep[]; onAssign: (leadId: string, repId: string | null) => void }) {
   const [open, setOpen] = useState(false)
 
@@ -156,6 +165,15 @@ export function LeadCard({ lead, canAssign, reps, onAssign }: Props) {
             {SERVICE_LABELS[lead.service_type]}
           </span>
           <span style={{ color: pColor, fontSize: 11, flexShrink: 0 }}>● {lead.priority}</span>
+        </div>
+
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ color: lead.lead_source === 'meta' ? '#60A5FA' : '#475569', fontSize: 10 }}>
+            {lead.lead_source === 'meta' ? '⚡' : '◎'}
+          </span>
+          <span style={{ color: '#475569', fontSize: 10 }}>
+            {lead.lead_source === 'meta' ? 'Meta · ' : ''}{timeAgo(lead.created_at)}
+          </span>
         </div>
 
         {!canAssign && lead.assigned_rep && (

@@ -66,6 +66,15 @@ function RepPicker({ lead, reps, onAssign }: { lead: Lead; reps: Rep[]; onAssign
   )
 }
 
+function timeAgo(date: string) {
+  const secs = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  if (secs < 60)    return 'just now'
+  if (secs < 3600)  return `${Math.floor(secs / 60)}m ago`
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
+  if (secs < 7 * 86400) return `${Math.floor(secs / 86400)}d ago`
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 type Board = Record<string, Lead[]>
 
 const STAGE_ACCENT: Record<string, string> = {
@@ -131,6 +140,14 @@ function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
           ) : lead.assigned_rep?.name ? (
             <p style={{ color: '#64748B', fontSize: 10, marginTop: 6 }}>↳ {lead.assigned_rep.name}</p>
           ) : null}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 7 }}>
+            <span style={{ color: lead.lead_source === 'meta' ? '#60A5FA' : '#334155', fontSize: 9 }}>
+              {lead.lead_source === 'meta' ? '⚡' : '◎'}
+            </span>
+            <span style={{ color: '#334155', fontSize: 9 }}>
+              {lead.lead_source === 'meta' ? 'Meta · ' : ''}{timeAgo(lead.created_at)}
+            </span>
+          </div>
         </div>
       )}
     </Draggable>
