@@ -5,6 +5,8 @@ import { useSession } from 'next-auth/react'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { AutoAssignCard } from '@/components/sales/AutoAssignCard'
 import { NotificationSettingsCard } from '@/components/sales/NotificationSettingsCard'
+import { ServicesManager } from '@/components/sales/ServicesManager'
+import { ChallengeAdminPanel } from '@/components/sales/ChallengeAdminPanel'
 
 function Flash({ msg, type }: { msg: string; type: 'ok' | 'err' }) {
   if (!msg) return null
@@ -142,14 +144,83 @@ function ContractTemplateCard() {
   )
 }
 
+function CommissionTargetCard() {
+  const [target,  setTarget]  = useState(0)
+  const [period,  setPeriod]  = useState<'monthly'|'quarterly'|'yearly'>('monthly')
+  const [loading, setLoading] = useState(true)
+  const [saving,  setSaving]  = useState(false)
+  const [msg,     setMsg]     = useState('')
+  const [msgType, setMsgType] = useState<'ok'|'err'>('ok')
+
+  useEffect(() => {
+    fetch('/api/sales/settings').then(r => r.json()).then(d => {
+      setTarget(d.settings?.commission?.team_target ?? 0)
+      setPeriod(d.settings?.commission?.team_target_period ?? 'monthly')
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  function flash(text: string, type: 'ok'|'err') { setMsg(text); setMsgType(type); setTimeout(() => setMsg(''), 3000) }
+
+  async function save() {
+    setSaving(true)
+    const res = await fetch('/api/sales/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commission: { team_target: target, team_target_period: period, enabled: target > 0 } }),
+    })
+    setSaving(false)
+    if (res.ok) flash('Saved', 'ok')
+    else flash('Failed', 'err')
+  }
+
+  return (
+    <div className="fadaa-card" style={{ padding: '20px 24px' }}>
+      <div className="card-header" style={{ marginBottom: 16 }}>
+        <div>
+          <h3 className="t-section-title">Team Commission Target</h3>
+          <p className="t-caption" style={{ marginTop: 3 }}>Set a revenue target to show a team progress bar on the dashboard.</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {msg && <span style={{ fontSize: 12, color: msgType === 'ok' ? 'var(--brand-green-text)' : 'var(--brand-red-text)' }}>{msgType === 'ok' ? '✓' : '⚠'} {msg}</span>}
+          <button onClick={save} disabled={saving || loading} className="fadaa-btn fadaa-btn-sm">
+            {saving ? <><span className="spinner spinner-sm" style={{ borderTopColor: '#fff' }} /> Saving…</> : 'Save'}
+          </button>
+        </div>
+      </div>
+      {loading ? <div className="skeleton" style={{ height: 44, borderRadius: 8 }} /> : (
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label className="t-label">Target Amount ($)</label>
+            <input className="fadaa-input" type="number" min={0} style={{ width: 160 }}
+              value={target} onChange={e => setTarget(parseFloat(e.target.value) || 0)} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label className="t-label">Period</label>
+            <select className="fadaa-input" value={period} onChange={e => setPeriod(e.target.value as 'monthly'|'quarterly'|'yearly')}>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+type SettingsTab = 'notifications' | 'services' | 'challenges' | 'system'
+
 export default function SettingsPage() {
   const { data: session } = useSession()
   const role = (session?.user as { role?: string })?.role ?? 'rep'
   const isPrivileged = role === 'manager' || role === 'admin'
+  const isAdmin      = role === 'admin'
+  const [tab, setTab] = useState<SettingsTab>('notifications')
 
   return (
     <SalesShell>
-      <div className="page-header" style={{ marginBottom: 32 }}>
+      <div className="page-header" style={{ marginBottom: 24 }}>
         <div className="page-header-left">
           <h1 className="t-page-title">Settings</h1>
           <p className="t-caption">
@@ -158,9 +229,38 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 700, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <NotificationSettingsCard role={role} />
+      {/* Tab bar */}
+      <div className="tab-underline-bar" style={{ marginBottom: 24 }}>
+        <button className={`tab-underline${tab === 'notifications' ? ' active' : ''}`} onClick={() => setTab('notifications')}>
+          Notifications
+        </button>
         {isPrivileged && (
+          <button className={`tab-underline${tab === 'services' ? ' active' : ''}`} onClick={() => setTab('services')}>
+            Services & Commissions
+          </button>
+        )}
+        {isAdmin && (
+          <button className={`tab-underline${tab === 'challenges' ? ' active' : ''}`} onClick={() => setTab('challenges')}>
+            Challenges & Rewards
+          </button>
+        )}
+        {isPrivileged && (
+          <button className={`tab-underline${tab === 'system' ? ' active' : ''}`} onClick={() => setTab('system')}>
+            System
+          </button>
+        )}
+      </div>
+
+      <div style={{ maxWidth: 700, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {tab === 'notifications' && <NotificationSettingsCard role={role} />}
+        {tab === 'services' && isPrivileged && (
+          <>
+            <ServicesManager />
+            <CommissionTargetCard />
+          </>
+        )}
+        {tab === 'challenges' && isAdmin && <ChallengeAdminPanel />}
+        {tab === 'system' && isPrivileged && (
           <>
             <AutoAssignCard />
             <ContractTemplateCard />

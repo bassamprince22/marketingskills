@@ -1,12 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { FadaaStatCard } from '@/components/sales/FadaaStatCard'
+import { DailyReportForm } from '@/components/sales/DailyReportForm'
+import { DailyReportCalendar } from '@/components/sales/DailyReportCalendar'
 
 /* Chart palette — maps to CSS token hues */
 const CHART_COLORS = ['#4F8EF7','#7C3AED','#06B6D4','#F59E0B','#22C55E','#EF4444','#A78BFA','#34D399']
@@ -78,11 +81,115 @@ function ReportsSkeleton() {
   )
 }
 
+const TODAY = new Date().toISOString().split('T')[0]
+
+function DailyReportsTab({ role }: { role: string }) {
+  const [selDate, setSelDate] = useState(TODAY)
+  const isPrivileged = role === 'manager' || role === 'admin'
+
+  if (!isPrivileged) {
+    return (
+      <div style={{ maxWidth: 700 }}>
+        <DailyReportForm date={selDate} />
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <DailyReportCalendar onDaySelect={setSelDate} />
+      {selDate && (
+        <div>
+          <p className="t-label" style={{ marginBottom: 12 }}>Reports for {selDate}</p>
+          <ManagerDayDetail date={selDate} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ManagerDayDetail({ date }: { date: string }) {
+  const [reports, setReports] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/sales/daily-reports?date=${date}`)
+      .then(r => r.json())
+      .then(d => { setReports(d.reports ?? []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [date])
+
+  if (loading) return <div className="skeleton" style={{ height: 80, borderRadius: 10 }} />
+  if (reports.length === 0) return (
+    <div className="empty-state">
+      <div className="empty-state-icon">📋</div>
+      <p className="empty-state-title">No reports for this date</p>
+      <p className="empty-state-sub">Reps haven't submitted reports for {date}</p>
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {reports.map((r: any) => (
+        <div key={r.id} className="fadaa-card" style={{ padding: '16px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontSize: 13, fontWeight: 700,
+              }}>
+                {(r.sales_users?.name ?? 'U').charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="t-card-title">{r.sales_users?.name ?? 'Unknown'}</p>
+                <p className="t-caption">{r.status === 'submitted' ? '✓ Submitted' : '◎ Draft'}</p>
+              </div>
+            </div>
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999,
+              background: r.status === 'submitted' ? 'var(--brand-green-dim)' : 'var(--brand-amber-dim)',
+              color: r.status === 'submitted' ? 'var(--brand-green-text)' : 'var(--brand-amber-text)',
+            }}>
+              {r.status}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px,1fr))', gap: 10 }}>
+            {[
+              { label: 'Leads', value: r.leads_total },
+              { label: 'Qualified', value: r.leads_qualified },
+              { label: 'Meetings', value: r.meetings_done },
+              { label: 'Proposals', value: r.proposals_sent },
+              { label: 'Won', value: r.won_today },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ textAlign: 'center', padding: '8px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+                <p className="t-mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{value}</p>
+                <p className="t-caption" style={{ marginTop: 2 }}>{label}</p>
+              </div>
+            ))}
+          </div>
+          {r.highlights && <p className="t-caption" style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(79,142,247,0.05)', borderRadius: 6, borderLeft: '2px solid var(--brand-primary)' }}>{r.highlights}</p>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function ReportsPage() {
+  const { data: session } = useSession()
+  const role = (session?.user as { role?: string })?.role ?? 'rep'
+  const isPrivileged = role === 'manager' || role === 'admin'
+
+  const [tab,     setTab]     = useState<'analytics' | 'daily'>('analytics')
   const [data,    setData]    = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [from,    setFrom]    = useState('')
   const [to,      setTo]      = useState('')
+
+  // Reps default to daily reports tab
+  useEffect(() => { if (!isPrivileged) setTab('daily') }, [isPrivileged])
 
   function load() {
     setLoading(true)
@@ -94,7 +201,7 @@ export default function ReportsPage() {
       .then(d => { setData(d); setLoading(false) })
   }
 
-  useEffect(() => { load() }, []) // eslint-disable-line
+  useEffect(() => { if (tab === 'analytics') load() }, [tab]) // eslint-disable-line
 
   const axisStyle = { fill: 'var(--text-muted)', fontSize: 11 } as const
   const axisSecondary = { fill: 'var(--text-secondary)', fontSize: 11 } as const
@@ -104,8 +211,11 @@ export default function ReportsPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="t-page-title">Reports</h1>
-          <p className="t-caption">Sales performance analytics</p>
+          <p className="t-caption">
+            {tab === 'analytics' ? 'Sales performance analytics' : 'Daily end-of-day reports'}
+          </p>
         </div>
+        {tab === 'analytics' && isPrivileged && (
         <div className="filter-bar">
           <input className="fadaa-input filter-select" type="date" value={from} onChange={e => setFrom(e.target.value)} style={{ maxWidth: 160 }} aria-label="From date" />
           <span className="t-caption">to</span>
@@ -115,9 +225,24 @@ export default function ReportsPage() {
             <button className="fadaa-btn-ghost fadaa-btn-sm" onClick={() => { setFrom(''); setTo(''); setTimeout(load, 0) }}>Clear</button>
           )}
         </div>
+        )}
       </div>
 
-      {loading || !data ? <ReportsSkeleton /> : (() => {
+      {/* Tab bar */}
+      <div className="tab-underline-bar" style={{ marginBottom: 24 }}>
+        {isPrivileged && (
+          <button className={`tab-underline${tab === 'analytics' ? ' active' : ''}`} onClick={() => setTab('analytics')}>
+            Analytics
+          </button>
+        )}
+        <button className={`tab-underline${tab === 'daily' ? ' active' : ''}`} onClick={() => setTab('daily')}>
+          Daily Reports
+        </button>
+      </div>
+
+      {tab === 'daily' && <DailyReportsTab role={role} />}
+
+      {tab === 'analytics' && (loading || !data ? <ReportsSkeleton /> : (() => {
         const { summary, bySource, byService, qualByRep, meetingsByRep, monthly, pipelineValue } = data
         const sourceData   = Object.entries(bySource   as Record<string, number>).map(([k, v]) => ({ name: SOURCE_LABELS[k]  ?? k, value: v }))
         const serviceData  = Object.entries(byService  as Record<string, number>).map(([k, v]) => ({ name: SERVICE_LABELS[k] ?? k, value: v }))
@@ -271,7 +396,7 @@ export default function ReportsPage() {
             </section>
           </div>
         )
-      })()}
+      })())}
     </SalesShell>
   )
 }

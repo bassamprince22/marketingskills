@@ -3,10 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
 import { readSettings, DEFAULT_NOTIFICATIONS } from '@/lib/sales/autoAssign'
+import { sendReportReminderEmail } from '@/lib/sales/emailReporter'
 
 export interface Notification {
   id:        string
-  type:      'new_leads' | 'urgent' | 'stuck' | 'overdue' | 'unassigned' | 'hot_deals'
+  type:      'new_leads' | 'urgent' | 'stuck' | 'overdue' | 'unassigned' | 'hot_deals' | 'daily_report' | 'challenge'
   severity:  'critical' | 'warning' | 'info'
   title:     string
   message:   string
@@ -137,6 +138,88 @@ export async function GET() {
       })
     }
   }
+
+  // ── 7. Daily report reminder ──────────────────────────────────────
+  const drCfg = cfg.daily_report
+  if (drCfg.reminder_enabled) {
+    const currentHour = now.getHours()
+    if (currentHour >= drCfg.reminder_hour) {
+      const today = now.toISOString().slice(0, 10)
+      try {
+        const { data: allReps } = await db.from('sales_users')
+          .select('id, name, email').eq('is_active', true).in('role', ['rep', 'manager'])
+
+        const { data: submitted } = await db.from('sales_daily_reports')
+          .select('user_id').eq('report_date', today).eq('status', 'submitted')
+
+        const submittedIds = new Set((submitted ?? []).map(r => r.user_id))
+        const missing      = (allReps ?? []).filter(r => !submittedIds.has(r.id))
+
+        if (missing.length > 0) {
+          notifications.push({
+            id:        'daily_report',
+            type:      'daily_report',
+            severity:  'warning',
+            title:     `${missing.length} rep${missing.length !== 1 ? 's' : ''} haven't submitted today's report`,
+            message:   `${submittedIds.size} submitted · ${missing.length} pending`,
+            count:     missing.length,
+            filterUrl: '/sales/reports',
+          })
+
+          // Send email reminder once per day (throttle check)
+          if (drCfg.email_reminder) {
+            const { data: managers } = await db.from('sales_users')
+              .select('email').in('role', ['manager', 'admin']).eq('is_active', true)
+            const managerEmails = (managers ?? []).map(m => m.email).filter(Boolean)
+            await sendReportReminderEmail(managerEmails, missing, submittedIds.size)
+          }
+        }
+      } catch { /* silent if table missing */ }
+    }
+  }
+
+  // ── 8. Active challenge achievements ─────────────────────────────
+  try {
+    const { data: activeChallenges } = await db.from('sales_challenges')
+      .select('id, title, target_amount, start_date, end_date, sales_challenge_rewards(*)')
+      .eq('is_active', true)
+      .limit(1)
+
+    const challenge = activeChallenges?.[0]
+    if (challenge && challenge.target_amount) {
+      // Get leaderboard totals
+      let leadsQ = db.from('sales_leads')
+        .select('assigned_rep_id, estimated_value')
+        .eq('pipeline_stage', 'won')
+        .gte('updated_at', challenge.start_date)
+
+      if (challenge.end_date) {
+        leadsQ = leadsQ.lte('updated_at', challenge.end_date + 'T23:59:59')
+      }
+
+      const { data: wonLeads } = await leadsQ
+      const repTotals: Record<string, number> = {}
+      for (const lead of (wonLeads ?? [])) {
+        if (lead.assigned_rep_id) {
+          repTotals[lead.assigned_rep_id] = (repTotals[lead.assigned_rep_id] ?? 0) + Number(lead.estimated_value ?? 0)
+        }
+      }
+
+      // Count reps who've hit target
+      const achieved = Object.values(repTotals).filter(v => v >= Number(challenge.target_amount)).length
+      if (achieved > 0) {
+        notifications.push({
+          id:        'challenge',
+          type:      'challenge',
+          severity:  'info',
+          title:     `${achieved} rep${achieved !== 1 ? 's' : ''} reached the challenge target!`,
+          message:   `${challenge.title} · ${achieved} rep${achieved !== 1 ? 's' : ''} hit $${Number(challenge.target_amount).toLocaleString()}`,
+          count:     achieved,
+          filterUrl: '/sales/challenges',
+        })
+      }
+    }
+  } catch { /* silent if table missing */ }
 
   const order = { critical: 0, warning: 1, info: 2 }
   notifications.sort((a, b) => order[a.severity] - order[b.severity])

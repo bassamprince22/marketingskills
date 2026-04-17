@@ -49,6 +49,12 @@ export async function PATCH(req: NextRequest) {
         system: { ...current.notifications.system, ...body.notifications.system },
       },
     } : {}),
+    ...(body.daily_report ? {
+      daily_report: { ...current.daily_report, ...body.daily_report },
+    } : {}),
+    ...(body.commission ? {
+      commission: { ...current.commission, ...body.commission },
+    } : {}),
   }
 
   await writeSettings(db, updated)

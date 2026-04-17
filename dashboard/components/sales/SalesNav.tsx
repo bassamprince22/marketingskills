@@ -89,6 +89,25 @@ const Icons = {
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
     </svg>
   ),
+  Commission: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M14.5 9.5a2.5 2.5 0 0 0-5 0c0 1.5 1 2.5 2.5 3s2.5 1.5 2.5 3a2.5 2.5 0 0 1-5 0"/>
+      <line x1="12" y1="7" x2="12" y2="5"/>
+      <line x1="12" y1="19" x2="12" y2="17"/>
+    </svg>
+  ),
+  Challenges: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+    </svg>
+  ),
+  Marketing: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+      <polyline points="16 7 22 7 22 13"/>
+    </svg>
+  ),
   SignOut: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -105,8 +124,11 @@ const NAV: NavItem[] = [
   { href: '/sales/meetings',     label: 'Meetings',     icon: Icons.Meetings,     roles: ['manager','rep','admin'] },
   { href: '/sales/qualified',    label: 'Qualified',    icon: Icons.Qualified,    roles: ['manager','rep','admin'] },
   { href: '/sales/documents',    label: 'Documents',    icon: Icons.Documents,    roles: ['manager','rep','admin'] },
+  { href: '/sales/commissions',  label: 'Commissions',  icon: Icons.Commission,   roles: ['manager','rep','admin'] },
+  { href: '/sales/challenges',   label: 'Challenges',   icon: Icons.Challenges,   roles: ['manager','rep','admin'] },
   { href: '/sales/import',       label: 'Import CSV',   icon: Icons.Import,       roles: ['manager','admin'] },
-  { href: '/sales/reports',      label: 'Reports',      icon: Icons.Reports,      roles: ['manager','admin'] },
+  { href: '/sales/reports',      label: 'Reports',      icon: Icons.Reports,      roles: ['manager','rep','admin'] },
+  { href: '/sales/marketing',    label: 'Marketing',    icon: Icons.Marketing,    roles: ['admin'] },
   { href: '/sales/integrations', label: 'Integrations', icon: Icons.Integrations, roles: ['manager','admin'] },
   { href: '/sales/team',         label: 'Team',         icon: Icons.Team,         roles: ['admin','manager'] },
   { href: '/sales/settings',     label: 'Settings',     icon: Icons.Settings,     roles: ['manager','admin','rep'] },
@@ -138,15 +160,13 @@ export function SalesNav() {
   const { data: session } = useSession()
   const role = (session?.user as { role?: string })?.role ?? 'rep'
   const name = session?.user?.name ?? '—'
+  const avatarUrl = (session?.user as { image?: string })?.image
   const [open, setOpen]   = useState(false)
 
   const visible = NAV.filter(n => n.roles.includes(role))
 
   const logoBlock = (
-    <div style={{
-      padding: '20px 16px 16px',
-      borderBottom: '1px solid var(--border-subtle)',
-    }}>
+    <Link href="/sales/dashboard" style={{ textDecoration: 'none', display: 'block', padding: '20px 16px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <div style={{
           width: 28, height: 28, borderRadius: 8,
@@ -161,7 +181,7 @@ export function SalesNav() {
           <p style={{ color: 'var(--text-muted)', fontSize: 10, letterSpacing: '0.06em' }}>SALES · MISSION CONTROL</p>
         </div>
       </div>
-    </div>
+    </Link>
   )
 
   const userBlock = (onNav?: () => void) => (
@@ -175,12 +195,16 @@ export function SalesNav() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
           width: 32, height: 32, borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
+          background: avatarUrl ? 'transparent' : 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#fff', fontSize: 13, fontWeight: 700, flexShrink: 0,
           boxShadow: '0 2px 8px var(--brand-primary-dim)',
+          overflow: 'hidden',
         }}>
-          {name.charAt(0).toUpperCase()}
+          {avatarUrl
+            ? <img src={avatarUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : name.charAt(0).toUpperCase()
+          }
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
@@ -222,7 +246,7 @@ export function SalesNav() {
 
       {/* ── Mobile top bar ── */}
       <header className="sales-topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Link href="/sales/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
             width: 24, height: 24, borderRadius: 6,
             background: 'linear-gradient(135deg, #4F8EF7, #7C3AED)',
@@ -230,7 +254,7 @@ export function SalesNav() {
             fontSize: 11,
           }}>✦</div>
           <p style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14, letterSpacing: '0.04em' }}>FADAA</p>
-        </div>
+        </Link>
         <button
           onClick={() => setOpen(o => !o)}
           style={{

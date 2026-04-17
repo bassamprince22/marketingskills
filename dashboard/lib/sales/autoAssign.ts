@@ -28,9 +28,25 @@ export interface NotificationSettings {
   system: SystemNotificationSettings
 }
 
+export interface DailyReportSettings {
+  enabled:          boolean
+  retention_days:   3 | 7 | 30
+  reminder_enabled: boolean
+  reminder_hour:    number
+  email_reminder:   boolean
+}
+
+export interface CommissionSettings {
+  enabled:             boolean
+  team_target:         number
+  team_target_period:  'monthly' | 'quarterly' | 'yearly'
+}
+
 export interface Settings {
   auto_assign:   AutoAssignSettings
   notifications: NotificationSettings
+  daily_report:  DailyReportSettings
+  commission:    CommissionSettings
 }
 
 export const DEFAULT_NOTIFICATIONS: NotificationSettings = {
@@ -44,9 +60,25 @@ export const DEFAULT_NOTIFICATIONS: NotificationSettings = {
   },
 }
 
+export const DEFAULT_DAILY_REPORT: DailyReportSettings = {
+  enabled:          true,
+  retention_days:   7,
+  reminder_enabled: true,
+  reminder_hour:    18,
+  email_reminder:   false,
+}
+
+export const DEFAULT_COMMISSION: CommissionSettings = {
+  enabled:            false,
+  team_target:        0,
+  team_target_period: 'monthly',
+}
+
 const DEFAULT: Settings = {
   auto_assign:   { enabled: false, rep_pool: [], last_assigned_rep_id: null },
   notifications: DEFAULT_NOTIFICATIONS,
+  daily_report:  DEFAULT_DAILY_REPORT,
+  commission:    DEFAULT_COMMISSION,
 }
 
 async function readSettings(db: ReturnType<typeof getServiceClient>): Promise<Settings> {
@@ -60,6 +92,8 @@ async function readSettings(db: ReturnType<typeof getServiceClient>): Promise<Se
       notifications: {
         system: { ...DEFAULT_NOTIFICATIONS.system, ...(parsed.notifications?.system ?? {}) },
       },
+      daily_report: { ...DEFAULT_DAILY_REPORT, ...(parsed.daily_report ?? {}) },
+      commission:   { ...DEFAULT_COMMISSION,   ...(parsed.commission   ?? {}) },
     }
   } catch {
     return DEFAULT

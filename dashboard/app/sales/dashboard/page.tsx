@@ -10,6 +10,8 @@ import { RepPerformanceTable } from '@/components/sales/RepPerformanceTable'
 import { ActivityFeed } from '@/components/sales/ActivityFeed'
 import { AutoAssignCard } from '@/components/sales/AutoAssignCard'
 import { NotificationPanel } from '@/components/sales/NotificationPanel'
+import { CommissionWidget } from '@/components/sales/CommissionWidget'
+import { ChallengeRaceWidget } from '@/components/sales/ChallengeRaceWidget'
 import type { ManagerStats, RepStats, PipelineCount, RepPerformance, Activity, Lead, Meeting } from '@/lib/sales/types'
 
 interface DashData {
@@ -240,6 +242,8 @@ function ManagerDash({ data }: { data: DashData }) {
 
       <NotificationPanel />
 
+      <ChallengeRaceWidget />
+
       <AlertBanner overdue={data.overdue} stale={data.stale} atRisk={data.atRisk} todayMeetings={data.todayMeetings} />
 
       <section>
@@ -307,7 +311,11 @@ function RepDash({ data }: { data: DashData }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
+      <ChallengeRaceWidget />
+
       <AlertBanner overdue={data.overdue} stale={data.stale} atRisk={data.atRisk} todayMeetings={data.todayMeetings} />
+
+      <CommissionWidget />
 
       <section>
         <p className="t-label" style={{ marginBottom: 12 }}>My Pipeline</p>
