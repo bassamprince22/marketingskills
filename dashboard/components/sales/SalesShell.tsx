@@ -41,7 +41,7 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
-    const cards = (e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('.fadaa-card')
+    const cards = Array.from((e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('.fadaa-card'))
     for (const card of cards) {
       const rect = card.getBoundingClientRect()
       const x = ((e.clientX - rect.left) / rect.width) * 100
