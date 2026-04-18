@@ -124,27 +124,24 @@ export async function POST(req: NextRequest) {
       // Auto-assign to next rep if enabled
       const assignedRepId = await getNextAssignee()
 
+      // Build insert payload — meta_raw_payload is optional (requires DB migration)
+      const insertPayload: Record<string, unknown> = {
+        contact_person: name,
+        email,
+        phone,
+        company_name: name,
+        lead_source: 'meta',
+        pipeline_stage: 'new_lead',
+        service_type: 'marketing',
+        priority: 'medium',
+        notes,
+        ...(assignedRepId ? { assigned_rep_id: assignedRepId } : {}),
+      }
+
       // Insert into sales_leads
       const { data: lead, error: leadErr } = await db
         .from('sales_leads')
-        .insert({
-          contact_person: name,
-          email,
-          phone,
-          company_name: name,
-          lead_source: 'meta',
-          pipeline_stage: 'new_lead',
-          service_type: 'marketing',
-          priority: 'medium',
-          notes,
-          meta_raw_payload: {
-            fields,
-            ad_name:   leadData.ad_name   ?? null,
-            form_id:   leadData.form_id   ?? null,
-            form_name: null,
-          },
-          ...(assignedRepId ? { assigned_rep_id: assignedRepId } : {}),
-        })
+        .insert(insertPayload)
         .select('id')
         .single()
 

@@ -51,7 +51,7 @@ export async function POST() {
   const pages = (integration.config?.pages as { id: string; name: string; access_token: string }[]) ?? []
   if (pages.length === 0) return NextResponse.json({ error: 'No connected pages found' }, { status: 400 })
 
-  const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000) // 30 days ago in unix seconds
+  const since = Math.floor((Date.now() - 90 * 24 * 60 * 60 * 1000) / 1000) // 90 days ago in unix seconds
 
   let total = 0
   let imported = 0
@@ -117,10 +117,8 @@ export async function POST() {
           .maybeSingle()
 
         if (existing) {
-          // Patch form answers onto existing lead if it has no notes yet
-          if (!existing.notes) {
-            await db.from('sales_leads').update({ notes, meta_raw_payload: metaPayload }).eq('id', existing.id)
-          }
+          // Always overwrite notes with fresh Q&A from Meta form
+          await db.from('sales_leads').update({ notes }).eq('id', existing.id)
           skipped++
           continue
         }
@@ -136,7 +134,6 @@ export async function POST() {
           priority:        'medium',
           created_by:      userId,
           notes,
-          meta_raw_payload: metaPayload,
         })
 
         if (insertErr) { skipped++; continue }
