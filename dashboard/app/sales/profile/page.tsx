@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { AvatarUpload } from '@/components/sales/AvatarUpload'
-import Link from 'next/link'
 
 const DEPT_OPTIONS = ['Sales', 'Marketing', 'Operations', 'Management', 'Technical', 'Finance', 'Other']
 
@@ -30,6 +29,12 @@ export default function ProfilePage() {
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
   const [form,    setForm]    = useState<Record<string, string>>({})
+
+  const [pwExpanded, setPwExpanded] = useState(false)
+  const [pwForm, setPwForm]         = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [pwSaving, setPwSaving]     = useState(false)
+  const [pwError, setPwError]       = useState('')
+  const [pwSaved, setPwSaved]       = useState(false)
 
   useEffect(() => {
     fetch('/api/sales/profile')
@@ -62,6 +67,28 @@ export default function ProfilePage() {
     setProfile(p => p ? { ...p, ...form } : form)
   }
 
+  async function changePassword() {
+    setPwError('')
+    if (pwForm.newPassword !== pwForm.confirmPassword) { setPwError('Passwords do not match'); return }
+    if (pwForm.newPassword.length < 8) { setPwError('Minimum 8 characters'); return }
+    setPwSaving(true)
+    try {
+      const res = await fetch('/api/sales/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'change', currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setPwError(data.error ?? 'Failed to update password'); return }
+      setPwSaved(true)
+      setPwExpanded(false)
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setTimeout(() => setPwSaved(false), 4000)
+    } finally {
+      setPwSaving(false)
+    }
+  }
+
   const label = (l: string) => (
     <label style={{ color: '#64748B', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>{l}</label>
   )
@@ -76,9 +103,6 @@ export default function ProfilePage() {
             <p style={{ color: '#64748B', fontSize: 13, marginTop: 4 }}>Your account information and preferences</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Link href="/sales/password" className="fadaa-btn-ghost" style={{ textDecoration: 'none', fontSize: 13 }}>
-              🔒 Change Password
-            </Link>
             {!editing && (
               <button className="fadaa-btn" onClick={() => setEditing(true)}>✎ Edit Profile</button>
             )}
@@ -158,9 +182,82 @@ export default function ProfilePage() {
               )}
             </div>
 
+            {/* Account & Security */}
+            <div className="fadaa-card" style={{ padding: 28 }}>
+              <h3 style={{ color: '#E2E8F0', fontSize: 15, fontWeight: 700, marginBottom: 20 }}>Account & Security</h3>
+
+              {/* Username */}
+              <div style={{ marginBottom: 24 }}>
+                {label('Username')}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <p style={{ color: '#E2E8F0', fontSize: 14, fontFamily: 'monospace' }}>{user.username}</p>
+                  <span style={{ fontSize: 11, color: '#64748B', background: 'rgba(100,116,139,0.12)', padding: '2px 8px', borderRadius: 999 }}>login ID</span>
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                {label('Password')}
+                {!pwExpanded ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ color: '#94A3B8', fontSize: 18, letterSpacing: 3 }}>••••••••</span>
+                    <button
+                      className="fadaa-btn-ghost"
+                      style={{ fontSize: 12 }}
+                      onClick={() => { setPwExpanded(true); setPwError('') }}
+                    >
+                      Change Password
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 8 }}>
+                    <div>
+                      {label('Current Password')}
+                      <input className="fadaa-input" type="password" autoComplete="current-password"
+                        value={pwForm.currentPassword}
+                        onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))} />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div>
+                        {label('New Password')}
+                        <input className="fadaa-input" type="password" autoComplete="new-password"
+                          placeholder="Min 8 characters"
+                          value={pwForm.newPassword}
+                          onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))} />
+                      </div>
+                      <div>
+                        {label('Confirm New Password')}
+                        <input className="fadaa-input" type="password" autoComplete="new-password"
+                          value={pwForm.confirmPassword}
+                          onChange={e => setPwForm(f => ({ ...f, confirmPassword: e.target.value }))} />
+                      </div>
+                    </div>
+                    {pwError && (
+                      <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', color: '#F87171', fontSize: 13 }}>
+                        {pwError}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                      <button className="fadaa-btn-ghost" onClick={() => { setPwExpanded(false); setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' }); setPwError('') }}>
+                        Cancel
+                      </button>
+                      <button className="fadaa-btn" onClick={changePassword} disabled={pwSaving}>
+                        {pwSaving ? 'Updating…' : 'Update Password'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {saved && (
               <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 10, padding: '12px 16px', color: '#4ADE80', fontSize: 13 }}>
                 ✓ Profile updated successfully
+              </div>
+            )}
+            {pwSaved && (
+              <div style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 10, padding: '12px 16px', color: '#4ADE80', fontSize: 13 }}>
+                ✓ Password updated successfully
               </div>
             )}
           </div>
