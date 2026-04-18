@@ -176,3 +176,51 @@ export async function sendRewardAchievedEmail(
 
   await send([repEmail], `${reward.badge_emoji ?? '🏆'} You've earned: ${reward.title}!`, html)
 }
+
+/* ── Team invite ─────────────────────────────────────────────────────── */
+const ROLE_LABELS: Record<string, string> = { manager: 'Sales Manager', rep: 'Sales Rep', admin: 'Admin' }
+
+export async function sendInviteEmail(
+  inviteEmail: string,
+  role: string,
+  inviteUrl: string,
+  expiresAt: string,
+) {
+  if (!getKey()) return
+  const roleLabel = ROLE_LABELS[role] ?? role
+  const expiryDate = new Date(expiresAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+
+  const html = `
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="font-size:48px;margin-bottom:12px;">✉</div>
+      <h2 style="color:#E2E8F0;font-size:22px;font-weight:800;margin:0 0 6px;">You're invited to Fadaa Sales</h2>
+      <p style="color:#64748B;font-size:14px;margin:0;">
+        You've been added as <span style="color:#7CB9FC;font-weight:700;">${roleLabel}</span>
+      </p>
+    </div>
+
+    <p style="color:#94A3B8;font-size:14px;line-height:1.7;margin:0 0 24px;text-align:center;">
+      Click the button below to create your account. Choose your own username and password.
+    </p>
+
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${inviteUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,#4F8EF7,#7C3AED);color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 36px;border-radius:12px;letter-spacing:0.03em;">
+        → Create My Account
+      </a>
+    </div>
+
+    <div style="background:rgba(79,142,247,0.06);border:1px solid rgba(79,142,247,0.18);border-radius:10px;padding:14px 18px;margin-top:20px;">
+      <p style="color:#64748B;font-size:12px;margin:0;line-height:1.6;">
+        Or copy this link:<br>
+        <span style="color:#7CB9FC;word-break:break-all;font-size:11px;font-family:monospace;">${inviteUrl}</span>
+      </p>
+    </div>
+
+    <p style="color:#64748B;font-size:12px;text-align:center;margin:20px 0 0;">
+      This invite expires on <strong style="color:#94A3B8;">${expiryDate}</strong> and can only be used once.
+    </p>
+  `
+
+  await send([inviteEmail], '✉ You\'ve been invited to Fadaa Sales CRM', html)
+}

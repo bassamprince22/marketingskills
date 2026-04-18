@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
+import { sendInviteEmail } from '@/lib/sales/emailReporter'
 import crypto from 'crypto'
 
 // GET: list pending invites (admin only)
@@ -54,6 +55,9 @@ export async function POST(req: NextRequest) {
 
   const origin = req.nextUrl.origin
   const inviteUrl = `${origin}/sales/invite/${token}`
+
+  // Send invite email (non-blocking — fails silently if RESEND_API_KEY not set)
+  sendInviteEmail(data.email, data.role, inviteUrl, data.expires_at).catch(() => {})
 
   return NextResponse.json({ invite: data, inviteUrl }, { status: 201 })
 }
