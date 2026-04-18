@@ -110,6 +110,16 @@ export async function POST(req: NextRequest) {
       const email = fields.email || ''
       const phone = fields.phone_number || fields.phone || ''
 
+      // Format every form answer as a readable Q&A block stored in notes
+      function fmtKey(k: string) { return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }
+      const qaLines = Object.entries(fields).filter(([, v]) => v.trim()).map(([k, v]) => `${fmtKey(k)}: ${v}`)
+      const notes = [
+        ...qaLines,
+        '',
+        `Ad: ${leadData.ad_name ?? '—'}`,
+        `Form ID: ${leadData.form_id ?? '—'}`,
+      ].join('\n').trim()
+
       // Auto-assign to next rep if enabled
       const assignedRepId = await getNextAssignee()
 
@@ -125,6 +135,7 @@ export async function POST(req: NextRequest) {
           pipeline_stage: 'new_lead',
           service_type: 'marketing',
           priority: 'medium',
+          notes,
           meta_raw_payload: {
             fields,
             ad_name:   leadData.ad_name   ?? null,

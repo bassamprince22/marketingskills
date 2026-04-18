@@ -89,17 +89,40 @@ export async function POST() {
 
         if (!email && !phone) { skipped++; continue }
 
-        // Duplicate check
+        function fmtKey(k: string) { return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }
+        const qaLines = Object.entries(fields).filter(([, v]) => v.trim()).map(([k, v]) => `${fmtKey(k)}: ${v}`)
+        const notes = [
+          ...qaLines,
+          '',
+          `Form: ${form.name}`,
+          `Ad: ${lead.ad_name ?? '—'}`,
+        ].join('\n').trim()
+
+        const metaPayload = {
+          fields,
+          ad_name:   lead.ad_name   ?? null,
+          form_id:   null,
+          form_name: form.name ?? null,
+        }
+
+        // Duplicate check — update existing lead with form answers instead of skipping
         const { data: existing } = await db
           .from('sales_leads')
-          .select('id')
+          .select('id, notes')
           .or(
             [email ? `email.eq.${email}` : null, phone ? `phone.eq.${phone}` : null]
               .filter(Boolean).join(',')
           )
           .maybeSingle()
 
-        if (existing) { skipped++; continue }
+        if (existing) {
+          // Patch form answers onto existing lead if it has no notes yet
+          if (!existing.notes) {
+            await db.from('sales_leads').update({ notes, meta_raw_payload: metaPayload }).eq('id', existing.id)
+          }
+          skipped++
+          continue
+        }
 
         const { error: insertErr } = await db.from('sales_leads').insert({
           contact_person:  name,
@@ -111,12 +134,8 @@ export async function POST() {
           service_type:    'marketing',
           priority:        'medium',
           created_by:      userId,
-          meta_raw_payload: {
-            fields,
-            ad_name:   lead.ad_name ?? null,
-            form_id:   null,
-            form_name: form.name ?? null,
-          },
+          notes,
+          meta_raw_payload: metaPayload,
         })
 
         if (insertErr) { skipped++; continue }

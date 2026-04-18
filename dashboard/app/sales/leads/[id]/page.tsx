@@ -232,45 +232,80 @@ export default function LeadDetailPage() {
             </div>
           )}
 
-          {lead.lead_source === 'meta' && lead.meta_raw_payload && Object.keys(lead.meta_raw_payload.fields ?? {}).length > 0 && (
-            <div className="fadaa-card" style={{ gridColumn: '1 / -1' }}>
-              <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h3 className="t-label" style={{ color: '#4F8EF7' }}>⚡ Meta Form Answers</h3>
-                {(lead.meta_raw_payload.ad_name || lead.meta_raw_payload.form_name) && (
-                  <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto', paddingRight: 20 }}>
-                    {lead.meta_raw_payload.form_name ? `Form: ${lead.meta_raw_payload.form_name}` : ''}
-                    {lead.meta_raw_payload.form_name && lead.meta_raw_payload.ad_name ? ' · ' : ''}
-                    {lead.meta_raw_payload.ad_name ? `Ad: ${lead.meta_raw_payload.ad_name}` : ''}
-                  </span>
-                )}
-              </div>
-              <div style={{ padding: '12px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 0' }}>
-                {Object.entries(lead.meta_raw_payload.fields).map(([key, value]) => {
-                  if (!value) return null
-                  const label = key
-                    .replace(/_/g, ' ')
-                    .replace(/\b\w/g, c => c.toUpperCase())
-                  return (
-                    <div key={key} className="info-row" style={{ gridColumn: 'span 1' }}>
-                      <span className="info-row-label">{label}</span>
-                      <span className="info-row-value" style={{ wordBreak: 'break-word' }}>{value}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+          {(() => {
+            // Build form Q&A from meta_raw_payload if available, or parse from notes
+            let displayFields: Record<string, string> | null = null
+            let adName: string | null = null
+            let formName: string | null = null
 
-          {lead.notes && (
-            <div className="fadaa-card" style={{ gridColumn: '1 / -1' }}>
-              <div className="card-header">
-                <h3 className="t-label" style={{ color: '#F59E0B' }}>Notes</h3>
-              </div>
-              <div style={{ padding: '16px 20px' }}>
-                <p className="t-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{lead.notes}</p>
-              </div>
-            </div>
-          )}
+            if (lead.lead_source === 'meta') {
+              if (lead.meta_raw_payload && Object.keys(lead.meta_raw_payload.fields ?? {}).length > 0) {
+                displayFields = lead.meta_raw_payload.fields
+                adName   = lead.meta_raw_payload.ad_name ?? null
+                formName = lead.meta_raw_payload.form_name ?? null
+              } else if (lead.notes) {
+                // Parse notes that were written as "Key: Value" lines by the webhook/import
+                const parsed: Record<string, string> = {}
+                for (const line of lead.notes.split('\n')) {
+                  const idx = line.indexOf(':')
+                  if (idx < 1) continue
+                  const rawKey = line.slice(0, idx).trim()
+                  const val    = line.slice(idx + 1).trim()
+                  if (!val) continue
+                  const k = rawKey.toLowerCase()
+                  if (k === 'ad')    { adName   = val; continue }
+                  if (k === 'form' || k === 'form name') { formName = val; continue }
+                  if (k === 'form id' || k === 'source') continue
+                  parsed[rawKey] = val
+                }
+                if (Object.keys(parsed).length > 0) displayFields = parsed
+              }
+            }
+
+            const hasMetaAnswers = displayFields && Object.keys(displayFields).length > 0
+
+            return (
+              <>
+                {hasMetaAnswers && (
+                  <div className="fadaa-card" style={{ gridColumn: '1 / -1', border: '1px solid rgba(79,142,247,0.2)', background: 'rgba(79,142,247,0.03)' }}>
+                    <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <h3 className="t-label" style={{ color: '#4F8EF7' }}>⚡ Meta Form Answers</h3>
+                      {(adName || formName) && (
+                        <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto', paddingRight: 20 }}>
+                          {formName ? `Form: ${formName}` : ''}
+                          {formName && adName ? ' · ' : ''}
+                          {adName ? `Ad: ${adName}` : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ padding: '12px 20px' }}>
+                      {Object.entries(displayFields!).map(([key, value]) => {
+                        if (!value) return null
+                        const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                        return (
+                          <div key={key} className="info-row">
+                            <span className="info-row-label">{label}</span>
+                            <span className="info-row-value" style={{ wordBreak: 'break-word' }}>{value}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {lead.notes && !hasMetaAnswers && (
+                  <div className="fadaa-card" style={{ gridColumn: '1 / -1' }}>
+                    <div className="card-header">
+                      <h3 className="t-label" style={{ color: '#F59E0B' }}>Notes</h3>
+                    </div>
+                    <div style={{ padding: '16px 20px' }}>
+                      <p className="t-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{lead.notes}</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       )}
 
