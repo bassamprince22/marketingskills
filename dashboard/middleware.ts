@@ -11,7 +11,8 @@ export default withAuth(
       pathname.startsWith('/sales') &&
       !pathname.startsWith('/sales/login') &&
       !pathname.startsWith('/sales/forgot-password') &&
-      !pathname.startsWith('/sales/reset-password')
+      !pathname.startsWith('/sales/reset-password') &&
+      !pathname.startsWith('/sales/invite/')
     ) {
       if (!token) {
         return NextResponse.redirect(new URL('/sales/login', req.url))
@@ -57,7 +58,10 @@ export default withAuth(
           // Meta webhook is server-to-server from Facebook — must be public
           pathname.startsWith('/api/sales/integrations/meta/webhook') ||
           // Password reset API endpoint must be public for forgot-password flow
-          pathname === '/api/sales/password'
+          pathname === '/api/sales/password' ||
+          // Invite validate / accept: public (token-authenticated)
+          pathname.startsWith('/sales/invite/') ||
+          /^\/api\/sales\/invites\/[^/]+(\/accept)?$/.test(pathname)
         ) return true
         // All other paths require auth
         return !!token
