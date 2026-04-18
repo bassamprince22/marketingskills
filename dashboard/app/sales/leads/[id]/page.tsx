@@ -232,6 +232,35 @@ export default function LeadDetailPage() {
             </div>
           )}
 
+          {lead.lead_source === 'meta' && lead.meta_raw_payload && Object.keys(lead.meta_raw_payload.fields ?? {}).length > 0 && (
+            <div className="fadaa-card" style={{ gridColumn: '1 / -1' }}>
+              <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 className="t-label" style={{ color: '#4F8EF7' }}>⚡ Meta Form Answers</h3>
+                {(lead.meta_raw_payload.ad_name || lead.meta_raw_payload.form_name) && (
+                  <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto', paddingRight: 20 }}>
+                    {lead.meta_raw_payload.form_name ? `Form: ${lead.meta_raw_payload.form_name}` : ''}
+                    {lead.meta_raw_payload.form_name && lead.meta_raw_payload.ad_name ? ' · ' : ''}
+                    {lead.meta_raw_payload.ad_name ? `Ad: ${lead.meta_raw_payload.ad_name}` : ''}
+                  </span>
+                )}
+              </div>
+              <div style={{ padding: '12px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 0' }}>
+                {Object.entries(lead.meta_raw_payload.fields).map(([key, value]) => {
+                  if (!value) return null
+                  const label = key
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, c => c.toUpperCase())
+                  return (
+                    <div key={key} className="info-row" style={{ gridColumn: 'span 1' }}>
+                      <span className="info-row-label">{label}</span>
+                      <span className="info-row-value" style={{ wordBreak: 'break-word' }}>{value}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {lead.notes && (
             <div className="fadaa-card" style={{ gridColumn: '1 / -1' }}>
               <div className="card-header">

@@ -109,7 +109,6 @@ export async function POST(req: NextRequest) {
       const name  = fields.full_name || fields.name || fields.first_name || 'Unknown'
       const email = fields.email || ''
       const phone = fields.phone_number || fields.phone || ''
-      const notes = `Source: Meta Lead Ad\nAd: ${leadData.ad_name ?? '—'}\nForm ID: ${leadData.form_id ?? '—'}`
 
       // Auto-assign to next rep if enabled
       const assignedRepId = await getNextAssignee()
@@ -125,8 +124,13 @@ export async function POST(req: NextRequest) {
           lead_source: 'meta',
           pipeline_stage: 'new_lead',
           service_type: 'marketing',
-          notes,
           priority: 'medium',
+          meta_raw_payload: {
+            fields,
+            ad_name:   leadData.ad_name   ?? null,
+            form_id:   leadData.form_id   ?? null,
+            form_name: null,
+          },
           ...(assignedRepId ? { assigned_rep_id: assignedRepId } : {}),
         })
         .select('id')
