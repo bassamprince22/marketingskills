@@ -7,7 +7,12 @@ export default withAuth(
     const { pathname } = req.nextUrl
 
     // Sales routes require a real role (not the legacy single-password admin)
-    if (pathname.startsWith('/sales') && !pathname.startsWith('/sales/login')) {
+    if (
+      pathname.startsWith('/sales') &&
+      !pathname.startsWith('/sales/login') &&
+      !pathname.startsWith('/sales/forgot-password') &&
+      !pathname.startsWith('/sales/reset-password')
+    ) {
       if (!token) {
         return NextResponse.redirect(new URL('/sales/login', req.url))
       }
