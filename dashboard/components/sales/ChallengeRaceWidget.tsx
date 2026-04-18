@@ -74,6 +74,8 @@ export function ChallengeRaceWidget() {
   const [rewards,      setRewards]      = useState<Reward[]>([])
   const [loading,      setLoading]      = useState(true)
   const [congrats,     setCongrats]     = useState<Reward | null>(null)
+  const [claiming,     setClaiming]     = useState(false)
+  const [claimed,      setClaimed]      = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     try {
@@ -99,6 +101,22 @@ export function ChallengeRaceWidget() {
   const max     = Math.max(...leaderboard.map(e => e.amount), 1)
   const target  = challenge.target_amount ?? max
   const myEntry = leaderboard.find(e => e.rep_id === userId)
+
+  async function claimReward(reward: Reward, amountAchieved: number | null) {
+    if (claiming) return
+    setClaiming(true)
+    try {
+      const res = await fetch(`/api/sales/challenges/${challenge!.id}/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reward_id: reward.id, amount_achieved: amountAchieved }),
+      })
+      if (res.ok) {
+        setClaimed(prev => { const n = new Set(prev); n.add(reward.id); return n })
+        setCongrats(reward)
+      }
+    } finally { setClaiming(false) }
+  }
 
   // Only show own bar to rep if not transparent
   const displayBoard = !challenge.transparent && role === 'rep'
@@ -228,6 +246,47 @@ export function ChallengeRaceWidget() {
             Target: {fmt(challenge.target_amount)}
           </p>
         )}
+
+        {/* Claim Reward — reps only, when they have a qualifying rank */}
+        {role === 'rep' && myEntry && (() => {
+          const myReward = rewards.find(r => r.rank === myEntry.rank)
+          if (!myReward) return null
+          const alreadyClaimed = claimed.has(myReward.id)
+          return (
+            <div style={{
+              marginTop: 20, padding: '14px 16px', borderRadius: 10,
+              background: 'rgba(79,142,247,0.08)', border: '1px solid rgba(79,142,247,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 24 }}>{myReward.badge_emoji}</span>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    You qualified: {myReward.title}
+                  </p>
+                  {myReward.cash_amount && (
+                    <p style={{ fontSize: 12, color: 'var(--brand-green-text)', fontWeight: 600 }}>
+                      {fmt(myReward.cash_amount)} reward
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                disabled={alreadyClaimed || claiming}
+                onClick={() => claimReward(myReward, myEntry.amount)}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: 'none', cursor: alreadyClaimed ? 'default' : 'pointer',
+                  background: alreadyClaimed ? 'rgba(100,116,139,0.2)' : 'linear-gradient(135deg, #4F8EF7, #7C3AED)',
+                  color: alreadyClaimed ? 'var(--text-faint)' : '#fff',
+                  fontSize: 13, fontWeight: 700, transition: 'opacity 0.15s',
+                  opacity: claiming ? 0.6 : 1, flexShrink: 0,
+                }}
+              >
+                {alreadyClaimed ? '✓ Claimed' : claiming ? 'Claiming…' : '🎉 Claim Reward'}
+              </button>
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
