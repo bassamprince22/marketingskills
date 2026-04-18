@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     await Promise.all(ids.map(leadId =>
       logActivity({
         lead_id: leadId, user_id: userId,
-        action_type: 'note',
+        action_type: 'lead_assigned',
         description: repId ? 'Bulk assigned to rep' : 'Bulk unassigned',
       })
     ))
