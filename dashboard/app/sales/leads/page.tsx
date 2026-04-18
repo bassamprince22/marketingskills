@@ -15,11 +15,41 @@ export default function LeadsPage() {
   const role      = (session?.user as { role?: string })?.role ?? 'rep'
   const canAssign = role === 'manager' || role === 'admin'
 
-  const [leads,   setLeads]   = useState<Lead[]>([])
-  const [reps,    setReps]    = useState<Rep[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search,  setSearch]  = useState('')
-  const [filters, setFilters] = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '' })
+  const [leads,    setLeads]    = useState<Lead[]>([])
+  const [reps,     setReps]     = useState<Rep[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [search,   setSearch]   = useState('')
+  const [filters,  setFilters]  = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '' })
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  // ── Read initial state from URL on mount ──────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const sp = new URLSearchParams(window.location.search)
+    setSearch(sp.get('search') ?? '')
+    setFilters({
+      stage:       sp.get('stage')       ?? '',
+      serviceType: sp.get('serviceType') ?? '',
+      source:      sp.get('source')      ?? '',
+      priority:    sp.get('priority')    ?? '',
+      repId:       sp.get('repId')       ?? '',
+    })
+  }, [])
+
+  // ── Sync filters → URL silently ────────────────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const sp = new URLSearchParams()
+    if (search)              sp.set('search',      search)
+    if (filters.stage)       sp.set('stage',        filters.stage)
+    if (filters.serviceType) sp.set('serviceType',  filters.serviceType)
+    if (filters.source)      sp.set('source',       filters.source)
+    if (filters.priority)    sp.set('priority',     filters.priority)
+    if (filters.repId)       sp.set('repId',        filters.repId)
+    const url = sp.toString() ? `/sales/leads?${sp}` : '/sales/leads'
+    window.history.replaceState({}, '', url)
+  }, [search, filters])
 
   const loadLeads = useCallback(() => {
     setLoading(true)
@@ -56,6 +86,28 @@ export default function LeadsPage() {
     })
   }, [reps])
 
+  // ── Bulk selection ─────────────────────────────────────────────────────
+  const toggleSelect = useCallback((id: string, on: boolean) =>
+    setSelected(s => { const n = new Set(s); on ? n.add(id) : n.delete(id); return n }), [])
+
+  const toggleAll = () =>
+    setSelected(s => s.size === leads.length ? new Set() : new Set(leads.map(l => l.id)))
+
+  const clearSelection = () => setSelected(new Set())
+
+  async function bulkAction(action: 'assign' | 'stage', value: string) {
+    if (!value || selected.size === 0) return
+    setBulkBusy(true)
+    await fetch('/api/sales/leads/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [...selected], action, value: value || null }),
+    })
+    clearSelection()
+    loadLeads()
+    setBulkBusy(false)
+  }
+
   const setFilter = (k: string) => (e: React.ChangeEvent<HTMLSelectElement>) =>
     setFilters(f => ({ ...f, [k]: e.target.value }))
 
@@ -72,7 +124,12 @@ export default function LeadsPage() {
             {role === 'rep' ? ' in your orbit' : ' across all reps'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {canAssign && leads.length > 0 && (
+            <button className="fadaa-btn-ghost fadaa-btn-sm" onClick={toggleAll}>
+              {selected.size === leads.length ? 'Deselect all' : 'Select all'}
+            </button>
+          )}
           {canAssign && (
             <Link href="/sales/import" className="fadaa-btn-ghost fadaa-btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               ↧ Import CSV
@@ -133,9 +190,9 @@ export default function LeadsPage() {
 
       {/* Lead grid */}
       {loading ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 12 }}>
           {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i} className="fadaa-card skeleton" style={{ height: 160 }} />
+            <div key={i} className="fadaa-card skeleton" style={{ height: 180 }} />
           ))}
         </div>
       ) : leads.length === 0 ? (
@@ -157,10 +214,60 @@ export default function LeadsPage() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 12, paddingBottom: selected.size > 0 ? 80 : 0 }}>
           {leads.map(lead => (
-            <LeadCard key={lead.id} lead={lead} canAssign={canAssign} reps={reps} onAssign={handleAssign} />
+            <LeadCard
+              key={lead.id} lead={lead} canAssign={canAssign} reps={reps}
+              onAssign={handleAssign}
+              selected={selected.has(lead.id)}
+              onSelect={canAssign ? toggleSelect : undefined}
+            />
           ))}
+        </div>
+      )}
+
+      {/* Bulk action tray */}
+      {selected.size > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(13,21,38,0.96)', backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(79,142,247,0.25)', borderRadius: 14,
+          padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 100,
+          whiteSpace: 'nowrap',
+        }}>
+          <span style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600 }}>
+            {selected.size} selected
+          </span>
+          <div style={{ width: 1, height: 20, background: 'var(--border-subtle)', flexShrink: 0 }} />
+          <select
+            className="filter-select"
+            disabled={bulkBusy}
+            defaultValue=""
+            onChange={e => { bulkAction('assign', e.target.value); e.target.value = '' }}
+            style={{ fontSize: 12 }}
+          >
+            <option value="" disabled>Assign to…</option>
+            <option value="null">— Unassign</option>
+            {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+          <select
+            className="filter-select"
+            disabled={bulkBusy}
+            defaultValue=""
+            onChange={e => { bulkAction('stage', e.target.value); e.target.value = '' }}
+            style={{ fontSize: 12 }}
+          >
+            <option value="" disabled>Move stage…</option>
+            {PIPELINE_STAGES.map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
+          </select>
+          <button
+            className="fadaa-btn-ghost fadaa-btn-sm"
+            onClick={clearSelection}
+            style={{ fontSize: 12, padding: '4px 10px' }}
+          >
+            ✕ Clear
+          </button>
         </div>
       )}
     </SalesShell>

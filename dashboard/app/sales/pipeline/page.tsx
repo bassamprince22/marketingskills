@@ -286,11 +286,9 @@ export default function PipelinePage() {
                         {cards.length}
                       </span>
                     </div>
-                    {colVal > 0 && (
-                      <p className="t-caption t-mono" style={{ marginTop: 2, fontSize: 10 }}>
-                        ${(colVal / 1000).toFixed(1)}k
-                      </p>
-                    )}
+                    <p className="t-mono" style={{ marginTop: 3, fontSize: 11, color: colVal > 0 ? '#4ADE80' : 'var(--text-faint)' }}>
+                      {colVal > 0 ? `$${(colVal / 1000).toFixed(1)}k` : '—'}
+                    </p>
                   </div>
 
                   {/* Drop zone */}
