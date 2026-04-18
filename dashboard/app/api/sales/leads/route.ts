@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getLeads, createLead, logActivity } from '@/lib/sales/db'
-import { getNextAssignee } from '@/lib/sales/autoAssign'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -35,12 +34,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    // Reps always own their leads; managers/admins use auto-assign if no rep specified
+    // Reps own leads they enter themselves; managers/admins leave unassigned for explicit assignment
     if (role === 'rep') {
       body.assigned_rep_id = userId
-    } else if (!body.assigned_rep_id) {
-      body.assigned_rep_id = await getNextAssignee()
     }
+    // managers/admins: only assign if they explicitly chose a rep
     body.created_by = userId
 
     const lead = await createLead(body)

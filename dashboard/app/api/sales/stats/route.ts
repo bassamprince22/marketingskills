@@ -7,6 +7,7 @@ import {
   getActivities,
   getOverdueFollowups, getStaleLeads,
   getMeetingsToday, getHighValueAtRisk,
+  getUnassignedLeads,
 } from '@/lib/sales/db'
 
 export async function GET() {
@@ -19,7 +20,7 @@ export async function GET() {
 
   try {
     if (role === 'manager' || role === 'admin') {
-      const [stats, pipeline, performance, activities, overdue, stale, todayMeetings, atRisk] = await Promise.all([
+      const [stats, pipeline, performance, activities, overdue, stale, todayMeetings, atRisk, unassignedLeads] = await Promise.all([
         getManagerStats(),
         getPipelineCounts(),
         getRepPerformance(),
@@ -28,8 +29,9 @@ export async function GET() {
         getStaleLeads(),
         getMeetingsToday(),
         getHighValueAtRisk(),
+        getUnassignedLeads(10),
       ])
-      return NextResponse.json({ type: 'manager', stats, pipeline, performance, activities, overdue, stale, todayMeetings, atRisk })
+      return NextResponse.json({ type: 'manager', stats, pipeline, performance, activities, overdue, stale, todayMeetings, atRisk, unassignedLeads })
     } else {
       const [stats, pipeline, activities, overdue, stale, todayMeetings, atRisk] = await Promise.all([
         getRepStats(id),

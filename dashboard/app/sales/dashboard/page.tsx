@@ -15,15 +15,16 @@ import { ChallengeRaceWidget } from '@/components/sales/ChallengeRaceWidget'
 import type { ManagerStats, RepStats, PipelineCount, RepPerformance, Activity, Lead, Meeting } from '@/lib/sales/types'
 
 interface DashData {
-  type:          'manager' | 'rep'
-  stats:         ManagerStats | RepStats
-  pipeline:      PipelineCount[]
-  performance:   RepPerformance[]
-  activities:    Activity[]
-  overdue:       Lead[]
-  stale:         Lead[]
-  todayMeetings: Meeting[]
-  atRisk:        Lead[]
+  type:             'manager' | 'rep'
+  stats:            ManagerStats | RepStats
+  pipeline:         PipelineCount[]
+  performance:      RepPerformance[]
+  activities:       Activity[]
+  overdue:          Lead[]
+  stale:            Lead[]
+  todayMeetings:    Meeting[]
+  atRisk:           Lead[]
+  unassignedLeads?: Lead[]
 }
 
 function daysSince(date: string) {
@@ -31,14 +32,15 @@ function daysSince(date: string) {
 }
 
 /* ── Alert Banner ─────────────────────────────────────────────────────── */
-function AlertBanner({ overdue, stale, atRisk, todayMeetings }: {
-  overdue: Lead[]; stale: Lead[]; atRisk: Lead[]; todayMeetings: Meeting[]
+function AlertBanner({ overdue, stale, atRisk, todayMeetings, unassigned = 0 }: {
+  overdue: Lead[]; stale: Lead[]; atRisk: Lead[]; todayMeetings: Meeting[]; unassigned?: number
 }) {
   const alerts = [
-    overdue.length       > 0 && { cls: 'badge-red',    icon: '⚠', count: overdue.length,       label: 'overdue follow-up',  labelP: 'overdue follow-ups', href: '/sales/leads?filter=overdue',  accent: '#F87171', bg: 'rgba(220,38,38,0.07)',   border: 'rgba(220,38,38,0.18)' },
-    atRisk.length        > 0 && { cls: 'badge-amber',  icon: '◈', count: atRisk.length,         label: 'deal at risk',        labelP: 'deals at risk',      href: '/sales/pipeline',              accent: '#F59E0B', bg: 'rgba(217,119,6,0.07)',   border: 'rgba(217,119,6,0.18)' },
-    stale.length         > 0 && { cls: 'badge-slate',  icon: '◌', count: stale.length,          label: 'stale lead',          labelP: 'stale leads',        href: '/sales/leads?filter=stale',    accent: '#A8B8CC', bg: 'rgba(100,116,139,0.07)', border: 'rgba(100,116,139,0.15)' },
-    todayMeetings.length > 0 && { cls: 'badge-green',  icon: '◷', count: todayMeetings.length,  label: 'meeting today',       labelP: 'meetings today',     href: '/sales/meetings',              accent: '#4ADE80', bg: 'rgba(22,163,74,0.07)',   border: 'rgba(22,163,74,0.18)' },
+    unassigned           > 0 && { cls: 'badge-purple', icon: '⊕', count: unassigned,            label: 'unassigned lead',     labelP: 'unassigned leads',   href: '/sales/leads?repId=unassigned', accent: '#A78BFA', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.22)' },
+    overdue.length       > 0 && { cls: 'badge-red',    icon: '⚠', count: overdue.length,         label: 'overdue follow-up',  labelP: 'overdue follow-ups', href: '/sales/leads?filter=overdue',   accent: '#F87171', bg: 'rgba(220,38,38,0.07)',   border: 'rgba(220,38,38,0.18)' },
+    atRisk.length        > 0 && { cls: 'badge-amber',  icon: '◈', count: atRisk.length,          label: 'deal at risk',        labelP: 'deals at risk',      href: '/sales/pipeline',               accent: '#F59E0B', bg: 'rgba(217,119,6,0.07)',   border: 'rgba(217,119,6,0.18)' },
+    stale.length         > 0 && { cls: 'badge-slate',  icon: '◌', count: stale.length,           label: 'stale lead',          labelP: 'stale leads',        href: '/sales/leads?filter=stale',     accent: '#A8B8CC', bg: 'rgba(100,116,139,0.07)', border: 'rgba(100,116,139,0.15)' },
+    todayMeetings.length > 0 && { cls: 'badge-green',  icon: '◷', count: todayMeetings.length,   label: 'meeting today',       labelP: 'meetings today',     href: '/sales/meetings',               accent: '#4ADE80', bg: 'rgba(22,163,74,0.07)',   border: 'rgba(22,163,74,0.18)' },
   ].filter(Boolean) as { cls: string; icon: string; count: number; label: string; labelP: string; href: string; accent: string; bg: string; border: string }[]
 
   if (alerts.length === 0) {
@@ -212,6 +214,36 @@ function StalePanel({ leads }: { leads: Lead[] }) {
   )
 }
 
+/* ── Unassigned Leads Panel ───────────────────────────────────────────── */
+function UnassignedLeadsPanel({ leads }: { leads: Lead[] }) {
+  if (leads.length === 0) return null
+  return (
+    <div className="fadaa-card" style={{ border: '1px solid rgba(124,58,237,0.25)' }}>
+      <div className="card-header">
+        <div>
+          <h3 className="t-section-title" style={{ color: '#A78BFA' }}>⊕ Unassigned Leads</h3>
+          <p className="t-caption" style={{ marginTop: 2 }}>Assign to a rep to activate</p>
+        </div>
+        <Link href="/sales/leads?repId=unassigned" className="t-caption" style={{ textDecoration: 'none', color: '#A78BFA' }}>View all →</Link>
+      </div>
+      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {leads.slice(0, 5).map(l => (
+          <PanelItem key={l.id} href={`/sales/leads/${l.id}`} accent="#7C3AED">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p className="t-card-title t-truncate">{l.company_name}</p>
+              <p className="t-caption">{l.contact_person} · {l.lead_source?.replace('_', ' ') ?? '—'}</p>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              {l.estimated_value ? <p style={{ color: '#4ADE80', fontSize: 12, fontWeight: 700 }} className="t-mono">${(l.estimated_value / 1000).toFixed(1)}k</p> : null}
+              <p style={{ color: '#A78BFA', fontSize: 11 }}>{daysSince(l.created_at ?? l.updated_at)}d ago</p>
+            </div>
+          </PanelItem>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /* ── Skeleton loader ──────────────────────────────────────────────────── */
 function DashboardSkeleton() {
   return (
@@ -246,7 +278,7 @@ function ManagerDash({ data }: { data: DashData }) {
 
       <CommissionWidget />
 
-      <AlertBanner overdue={data.overdue} stale={data.stale} atRisk={data.atRisk} todayMeetings={data.todayMeetings} />
+      <AlertBanner overdue={data.overdue} stale={data.stale} atRisk={data.atRisk} todayMeetings={data.todayMeetings} unassigned={data.unassignedLeads?.length ?? 0} />
 
       <section>
         <p className="t-label" style={{ marginBottom: 12 }}>Pipeline Overview</p>
@@ -263,6 +295,7 @@ function ManagerDash({ data }: { data: DashData }) {
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+        <UnassignedLeadsPanel leads={data.unassignedLeads ?? []} />
         <OverduePanel      leads={data.overdue} />
         <TodayMeetingsPanel meetings={data.todayMeetings} />
         <AtRiskPanel       leads={data.atRisk} />

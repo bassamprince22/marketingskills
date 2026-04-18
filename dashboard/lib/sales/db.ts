@@ -72,6 +72,10 @@ export async function getLeads(opts: {
   return data as Lead[]
 }
 
+export async function getUnassignedLeads(limit = 10): Promise<Lead[]> {
+  return getLeads({ repId: 'unassigned', limit })
+}
+
 export async function getLeadById(id: string): Promise<Lead | null> {
   const db = getServiceClient()
   const { data, error } = await db
