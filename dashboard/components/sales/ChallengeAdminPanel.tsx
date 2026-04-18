@@ -59,16 +59,16 @@ export function ChallengeAdminPanel() {
       top_achievers_visible: c.top_achievers_visible,
     })
     setRewards((c.sales_challenge_rewards ?? []).map(r => ({
-      rank:              r.rank,
-      title:             r.title,
-      description:       (r as any).description ?? '',
-      cash_amount:       r.cash_amount,
-      badge_emoji:       r.badge_emoji ?? '🏆',
-      badge_color:       r.badge_color ?? '#F59E0B',
+      rank:               r.rank,
+      title:              r.title,
+      description:        (r as any).description ?? '',
+      cash_amount:        r.cash_amount,
+      badge_emoji:        r.badge_emoji ?? '🏆',
+      badge_color:        r.badge_color ?? '#F59E0B',
       can_claim_multiple: r.can_claim_multiple,
-      max_claims:        r.max_claims,
-      claim_type:        (r as any).claim_type ?? 'manual',
-      require_approval:  (r as any).require_approval ?? false,
+      max_claims:         r.max_claims,
+      claim_type:         r.claim_type ?? 'manual',
+      require_approval:   r.require_approval ?? false,
     })))
     setEditId(c.id)
     setShowForm(true)
