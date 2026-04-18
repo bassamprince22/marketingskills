@@ -67,6 +67,8 @@ export function ChallengeAdminPanel() {
       badge_color:       r.badge_color ?? '#F59E0B',
       can_claim_multiple: r.can_claim_multiple,
       max_claims:        r.max_claims,
+      claim_type:        (r as any).claim_type ?? 'manual',
+      require_approval:  (r as any).require_approval ?? false,
     })))
     setEditId(c.id)
     setShowForm(true)

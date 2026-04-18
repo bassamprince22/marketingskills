@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
-import { readSettings, DEFAULT_NOTIFICATIONS } from '@/lib/sales/autoAssign'
+import { readSettings, writeSettings, DEFAULT_NOTIFICATIONS } from '@/lib/sales/autoAssign'
 import { sendReportReminderEmail } from '@/lib/sales/emailReporter'
 
 export interface Notification {
@@ -166,12 +166,20 @@ export async function GET() {
             filterUrl: '/sales/reports',
           })
 
-          // Send email reminder once per day (throttle check)
+          // Send email reminder once per day (throttle via settings)
           if (drCfg.email_reminder) {
-            const { data: managers } = await db.from('sales_users')
-              .select('email').in('role', ['manager', 'admin']).eq('is_active', true)
-            const managerEmails = (managers ?? []).map(m => m.email).filter(Boolean)
-            await sendReportReminderEmail(managerEmails, missing, submittedIds.size)
+            const today = now.toISOString().slice(0, 10)
+            const cfgAny  = cfg as unknown as Record<string, unknown>
+            const lastSent = cfgAny.last_report_email_date as string | undefined
+            if (lastSent !== today) {
+              const { data: managers } = await db.from('sales_users')
+                .select('email').in('role', ['manager', 'admin']).eq('is_active', true)
+              const managerEmails = (managers ?? []).map(m => m.email).filter(Boolean)
+              if (managerEmails.length > 0) {
+                await sendReportReminderEmail(managerEmails, missing, submittedIds.size)
+                await writeSettings(db, { ...cfg, last_report_email_date: today } as unknown as Parameters<typeof writeSettings>[1])
+              }
+            }
           }
         }
       } catch { /* silent if table missing */ }
