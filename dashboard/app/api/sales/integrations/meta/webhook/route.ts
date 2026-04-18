@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/supabase'
 import { getNextAssignee } from '@/lib/sales/autoAssign'
 
+const fmtKey = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? 'fadaa_meta_verify'
 const BUCKET       = 'sales-config'
 const CONFIG_FILE  = 'meta-integration.json'
@@ -111,7 +113,6 @@ export async function POST(req: NextRequest) {
       const phone = fields.phone_number || fields.phone || ''
 
       // Format every form answer as a readable Q&A block stored in notes
-      function fmtKey(k: string) { return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }
       const qaLines = Object.entries(fields).filter(([, v]) => v.trim()).map(([k, v]) => `${fmtKey(k)}: ${v}`)
       const notes = [
         ...qaLines,

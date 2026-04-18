@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
 
+const fmtKey = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
 const BUCKET      = 'sales-config'
 const CONFIG_FILE = 'meta-integration.json'
 const LOGS_FILE   = 'meta-logs.json'
@@ -89,7 +91,6 @@ export async function POST() {
 
         if (!email && !phone) { skipped++; continue }
 
-        function fmtKey(k: string) { return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }
         const qaLines = Object.entries(fields).filter(([, v]) => v.trim()).map(([k, v]) => `${fmtKey(k)}: ${v}`)
         const notes = [
           ...qaLines,
