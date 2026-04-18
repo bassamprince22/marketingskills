@@ -101,7 +101,7 @@ export default function LeadsPage() {
     await fetch('/api/sales/leads/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: [...selected], action, value: value || null }),
+      body: JSON.stringify({ ids: Array.from(selected), action, value: value || null }),
     })
     clearSelection()
     loadLeads()
