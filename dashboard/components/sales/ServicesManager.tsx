@@ -11,7 +11,18 @@ interface Service {
   sort_order:     number
 }
 
-function fmt(v: number) { return `${v}%` }
+const PRESETS = [
+  { name: 'Social Media Management', description: 'Full social media strategy & content', commission_pct: 8 },
+  { name: 'SEO Services',            description: 'Search engine optimization',           commission_pct: 10 },
+  { name: 'Google Ads Management',   description: 'Google paid search campaigns',         commission_pct: 12 },
+  { name: 'Meta Ads Management',     description: 'Facebook & Instagram paid campaigns',  commission_pct: 12 },
+  { name: 'Content Creation',        description: 'Blog posts, copywriting, graphics',    commission_pct: 7  },
+  { name: 'Email Marketing',         description: 'Newsletter & drip campaigns',          commission_pct: 8  },
+  { name: 'Web Design & Dev',        description: 'Website design and development',       commission_pct: 10 },
+  { name: 'Branding & Identity',     description: 'Logo, brand guide, visual identity',   commission_pct: 12 },
+  { name: 'Video Production',        description: 'Video ads, reels, promotional content',commission_pct: 10 },
+  { name: 'CRM Consulting',          description: 'CRM setup, training & consulting',     commission_pct: 15 },
+]
 
 export function ServicesManager() {
   const [services,  setServices]  = useState<Service[]>([])
@@ -23,6 +34,7 @@ export function ServicesManager() {
   const [newName,   setNewName]   = useState('')
   const [newDesc,   setNewDesc]   = useState('')
   const [newPct,    setNewPct]    = useState(0)
+  const [showPresets, setShowPresets] = useState(false)
 
   function load() {
     fetch('/api/sales/services').then(r => r.json()).then(d => {
@@ -57,19 +69,32 @@ export function ServicesManager() {
     flash('Removed', 'ok')
   }
 
-  async function add() {
-    if (!newName.trim()) return
+  async function addService(name: string, description: string | null, pct: number) {
     const res = await fetch('/api/sales/services', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim(), description: newDesc || null, commission_pct: newPct }),
+      body: JSON.stringify({ name, description: description || null, commission_pct: pct }),
     })
     if (!res.ok) { flash('Failed to add service', 'err'); return }
     const d = await res.json()
     setServices(prev => [...prev, d.service])
-    setNewName(''); setNewDesc(''); setNewPct(0); setAddOpen(false)
-    flash('Service added', 'ok')
+    return true
   }
+
+  async function add() {
+    if (!newName.trim()) return
+    const ok = await addService(newName.trim(), newDesc, newPct)
+    if (ok) { setNewName(''); setNewDesc(''); setNewPct(0); setAddOpen(false); flash('Service added', 'ok') }
+  }
+
+  async function addPreset(p: typeof PRESETS[0]) {
+    const already = services.some(s => s.name.toLowerCase() === p.name.toLowerCase())
+    if (already) { flash(`"${p.name}" already exists`, 'err'); return }
+    const ok = await addService(p.name, p.description, p.commission_pct)
+    if (ok) flash(`${p.name} added`, 'ok')
+  }
+
+  const existingNames = new Set(services.map(s => s.name.toLowerCase()))
 
   return (
     <div className="fadaa-card" style={{ padding: '20px 24px' }}>
@@ -80,13 +105,49 @@ export function ServicesManager() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {msg && <span style={{ fontSize: 12, color: msgType === 'ok' ? 'var(--brand-green-text)' : 'var(--brand-red-text)', fontWeight: 500 }}>{msgType === 'ok' ? '✓' : '⚠'} {msg}</span>}
-          <button onClick={() => setAddOpen(o => !o)} className="fadaa-btn fadaa-btn-sm">+ Add Service</button>
+          <button onClick={() => { setShowPresets(o => !o); setAddOpen(false) }} className="fadaa-btn-ghost fadaa-btn-sm">
+            {showPresets ? 'Hide Presets' : '⚡ Quick Add'}
+          </button>
+          <button onClick={() => { setAddOpen(o => !o); setShowPresets(false) }} className="fadaa-btn fadaa-btn-sm">+ Custom</button>
         </div>
       </div>
 
+      {/* ── Preset services ──────────────────────────────────────────── */}
+      {showPresets && (
+        <div style={{ marginBottom: 14, padding: '14px 16px', borderRadius: 10, background: 'rgba(79,142,247,0.04)', border: '1px solid rgba(79,142,247,0.12)' }}>
+          <p className="t-label" style={{ marginBottom: 10 }}>Common Marketing Services — click to add instantly</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {PRESETS.map(p => {
+              const added = existingNames.has(p.name.toLowerCase())
+              return (
+                <button
+                  key={p.name}
+                  onClick={() => !added && addPreset(p)}
+                  disabled={added}
+                  title={`${p.description} · ${p.commission_pct}% commission`}
+                  style={{
+                    padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 500,
+                    border: `1px solid ${added ? 'var(--border-subtle)' : 'rgba(79,142,247,0.3)'}`,
+                    background: added ? 'rgba(255,255,255,0.03)' : 'rgba(79,142,247,0.08)',
+                    color: added ? 'var(--text-muted)' : 'var(--brand-primary)',
+                    cursor: added ? 'default' : 'pointer',
+                    transition: 'all 0.15s',
+                    display: 'flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  {added ? '✓' : '+'} {p.name}
+                  <span style={{ opacity: 0.6, fontSize: 10 }}>{p.commission_pct}%</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Custom add form ──────────────────────────────────────────── */}
       {addOpen && (
         <div style={{ padding: '14px 16px', marginBottom: 12, borderRadius: 10, background: 'rgba(79,142,247,0.05)', border: '1px solid rgba(79,142,247,0.15)' }}>
-          <p className="t-label" style={{ marginBottom: 10 }}>New Service</p>
+          <p className="t-label" style={{ marginBottom: 10 }}>New Custom Service</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 8, alignItems: 'end' }}>
             <div>
               <label className="t-label" style={{ marginBottom: 4, display: 'block' }}>Name *</label>
@@ -116,11 +177,10 @@ export function ServicesManager() {
         <div className="empty-state">
           <div className="empty-state-icon">⚙</div>
           <p className="empty-state-title">No services yet</p>
-          <p className="empty-state-sub">Add your first service to enable commission tracking</p>
+          <p className="empty-state-sub">Use Quick Add to add common services, or create a custom one</p>
         </div>
       ) : (
         <div>
-          {/* Header row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px 80px 60px', gap: 12, padding: '6px 12px', marginBottom: 4 }}>
             {['Service','Description','Commission %','Enabled',''].map(h => <span key={h} className="t-label" style={{ fontSize: 10 }}>{h}</span>)}
           </div>

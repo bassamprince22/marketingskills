@@ -244,6 +244,8 @@ function ManagerDash({ data }: { data: DashData }) {
 
       <ChallengeRaceWidget />
 
+      <CommissionWidget />
+
       <AlertBanner overdue={data.overdue} stale={data.stale} atRisk={data.atRisk} todayMeetings={data.todayMeetings} />
 
       <section>
