@@ -244,6 +244,11 @@ export function LeadCard({ lead, canAssign, reps, onAssign, selected, onSelect }
             <span className="t-caption" style={{ fontSize: 10 }}>
               {lead.lead_source === 'meta' ? '⚡ ' : ''}{timeAgo(lead.created_at)}
             </span>
+            {lead.lead_source === 'meta' && lead.meta_raw_payload && Object.keys(lead.meta_raw_payload.fields ?? {}).length > 0 && (
+              <span title="Has Meta form answers" style={{ fontSize: 10, color: '#4F8EF7', background: 'rgba(79,142,247,0.1)', padding: '1px 5px', borderRadius: 4 }}>
+                {Object.keys(lead.meta_raw_payload.fields).length}f
+              </span>
+            )}
             {canAssign && <RepAvatar rep={lead.assigned_rep} />}
           </div>
         </div>

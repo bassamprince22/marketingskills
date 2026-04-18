@@ -110,9 +110,13 @@ export async function POST() {
           pipeline_stage:  'new_lead',
           service_type:    'marketing',
           priority:        'medium',
-          notes:           `Imported from Meta Lead Ads\nForm: ${form.name}\nAd: ${lead.ad_name ?? '—'}`,
           created_by:      userId,
-          assigned_rep_id: userId,
+          meta_raw_payload: {
+            fields,
+            ad_name:   lead.ad_name ?? null,
+            form_id:   null,
+            form_name: form.name ?? null,
+          },
         })
 
         if (insertErr) { skipped++; continue }

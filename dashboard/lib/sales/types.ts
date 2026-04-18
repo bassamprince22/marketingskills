@@ -75,6 +75,7 @@ export interface Lead {
   lost_reason:          string | null
   created_at:           string
   updated_at:           string
+  meta_raw_payload?:    { fields: Record<string, string>; ad_name?: string | null; form_id?: string | null; form_name?: string | null } | null
   // joined
   assigned_rep?:        Pick<SalesUser, 'id' | 'name' | 'avatar_url'> | null
 }
