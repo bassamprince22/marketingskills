@@ -117,38 +117,74 @@ const Icons = {
   ),
 }
 
-const NAV: NavItem[] = [
-  { href: '/sales/dashboard',    label: 'Dashboard',    icon: Icons.Dashboard,    roles: ['manager','rep','admin'] },
-  { href: '/sales/leads',        label: 'Leads',        icon: Icons.Leads,        roles: ['manager','rep','admin'] },
-  { href: '/sales/pipeline',     label: 'Pipeline',     icon: Icons.Pipeline,     roles: ['manager','rep','admin'] },
-  { href: '/sales/meetings',     label: 'Meetings',     icon: Icons.Meetings,     roles: ['manager','rep','admin'] },
-  { href: '/sales/qualified',    label: 'Qualified',    icon: Icons.Qualified,    roles: ['manager','rep','admin'] },
-  { href: '/sales/documents',    label: 'Documents',    icon: Icons.Documents,    roles: ['manager','rep','admin'] },
-  { href: '/sales/commissions',  label: 'Commissions',  icon: Icons.Commission,   roles: ['manager','rep','admin'] },
-  { href: '/sales/challenges',   label: 'Challenges',   icon: Icons.Challenges,   roles: ['manager','rep','admin'] },
-  { href: '/sales/import',       label: 'Import CSV',   icon: Icons.Import,       roles: ['manager','admin'] },
-  { href: '/sales/reports',      label: 'Reports',      icon: Icons.Reports,      roles: ['manager','rep','admin'] },
-  { href: '/sales/marketing',    label: 'Marketing',    icon: Icons.Marketing,    roles: ['admin'] },
-  { href: '/sales/integrations', label: 'Integrations', icon: Icons.Integrations, roles: ['manager','admin'] },
-  { href: '/sales/team',         label: 'Team',         icon: Icons.Team,         roles: ['admin','manager'] },
-  { href: '/sales/settings',     label: 'Settings',     icon: Icons.Settings,     roles: ['manager','admin','rep'] },
+interface NavSection {
+  label: string
+  items: NavItem[]
+}
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    label: 'CORE',
+    items: [
+      { href: '/sales/dashboard',   label: 'Dashboard',   icon: Icons.Dashboard,    roles: ['manager','rep','admin'] },
+      { href: '/sales/leads',       label: 'Leads',       icon: Icons.Leads,        roles: ['manager','rep','admin'] },
+      { href: '/sales/pipeline',    label: 'Pipeline',    icon: Icons.Pipeline,     roles: ['manager','rep','admin'] },
+      { href: '/sales/meetings',    label: 'Meetings',    icon: Icons.Meetings,     roles: ['manager','rep','admin'] },
+      { href: '/sales/qualified',   label: 'Qualified',   icon: Icons.Qualified,    roles: ['manager','rep','admin'] },
+    ],
+  },
+  {
+    label: 'TOOLS',
+    items: [
+      { href: '/sales/documents',   label: 'Documents',   icon: Icons.Documents,    roles: ['manager','rep','admin'] },
+      { href: '/sales/commissions', label: 'Commissions', icon: Icons.Commission,   roles: ['manager','rep','admin'] },
+      { href: '/sales/challenges',  label: 'Challenges',  icon: Icons.Challenges,   roles: ['manager','rep','admin'] },
+      { href: '/sales/reports',     label: 'Reports',     icon: Icons.Reports,      roles: ['manager','rep','admin'] },
+    ],
+  },
+  {
+    label: 'MANAGE',
+    items: [
+      { href: '/sales/import',       label: 'Import CSV',   icon: Icons.Import,       roles: ['manager','admin'] },
+      { href: '/sales/marketing',    label: 'Marketing',    icon: Icons.Marketing,    roles: ['admin'] },
+      { href: '/sales/integrations', label: 'Integrations', icon: Icons.Integrations, roles: ['manager','admin'] },
+      { href: '/sales/team',         label: 'Team',         icon: Icons.Team,         roles: ['admin','manager'] },
+      { href: '/sales/settings',     label: 'Settings',     icon: Icons.Settings,     roles: ['manager','admin','rep'] },
+    ],
+  },
 ]
 
+const NAV: NavItem[] = NAV_SECTIONS.flatMap(s => s.items)
+
 function NavLinks({ visible, pathname, onNav }: { visible: NavItem[]; pathname: string; onNav?: () => void }) {
+  const visibleSet = new Set(visible.map(i => i.href))
   return (
     <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
-      {visible.map(({ href, label, icon }) => {
-        const active = pathname === href || pathname.startsWith(href + '/')
+      {NAV_SECTIONS.map((section) => {
+        const sectionItems = section.items.filter(i => visibleSet.has(i.href))
+        if (sectionItems.length === 0) return null
         return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNav}
-            className={`nav-link${active ? ' active' : ''}`}
-          >
-            <span className="nav-link-icon">{icon}</span>
-            <span className="nav-link-label">{label}</span>
-          </Link>
+          <div key={section.label} style={{ marginBottom: 4 }}>
+            <p style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+              color: 'var(--text-faint)', padding: '8px 12px 4px',
+              textTransform: 'uppercase',
+            }}>{section.label}</p>
+            {sectionItems.map(({ href, label, icon }) => {
+              const active = pathname === href || pathname.startsWith(href + '/')
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={onNav}
+                  className={`nav-link${active ? ' active' : ''}`}
+                >
+                  <span className="nav-link-icon">{icon}</span>
+                  <span className="nav-link-label">{label}</span>
+                </Link>
+              )
+            })}
+          </div>
         )
       })}
     </nav>
@@ -166,21 +202,27 @@ export function SalesNav() {
   const visible = NAV.filter(n => n.roles.includes(role))
 
   const logoBlock = (
-    <Link href="/sales/dashboard" style={{ textDecoration: 'none', display: 'block', padding: '20px 16px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <Link href="/sales/dashboard" style={{ textDecoration: 'none', display: 'block', padding: '18px 16px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
-          width: 28, height: 28, borderRadius: 8,
-          background: 'linear-gradient(135deg, #4F8EF7, #7C3AED)',
+          width: 32, height: 32, borderRadius: 10,
+          background: 'linear-gradient(135deg, #4F8EF7 0%, #6366F1 50%, #7C3AED 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13,
+          fontSize: 15, flexShrink: 0,
+          boxShadow: '0 4px 12px rgba(79,142,247,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset',
         }}>
           ✦
         </div>
         <div>
-          <p style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14, letterSpacing: '0.04em', lineHeight: 1.1 }}>FADAA</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: 10, letterSpacing: '0.06em' }}>SALES · MISSION CONTROL</p>
+          <p style={{
+            background: 'linear-gradient(90deg, #7CB9FC, #A78BFA)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            fontWeight: 800, fontSize: 15, letterSpacing: '0.06em', lineHeight: 1.1,
+          }}>FADAA</p>
+          <p style={{ color: 'var(--text-faint)', fontSize: 9, letterSpacing: '0.08em', marginTop: 1 }}>SALES · MISSION CONTROL</p>
         </div>
       </div>
+      <div style={{ height: 1, background: 'linear-gradient(90deg, rgba(79,142,247,0.3), rgba(124,58,237,0.3), transparent)', marginTop: 14, borderRadius: 1 }} />
     </Link>
   )
 

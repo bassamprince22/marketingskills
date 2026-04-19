@@ -1177,6 +1177,47 @@ textarea:focus-visible {
   .fadaa-overlay { padding: 12px; }
 }
 
+/* ─── Nav section label ──────────────────────────────────────────────── */
+.nav-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 8px 12px 4px;
+  pointer-events: none;
+}
+
+/* ─── Sidebar gradient divider ───────────────────────────────────────── */
+.sidebar-gradient-divider {
+  height: 1px;
+  background: linear-gradient(90deg, rgba(79,142,247,0.3), rgba(124,58,237,0.3), transparent);
+  margin: 0 0 4px;
+  border-radius: 1px;
+}
+
+/* ─── Stat card glow on hover ────────────────────────────────────────── */
+.fadaa-card.stat-card:hover {
+  transform: translateY(-2px);
+}
+
+/* ─── Page title gradient ────────────────────────────────────────────── */
+.page-title-gradient {
+  background: linear-gradient(90deg, var(--text-primary) 0%, var(--brand-blue-text) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Alert banner item hover ────────────────────────────────────────── */
+.alert-item {
+  transition: transform 0.15s var(--ease-smooth), box-shadow 0.15s var(--ease-smooth);
+}
+.alert-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+
 /* ─── Contract Editor ────────────────────────────────────────────────── */
 .contract-overlay {
   position: fixed; inset: 0;

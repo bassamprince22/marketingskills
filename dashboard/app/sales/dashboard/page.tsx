@@ -354,6 +354,13 @@ function RepDash({ data }: { data: DashData }) {
   )
 }
 
+function getGreeting() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
 /* ── Page ─────────────────────────────────────────────────────────────── */
 export default function DashboardPage() {
   const { data: session } = useSession()
@@ -369,16 +376,19 @@ export default function DashboardPage() {
 
   const role = (session?.user as { role?: string })?.role ?? 'rep'
   const name = session?.user?.name ?? '—'
+  const firstName = name.split(' ')[0]
 
   return (
     <SalesShell>
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="t-page-title">
-            {role === 'manager' || role === 'admin' ? 'Mission Control' : 'My Cockpit'}
+          <h1 className="t-page-title" style={{ fontSize: 22 }}>
+            {getGreeting()}, {firstName} 👋
           </h1>
           <p className="t-caption">
-            {name} · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            {role === 'manager' || role === 'admin' ? 'Mission Control' : 'My Cockpit'}
+            {' · '}
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
         <Link href="/sales/leads/new" className="fadaa-btn" style={{ textDecoration: 'none' }}>+ New Lead</Link>
