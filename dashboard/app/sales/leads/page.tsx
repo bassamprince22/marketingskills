@@ -16,6 +16,7 @@ export default function LeadsPage() {
   const canAssign = role === 'manager' || role === 'admin'
 
   const [leads,    setLeads]    = useState<Lead[]>([])
+  const [dupeIds,  setDupeIds]  = useState<Set<string>>(new Set())
   const [reps,     setReps]     = useState<Rep[]>([])
   const [loading,  setLoading]  = useState(true)
   const [search,   setSearch]   = useState('')
@@ -65,7 +66,24 @@ export default function LeadsPage() {
     if (filters.dateRange)   sp.set('dateRange',    filters.dateRange)
     fetch(`/api/sales/leads?${sp}`)
       .then(r => r.json())
-      .then(d => { setLeads(d.leads ?? []); setLoading(false) })
+      .then(d => {
+        const list: Lead[] = d.leads ?? []
+        // Mark duplicates: any lead sharing an email or phone with another in this result set
+        const emailCount = new Map<string, number>()
+        const phoneCount = new Map<string, number>()
+        list.forEach(l => {
+          if (l.email) emailCount.set(l.email, (emailCount.get(l.email) ?? 0) + 1)
+          if (l.phone) phoneCount.set(l.phone, (phoneCount.get(l.phone) ?? 0) + 1)
+        })
+        const dupeIds = new Set(
+          list
+            .filter(l => (l.email && (emailCount.get(l.email) ?? 0) > 1) || (l.phone && (phoneCount.get(l.phone) ?? 0) > 1))
+            .map(l => l.id)
+        )
+        setDupeIds(dupeIds)
+        setLeads(list)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [search, filters])
 
@@ -234,6 +252,7 @@ export default function LeadsPage() {
               onAssign={handleAssign}
               selected={selected.has(lead.id)}
               onSelect={canAssign ? toggleSelect : undefined}
+              isDuplicate={dupeIds.has(lead.id)}
             />
           ))}
         </div>

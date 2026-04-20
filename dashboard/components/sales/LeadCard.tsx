@@ -9,12 +9,13 @@ import { SERVICE_LABELS } from '@/lib/sales/types'
 interface Rep { id: string; name: string }
 
 interface Props {
-  lead:       Lead
-  canAssign?: boolean
-  reps?:      Rep[]
-  onAssign?:  (leadId: string, repId: string | null) => void
-  selected?:  boolean
-  onSelect?:  (leadId: string, on: boolean) => void
+  lead:         Lead
+  canAssign?:   boolean
+  reps?:        Rep[]
+  onAssign?:    (leadId: string, repId: string | null) => void
+  selected?:    boolean
+  onSelect?:    (leadId: string, on: boolean) => void
+  isDuplicate?: boolean
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -172,7 +173,7 @@ function InlineRepPicker({
   )
 }
 
-export function LeadCard({ lead, canAssign, reps, onAssign, selected, onSelect }: Props) {
+export function LeadCard({ lead, canAssign, reps, onAssign, selected, onSelect, isDuplicate }: Props) {
   const cardRef   = useRef<HTMLDivElement>(null)
   const pColor    = PRIORITY_COLORS[lead.priority] ?? '#7D8FA3'
   const today     = new Date().toISOString().slice(0, 10)
@@ -245,6 +246,20 @@ export function LeadCard({ lead, canAssign, reps, onAssign, selected, onSelect }
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, gap: 4 }}>
             {isNewToday && (
               <span className="badge badge-new" style={{ fontSize: 9 }}>✦ NEW</span>
+            )}
+            {isDuplicate && (
+              <span
+                title="Duplicate: another lead shares this email or phone"
+                style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
+                  padding: '2px 6px', borderRadius: 4,
+                  background: 'rgba(251,146,60,0.15)',
+                  border: '1px solid rgba(251,146,60,0.4)',
+                  color: '#FB923C',
+                }}
+              >
+                ⚠ DUPE
+              </span>
             )}
             {lead.estimated_value ? (
               <span className="t-mono" style={{ color: '#4ADE80', fontSize: 12, fontWeight: 700 }}>
