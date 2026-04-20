@@ -41,8 +41,6 @@ export async function POST(req: NextRequest) {
     } else if (!body.assigned_rep_id) {
       body.assigned_rep_id = await getNextAssignee()
     }
-    body.created_by = userId
-
     const lead = await createLead(body)
     await logActivity({
       lead_id:     lead.id,
