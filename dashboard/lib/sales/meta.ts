@@ -12,7 +12,7 @@ function normalizeMetaKey(key: string) {
   return key
     .trim()
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, '_')
+    .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
 }
 
