@@ -39,7 +39,6 @@ export async function POST(req: NextRequest) {
       body.assigned_rep_id = userId
     }
     // managers/admins: only assign if they explicitly chose a rep
-    body.created_by = userId
 
     const lead = await createLead(body)
     await logActivity({

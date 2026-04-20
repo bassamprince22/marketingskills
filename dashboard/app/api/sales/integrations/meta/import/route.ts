@@ -146,7 +146,6 @@ export async function POST() {
           pipeline_stage:  'new_lead',
           service_type:    'marketing',
           priority:        'medium',
-          created_by:      userId,
           notes,
           meta_raw_payload: metaPayload,
         })

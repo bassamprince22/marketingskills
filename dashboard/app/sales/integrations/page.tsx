@@ -7,8 +7,25 @@ import { SalesShell } from '@/components/sales/SalesShell'
 interface Integration {
   type: string
   is_active: boolean
-  config: Record<string, unknown>
+  config: Record<string, unknown> & {
+    last_sync_at?: string
+    last_sync_source?: string
+    sync_stats?: { total_imported?: number }
+  }
   updated_at: string
+}
+
+function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return 'never'
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return 'never'
+  const diffSec = Math.max(0, Math.floor((Date.now() - then) / 1000))
+  if (diffSec < 5)       return 'just now'
+  if (diffSec < 60)      return `${diffSec}s ago`
+  if (diffSec < 3600)    return `${Math.floor(diffSec / 60)}m ago`
+  if (diffSec < 86400)   return `${Math.floor(diffSec / 3600)}h ago`
+  if (diffSec < 604800)  return `${Math.floor(diffSec / 86400)}d ago`
+  return new Date(iso).toLocaleDateString()
 }
 
 interface Log {
@@ -58,12 +75,31 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
   }
   useEffect(() => { load() }, [])
 
+  // Poll every 30s so the "last synced" indicator stays fresh while this tab is open
+  useEffect(() => {
+    const t = setInterval(() => {
+      fetch('/api/sales/integrations/meta/pages')
+        .then(r => r.json())
+        .then(d => setData(d))
+        .catch(() => {})
+    }, 30_000)
+    return () => clearInterval(t)
+  }, [])
+
   const connected     = Boolean(data?.integration?.is_active)
   const pages         = (data?.integration?.config?.pages as { id: string; name: string }[] | undefined) ?? []
   const defaultPageId = (data?.integration?.config?.default_page_id as string | undefined) ?? null
   const connectedAt   = data?.integration?.updated_at
     ? new Date(data.integration.updated_at).toLocaleDateString()
     : null
+  const lastSyncAt     = (data?.integration?.config?.last_sync_at as string | undefined) ?? null
+  const lastSyncSource = (data?.integration?.config?.last_sync_source as string | undefined) ?? null
+  const totalImported  = ((data?.integration?.config?.sync_stats as { total_imported?: number } | undefined)?.total_imported) ?? 0
+
+  // Highlight stale syncs (>24h) so the user knows webhooks may be failing
+  const syncStale = lastSyncAt
+    ? (Date.now() - new Date(lastSyncAt).getTime()) > 24 * 3600 * 1000
+    : true
 
   async function disconnect() {
     if (!confirm('Disconnect Meta integration? Leads will stop importing.')) return
@@ -151,6 +187,61 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
           </p>
         </div>
       </div>
+
+      {/* Sync status — shows latest webhook/import timestamp and total imported */}
+      {connected && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          gap: 10,
+          marginBottom: 16,
+          padding: 14,
+          background: syncStale ? 'rgba(245,158,11,0.06)' : 'rgba(74,222,128,0.05)',
+          border: `1px solid ${syncStale ? 'rgba(245,158,11,0.22)' : 'rgba(74,222,128,0.18)'}`,
+          borderRadius: 10,
+        }}>
+          <div>
+            <p style={{ color: '#64748B', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+              Last sync
+            </p>
+            <p style={{ color: syncStale ? '#FCD34D' : '#4ADE80', fontSize: 15, fontWeight: 700 }}>
+              {lastSyncAt ? timeAgo(lastSyncAt) : 'Never'}
+            </p>
+            {lastSyncAt && (
+              <p style={{ color: '#64748B', fontSize: 10, marginTop: 2 }}>
+                {new Date(lastSyncAt).toLocaleString()}
+              </p>
+            )}
+          </div>
+          <div>
+            <p style={{ color: '#64748B', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+              Source
+            </p>
+            <p style={{ color: '#E2E8F0', fontSize: 15, fontWeight: 600 }}>
+              {lastSyncSource === 'webhook'
+                ? '⚡ Webhook'
+                : lastSyncSource === 'manual_import'
+                ? '📥 Manual'
+                : lastSyncSource ?? '—'}
+            </p>
+          </div>
+          <div>
+            <p style={{ color: '#64748B', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+              Total imported
+            </p>
+            <p style={{ color: '#E2E8F0', fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              {totalImported.toLocaleString()}
+            </p>
+          </div>
+          {syncStale && (
+            <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>
+              <p style={{ color: '#FCD34D', fontSize: 11, lineHeight: 1.5 }}>
+                ⚠ No webhook events received in the last 24 hours. If you expect new Meta leads, verify the webhook subscription in Facebook Business Settings → Webhooks → Page, or use &quot;Import Now&quot; below to pull the last 30 days.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Post-OAuth success flash */}
       {connectedParam === 'meta' && (

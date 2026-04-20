@@ -50,47 +50,48 @@ export function FadaaStatCard({ label, value, icon, color = 'blue', suffix = '',
       className="fadaa-card"
       onMouseMove={handleMouseMove}
       style={{
-        borderTop: `1px solid ${c.border}`,
+        borderTop: `2px solid ${c.border}`,
         opacity: entrance,
         transform: `translateY(${(1 - entrance) * 10}px)`,
         cursor: 'default',
         userSelect: 'none',
-        padding: '18px 20px',
+        padding: '16px 18px',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div style={{
-          width: 36, height: 36,
+          width: 34, height: 34,
           background: c.bg,
           border: `1px solid ${c.border}`,
-          borderRadius: 10,
+          borderRadius: 9,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 17,
+          fontSize: 16,
+          boxShadow: `0 2px 8px ${c.border}`,
         }}>
           {icon}
         </div>
         <span style={{
-          fontSize: 9, fontWeight: 700,
+          fontSize: 8, fontWeight: 700,
           color: c.text, background: c.bg,
-          padding: '2px 7px', borderRadius: 999,
-          letterSpacing: '0.1em',
+          padding: '2px 6px', borderRadius: 999,
+          letterSpacing: '0.12em',
           border: `1px solid ${c.border}`,
-          opacity: 0.8,
+          opacity: 0.75,
         }}>
           LIVE
         </span>
       </div>
 
       <p style={{
-        fontSize: 28, fontWeight: 700,
+        fontSize: 30, fontWeight: 800,
         color: c.text,
-        letterSpacing: '-0.025em',
+        letterSpacing: '-0.03em',
         lineHeight: 1,
         fontVariantNumeric: 'tabular-nums',
       }}>
         {display}
       </p>
-      <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 5, fontWeight: 500, letterSpacing: '0.01em' }}>
+      <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 6, fontWeight: 600, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
         {label}
       </p>
     </div>
