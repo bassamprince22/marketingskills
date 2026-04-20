@@ -15,11 +15,12 @@ export default function LeadsPage() {
   const role      = (session?.user as { role?: string })?.role ?? 'rep'
   const canAssign = role === 'manager' || role === 'admin'
 
-  const [leads,   setLeads]   = useState<Lead[]>([])
-  const [reps,    setReps]    = useState<Rep[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search,  setSearch]  = useState('')
-  const [filters, setFilters] = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '' })
+  const [leads,    setLeads]    = useState<Lead[]>([])
+  const [reps,     setReps]     = useState<Rep[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [search,   setSearch]   = useState('')
+  const [filters,  setFilters]  = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '' })
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   // Read URL params into state on first mount
   useEffect(() => {
@@ -86,6 +87,24 @@ export default function LeadsPage() {
     })
   }, [reps])
 
+  const toggleSelect  = useCallback((id: string, on: boolean) =>
+    setSelected(s => { const n = new Set(s); on ? n.add(id) : n.delete(id); return n }), [])
+  const toggleAll     = () =>
+    setSelected(s => s.size === leads.length ? new Set() : new Set(leads.map(l => l.id)))
+  const clearSelection = () => setSelected(new Set())
+
+  const bulkAction = useCallback(async (action: 'assign' | 'stage', value: string) => {
+    if (!value) return
+    const ids = [...selected]
+    await fetch('/api/sales/leads/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, action, value: value || null }),
+    })
+    clearSelection()
+    loadLeads()
+  }, [selected, loadLeads]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const setFilter = (k: string) => (e: React.ChangeEvent<HTMLSelectElement>) =>
     setFilters(f => ({ ...f, [k]: e.target.value }))
 
@@ -102,7 +121,12 @@ export default function LeadsPage() {
             {role === 'rep' ? ' in your orbit' : ' across all reps'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {canAssign && leads.length > 0 && (
+            <button className="fadaa-btn-ghost fadaa-btn-sm" onClick={toggleAll}>
+              {selected.size === leads.length ? 'Deselect all' : 'Select all'}
+            </button>
+          )}
           {canAssign && (
             <Link href="/sales/import" className="fadaa-btn-ghost fadaa-btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               ↧ Import CSV
@@ -189,8 +213,49 @@ export default function LeadsPage() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
           {leads.map(lead => (
-            <LeadCard key={lead.id} lead={lead} canAssign={canAssign} reps={reps} onAssign={handleAssign} />
+            <LeadCard
+              key={lead.id} lead={lead} canAssign={canAssign} reps={reps} onAssign={handleAssign}
+              selected={selected.has(lead.id)}
+              onSelect={canAssign ? toggleSelect : undefined}
+            />
           ))}
+        </div>
+      )}
+
+      {/* Bulk action tray */}
+      {selected.size > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(13,21,38,0.96)', backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(79,142,247,0.25)', borderRadius: 14,
+          padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 100,
+          animation: 'fadeIn 0.15s ease',
+        }}>
+          <span style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+            {selected.size} selected
+          </span>
+          <div style={{ width: 1, height: 20, background: 'var(--border-subtle)', flexShrink: 0 }} />
+          <select
+            className="filter-select"
+            defaultValue=""
+            onChange={e => { bulkAction('assign', e.target.value); e.target.value = '' }}
+          >
+            <option value="" disabled>Assign to…</option>
+            <option value="null">— Unassign —</option>
+            {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+          <select
+            className="filter-select"
+            defaultValue=""
+            onChange={e => { bulkAction('stage', e.target.value); e.target.value = '' }}
+          >
+            <option value="" disabled>Move stage…</option>
+            {PIPELINE_STAGES.map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
+          </select>
+          <button className="fadaa-btn-ghost fadaa-btn-sm" onClick={clearSelection} style={{ whiteSpace: 'nowrap' }}>
+            ✕ Clear
+          </button>
         </div>
       )}
     </SalesShell>
