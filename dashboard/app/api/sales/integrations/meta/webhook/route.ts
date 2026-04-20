@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/supabase'
 import { getNextAssignee } from '@/lib/sales/autoAssign'
+import { extractMetaLeadIdentity } from '@/lib/sales/meta'
 
 const fmtKey = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
@@ -108,9 +109,11 @@ export async function POST(req: NextRequest) {
         fields[f.name] = f.values?.[0] ?? ''
       }
 
-      const name  = fields.full_name || fields.name || fields.first_name || 'Unknown'
-      const email = fields.email || ''
-      const phone = fields.phone_number || fields.phone || ''
+      const identity = extractMetaLeadIdentity({ fields })
+      const name = identity.contactPerson ?? identity.companyName ?? 'Unknown'
+      const companyName = identity.companyName ?? name
+      const email = identity.email ?? ''
+      const phone = identity.phone ?? ''
 
       // Format every form answer as a readable Q&A block stored in notes
       const qaLines = Object.entries(fields).filter(([, v]) => v.trim()).map(([k, v]) => `${fmtKey(k)}: ${v}`)
@@ -129,12 +132,18 @@ export async function POST(req: NextRequest) {
         contact_person: name,
         email,
         phone,
-        company_name: name,
+        company_name: companyName,
         lead_source: 'meta',
         pipeline_stage: 'new_lead',
         service_type: 'marketing',
         priority: 'medium',
         notes,
+        meta_raw_payload: {
+          fields,
+          ad_name: leadData.ad_name ?? null,
+          form_id: leadData.form_id ?? null,
+          form_name: null,
+        },
         ...(assignedRepId ? { assigned_rep_id: assignedRepId } : {}),
       }
 
