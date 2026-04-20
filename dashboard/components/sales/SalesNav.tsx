@@ -133,32 +133,32 @@ const Icons = {
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    label: 'Mission Control',
+    label: 'Sales',
     items: [
       { href: '/sales/dashboard', label: 'Dashboard', icon: Icons.Dashboard, roles: ['manager', 'rep', 'admin'] },
-      { href: '/sales/leads', label: 'Leads', icon: Icons.Leads, roles: ['manager', 'rep', 'admin'] },
       { href: '/sales/pipeline', label: 'Pipeline', icon: Icons.Pipeline, roles: ['manager', 'rep', 'admin'] },
+      { href: '/sales/leads', label: 'Leads', icon: Icons.Leads, roles: ['manager', 'rep', 'admin'] },
+      { href: '/sales/commissions', label: 'Deals', icon: Icons.Commission, roles: ['manager', 'rep', 'admin'] },
+      { href: '/sales/reports', label: 'Reports', icon: Icons.Reports, roles: ['manager', 'rep', 'admin'] },
+    ],
+  },
+  {
+    label: 'Workspace',
+    items: [
+      { href: '/sales/documents', label: 'Documents', icon: Icons.Documents, roles: ['manager', 'rep', 'admin'], badge: '4' },
+      { href: '/sales/challenges', label: 'Automations', icon: Icons.Challenges, roles: ['manager', 'rep', 'admin'] },
+      { href: '/sales/settings', label: 'Settings', icon: Icons.Settings, roles: ['manager', 'rep', 'admin'] },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
       { href: '/sales/meetings', label: 'Meetings', icon: Icons.Meetings, roles: ['manager', 'rep', 'admin'] },
       { href: '/sales/qualified', label: 'Qualified', icon: Icons.Qualified, roles: ['manager', 'rep', 'admin'] },
-    ],
-  },
-  {
-    label: 'Execution',
-    items: [
-      { href: '/sales/documents', label: 'Documents', icon: Icons.Documents, roles: ['manager', 'rep', 'admin'] },
-      { href: '/sales/commissions', label: 'Commissions', icon: Icons.Commission, roles: ['manager', 'rep', 'admin'] },
-      { href: '/sales/challenges', label: 'Challenges', icon: Icons.Challenges, roles: ['manager', 'rep', 'admin'] },
-      { href: '/sales/reports', label: 'Reports', icon: Icons.Reports, roles: ['manager', 'rep', 'admin'] },
       { href: '/sales/marketing', label: 'Marketing', icon: Icons.Marketing, roles: ['admin'] },
-    ],
-  },
-  {
-    label: 'Manage',
-    items: [
       { href: '/sales/import', label: 'Import', icon: Icons.Import, roles: ['manager', 'admin'] },
       { href: '/sales/integrations', label: 'Integrations', icon: Icons.Integrations, roles: ['manager', 'admin'] },
       { href: '/sales/team', label: 'Team', icon: Icons.Team, roles: ['manager', 'admin'] },
-      { href: '/sales/settings', label: 'Settings', icon: Icons.Settings, roles: ['manager', 'rep', 'admin'] },
       { href: '/sales/profile', label: 'Profile', icon: Icons.Profile, roles: ['manager', 'rep', 'admin'] },
     ],
   },
@@ -222,7 +222,7 @@ export function SalesNav({ mobileOpen, onClose }: SalesNavProps) {
       </div>
       <div className="mission-sidebar-user-copy">
         <p className="mission-sidebar-user-name">{name}</p>
-        <p className="mission-sidebar-user-role">{role}</p>
+        <p className="mission-sidebar-user-role">{role === 'manager' ? 'Mission Lead' : role}</p>
       </div>
     </Link>
   )
@@ -232,7 +232,7 @@ export function SalesNav({ mobileOpen, onClose }: SalesNavProps) {
       <div className="mission-sidebar-logo-mark">*</div>
       <div>
         <p className="mission-sidebar-logo-wordmark">FADAA</p>
-        <p className="mission-sidebar-logo-sub">Sales Mission Control</p>
+        <p className="mission-sidebar-logo-sub">Mission Control</p>
       </div>
     </Link>
   )
@@ -248,9 +248,11 @@ export function SalesNav({ mobileOpen, onClose }: SalesNavProps) {
     <>
       <aside className="sales-sidebar mission-sidebar">
         {logoBlock}
-        {userBlock}
         <NavLinks sections={visibleSections} pathname={pathname} />
-        <div className="mission-sidebar-footer">{signOutBlock}</div>
+        <div className="mission-sidebar-footer">
+          {userBlock}
+          {signOutBlock}
+        </div>
       </aside>
 
       {mobileOpen && <button className="mission-drawer-scrim" onClick={onClose} aria-label="Close navigation" />}
@@ -260,9 +262,11 @@ export function SalesNav({ mobileOpen, onClose }: SalesNavProps) {
           {logoBlock}
           <button className="mission-drawer-close" onClick={onClose} aria-label="Close navigation">×</button>
         </div>
-        {userBlock}
         <NavLinks sections={visibleSections} pathname={pathname} onNavigate={onClose} />
-        <div className="mission-sidebar-footer">{signOutBlock}</div>
+        <div className="mission-sidebar-footer">
+          {userBlock}
+          {signOutBlock}
+        </div>
       </aside>
     </>
   )

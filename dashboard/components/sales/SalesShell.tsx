@@ -88,6 +88,7 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
           density={density}
           onThemeChange={setTheme}
           onDensityChange={setDensity}
+          showPageActions={pathname === '/sales/dashboard'}
         />
         {children}
       </main>
