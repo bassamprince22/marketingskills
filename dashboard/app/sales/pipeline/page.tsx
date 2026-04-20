@@ -117,8 +117,8 @@ function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
           <Link href={`/sales/leads/${lead.id}`} style={{ textDecoration: 'none' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
               <div style={{ minWidth: 0 }}>
-                <p className="t-card-title t-truncate">{lead.company_name}</p>
-                <p className="t-caption" style={{ marginTop: 2 }}>{lead.contact_person}</p>
+                <p className="t-card-title t-truncate">{lead.contact_person}</p>
+                <p className="t-caption" style={{ marginTop: 2 }}>{lead.company_name}</p>
               </div>
               {isNewToday && (
                 <span className="badge badge-new" style={{ fontSize: 9, flexShrink: 0, marginTop: 1 }}>NEW</span>

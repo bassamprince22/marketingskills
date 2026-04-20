@@ -237,9 +237,9 @@ export function LeadCard({ lead, canAssign, reps, onAssign, selected, onSelect, 
               </button>
             )}
             <div style={{ minWidth: 0 }}>
-              <p className="t-card-title t-truncate">{lead.company_name}</p>
+              <p className="t-card-title t-truncate">{lead.contact_person}</p>
               <p className="t-caption t-truncate" style={{ marginTop: 2 }}>
-                {lead.contact_person}{lead.phone ? ` · ${lead.phone}` : ''}
+                {lead.company_name}{lead.phone ? ` · ${lead.phone}` : ''}
               </p>
             </div>
           </div>
