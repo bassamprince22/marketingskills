@@ -18,20 +18,62 @@ async function readJson(db: ReturnType<typeof getServiceClient>, file: string) {
   }
 }
 
+async function writeJson(db: ReturnType<typeof getServiceClient>, file: string, value: unknown) {
+  try {
+    const blob = new Blob([JSON.stringify(value)], { type: 'application/json' })
+    await db.storage.from(BUCKET).upload(file, blob, { upsert: true, contentType: 'application/json' })
+  } catch {
+    // non-critical
+  }
+}
+
 async function appendLog(db: ReturnType<typeof getServiceClient>, log: Record<string, unknown>) {
   try {
     const existing = (await readJson(db, LOGS_FILE)) ?? []
     const updated = [
       { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...log },
       ...existing,
-    ].slice(0, 100)
-    const blob = new Blob([JSON.stringify(updated)], { type: 'application/json' })
-    await db.storage
-      .from(BUCKET)
-      .upload(LOGS_FILE, blob, { upsert: true, contentType: 'application/json' })
+    ].slice(0, 200)
+    await writeJson(db, LOGS_FILE, updated)
   } catch {
     // non-critical
   }
+}
+
+// Bump the integration config's last_sync_at timestamp
+async function touchLastSync(db: ReturnType<typeof getServiceClient>, extra: Record<string, unknown> = {}) {
+  try {
+    const current = await readJson(db, CONFIG_FILE)
+    if (!current) return
+    const prevStats = (current.config?.sync_stats ?? {}) as Record<string, number>
+    const totalImported = (prevStats.total_imported ?? 0) + ((extra.imported as number) ?? 0)
+    await writeJson(db, CONFIG_FILE, {
+      ...current,
+      config: {
+        ...current.config,
+        last_sync_at: new Date().toISOString(),
+        last_sync_source: extra.source ?? 'webhook',
+        sync_stats: { ...prevStats, total_imported: totalImported },
+      },
+      updated_at: new Date().toISOString(),
+    })
+  } catch {
+    // non-critical
+  }
+}
+
+function formatFieldsAsNotes(fields: Record<string, string>, meta: { ad_name?: string | null; form_id?: string | null; form_name?: string | null }): string {
+  const lines: string[] = []
+  if (meta.ad_name)   lines.push(`Ad: ${meta.ad_name}`)
+  if (meta.form_name) lines.push(`Form: ${meta.form_name}`)
+  if (meta.form_id)   lines.push(`Form ID: ${meta.form_id}`)
+  if (lines.length > 0) lines.push('—')
+  for (const [key, value] of Object.entries(fields)) {
+    if (!value) continue
+    const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    lines.push(`${label}: ${value}`)
+  }
+  return lines.join('\n')
 }
 
 // ── GET: Facebook webhook verification ───────────
@@ -57,11 +99,22 @@ export async function POST(req: NextRequest) {
   const db   = getServiceClient()
   const body = await req.json()
 
+  // Always log that we received a webhook event
+  await appendLog(db, {
+    integration_type: 'meta',
+    event_type:       'webhook_received',
+    status:           'info',
+    error_message:    null,
+    payload:          { object: body.object, entries: body.entry?.length ?? 0 },
+  })
+
   if (body.object !== 'page') return NextResponse.json({ ok: true })
 
   // Load integration config from Storage
   const integration = await readJson(db, CONFIG_FILE)
   const defaultPageId = (integration?.config?.default_page_id as string | undefined) ?? null
+
+  let importedCount = 0
 
   for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
@@ -70,7 +123,14 @@ export async function POST(req: NextRequest) {
       const { leadgen_id, page_id } = change.value
 
       // If a default page is configured, only process events from that page
-      if (defaultPageId && page_id !== defaultPageId) continue
+      if (defaultPageId && page_id !== defaultPageId) {
+        await appendLog(db, {
+          integration_type: 'meta', event_type: 'webhook_skipped_wrong_page',
+          status: 'info', error_message: null,
+          payload: { leadgen_id, page_id, default_page_id: defaultPageId },
+        })
+        continue
+      }
 
       const pages = integration?.config?.pages as { id: string; access_token: string }[] | undefined
       const pageToken =
@@ -110,10 +170,36 @@ export async function POST(req: NextRequest) {
       const email = fields.email || ''
       const phone = fields.phone_number || fields.phone || ''
 
-      // Auto-assign to next rep if enabled
-      const assignedRepId = await getNextAssignee()
+      // Dedupe by email or phone
+      if (email || phone) {
+        const filter = [email ? `email.eq.${email}` : null, phone ? `phone.eq.${phone}` : null]
+          .filter(Boolean).join(',')
+        const { data: existing } = await db.from('sales_leads').select('id').or(filter).maybeSingle()
+        if (existing) {
+          await appendLog(db, {
+            integration_type: 'meta', event_type: 'lead_duplicate_skipped',
+            status: 'info', error_message: null,
+            payload: { lead_id: existing.id, email, phone },
+          })
+          continue
+        }
+      }
 
-      // Insert into sales_leads
+      // Auto-assign to next rep if enabled (don't let this block the insert)
+      let assignedRepId: string | null = null
+      try {
+        assignedRepId = await getNextAssignee()
+      } catch {
+        assignedRepId = null
+      }
+
+      const notes = formatFieldsAsNotes(fields, {
+        ad_name:   leadData.ad_name   ?? null,
+        form_id:   leadData.form_id   ?? null,
+        form_name: null,
+      })
+
+      // Insert into sales_leads (without meta_raw_payload — store Q&A in notes so we never fail on schema)
       const { data: lead, error: leadErr } = await db
         .from('sales_leads')
         .insert({
@@ -125,12 +211,7 @@ export async function POST(req: NextRequest) {
           pipeline_stage: 'new_lead',
           service_type: 'marketing',
           priority: 'medium',
-          meta_raw_payload: {
-            fields,
-            ad_name:   leadData.ad_name   ?? null,
-            form_id:   leadData.form_id   ?? null,
-            form_name: null,
-          },
+          notes,
           ...(assignedRepId ? { assigned_rep_id: assignedRepId } : {}),
         })
         .select('id')
@@ -144,13 +225,35 @@ export async function POST(req: NextRequest) {
         continue
       }
 
+      // Best-effort: try to also store the raw payload in the JSONB column if it exists
+      try {
+        await db.from('sales_leads').update({
+          meta_raw_payload: {
+            fields,
+            ad_name:   leadData.ad_name   ?? null,
+            form_id:   leadData.form_id   ?? null,
+            form_name: null,
+          },
+        }).eq('id', lead.id)
+      } catch {
+        // column may not exist — fine, notes already has the data
+      }
+
+      importedCount++
       await appendLog(db, {
         integration_type: 'meta', event_type: 'lead_created',
         status: 'success', error_message: null,
-        payload: { lead_id: lead.id, name, email, phone },
+        payload: { lead_id: lead.id, name, email, phone, ad_name: leadData.ad_name },
       })
     }
   }
 
-  return NextResponse.json({ ok: true })
+  if (importedCount > 0) {
+    await touchLastSync(db, { source: 'webhook', imported: importedCount })
+  } else {
+    // Still update "last received" so UI shows webhooks are flowing
+    await touchLastSync(db, { source: 'webhook', imported: 0 })
+  }
+
+  return NextResponse.json({ ok: true, imported: importedCount })
 }
