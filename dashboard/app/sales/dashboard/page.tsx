@@ -24,6 +24,7 @@ import type {
 } from '@/lib/sales/types'
 
 interface RevenueData { months: { month: string; value: number }[]; total: number; trend: number }
+interface WidgetConfig  { id: string; label: string; visible: boolean; order: number }
 
 interface DashData {
   type: 'manager' | 'rep'
@@ -489,7 +490,9 @@ function DashboardSkeleton() {
   )
 }
 
-function ManagerDash({ data, revenue }: { data: DashData; revenue: RevenueData | null }) {
+type WVisibleFn = (id: string) => boolean
+
+function ManagerDash({ data, revenue, wVisible }: { data: DashData; revenue: RevenueData | null; wVisible: WVisibleFn }) {
   const stats = data.stats as ManagerStats
 
   return (
@@ -535,7 +538,7 @@ function ManagerDash({ data, revenue }: { data: DashData; revenue: RevenueData |
         />
       </div>
 
-      <section>
+      {wVisible('stat_cards') && <section>
         <div className="mission-section-label">Pipeline Overview</div>
         <div className="mission-stat-grid">
           <MissionStatCard tone="blue" label="Total Leads" value={stats.total_leads} trend="+12.3%" icon={<Glyph><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" /></Glyph>} />
@@ -547,46 +550,46 @@ function ManagerDash({ data, revenue }: { data: DashData; revenue: RevenueData |
           <MissionStatCard tone="green" label="Won" value={stats.won} icon={<Glyph><path d="m12 3 2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.8 6.7 19l1-5.8-4.2-4.1 5.9-.9L12 3Z" /></Glyph>} />
           <MissionStatCard tone="red" label="Lost" value={stats.lost} icon={<Glyph><path d="m8 8 8 8" /><path d="m16 8-8 8" /></Glyph>} />
         </div>
-      </section>
+      </section>}
 
-      <PipelineConstellationWidget pipeline={data.pipeline} />
+      {wVisible('pipeline_constellation') && <PipelineConstellationWidget pipeline={data.pipeline} />}
 
-      <NotificationPanel />
-      <ChallengeRaceWidget />
-      <CommissionWidget />
+      {wVisible('notifications') && <NotificationPanel />}
+      {wVisible('challenges')    && <ChallengeRaceWidget />}
+      {wVisible('commissions')   && <CommissionWidget />}
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-        <UnassignedLeadsPanel leads={data.unassignedLeads ?? []} />
-        <OverduePanel leads={data.overdue} />
-        <TodayMeetingsPanel meetings={data.todayMeetings} />
-        <AtRiskPanel leads={data.atRisk} />
-        <StalePanel leads={data.stale} />
-      </section>
+      {(wVisible('panel_unassigned') || wVisible('panel_overdue') || wVisible('panel_at_risk') || wVisible('panel_stale')) && (
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          {wVisible('panel_unassigned') && <UnassignedLeadsPanel leads={data.unassignedLeads ?? []} />}
+          {wVisible('panel_overdue')    && <OverduePanel leads={data.overdue} />}
+          {wVisible('panel_at_risk')    && <AtRiskPanel leads={data.atRisk} />}
+          {wVisible('panel_stale')      && <StalePanel leads={data.stale} />}
+        </section>
+      )}
 
-      {/* New 2-col: revenue chart + today's orbit */}
-      <section style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
-        {revenue ? (
-          <ClosedRevenueChart months={revenue.months} total={revenue.total} trend={revenue.trend} />
-        ) : (
-          <div className="skeleton fadaa-card" style={{ height: 320 }} />
-        )}
-        <TodaysOrbit meetings={data.todayMeetings} />
-      </section>
+      {(wVisible('revenue_chart') || wVisible('todays_orbit')) && (
+        <section style={{ display: 'grid', gridTemplateColumns: wVisible('revenue_chart') && wVisible('todays_orbit') ? '1.6fr 1fr' : '1fr', gap: 16 }}>
+          {wVisible('revenue_chart') && (revenue
+            ? <ClosedRevenueChart months={revenue.months} total={revenue.total} trend={revenue.trend} />
+            : <div className="skeleton fadaa-card" style={{ height: 320 }} />
+          )}
+          {wVisible('todays_orbit') && <TodaysOrbit meetings={data.todayMeetings} />}
+        </section>
+      )}
 
-      {/* New 2-col: crew leaderboard + signal stream */}
-      <section style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
-        <CrewLeaderboard data={data.performance} />
-        <SignalStream activities={data.activities} />
-      </section>
+      {(wVisible('crew_leaderboard') || wVisible('signal_stream')) && (
+        <section style={{ display: 'grid', gridTemplateColumns: wVisible('crew_leaderboard') && wVisible('signal_stream') ? '1.6fr 1fr' : '1fr', gap: 16 }}>
+          {wVisible('crew_leaderboard') && <CrewLeaderboard data={data.performance} />}
+          {wVisible('signal_stream')    && <SignalStream activities={data.activities} />}
+        </section>
+      )}
 
-      <section>
-        <AutoAssignCard />
-      </section>
+      {wVisible('auto_assign') && <section><AutoAssignCard /></section>}
     </div>
   )
 }
 
-function RepDash({ data, revenue }: { data: DashData; revenue: RevenueData | null }) {
+function RepDash({ data, revenue, wVisible }: { data: DashData; revenue: RevenueData | null; wVisible: WVisibleFn }) {
   const stats = data.stats as RepStats
 
   return (
@@ -636,10 +639,10 @@ function RepDash({ data, revenue }: { data: DashData; revenue: RevenueData | nul
         </div>
       </section>
 
-      <PipelineConstellationWidget pipeline={data.pipeline} />
+      {wVisible('pipeline_constellation') && <PipelineConstellationWidget pipeline={data.pipeline} />}
 
-      <ChallengeRaceWidget />
-      <CommissionWidget />
+      {wVisible('challenges')  && <ChallengeRaceWidget />}
+      {wVisible('commissions') && <CommissionWidget />}
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
         <TodayMeetingsPanel meetings={data.todayMeetings} />
@@ -673,9 +676,10 @@ function RepDash({ data, revenue }: { data: DashData; revenue: RevenueData | nul
 
 export default function DashboardPage() {
   const { data: session } = useSession()
-  const [data,    setData]    = useState<DashData | null>(null)
-  const [revenue, setRevenue] = useState<RevenueData | null>(null)
-  const [error,   setError]   = useState('')
+  const [data,          setData]          = useState<DashData | null>(null)
+  const [revenue,       setRevenue]       = useState<RevenueData | null>(null)
+  const [widgetConfigs, setWidgetConfigs] = useState<WidgetConfig[] | null>(null)
+  const [error,         setError]         = useState('')
 
   useEffect(() => {
     fetch('/api/sales/stats')
@@ -686,7 +690,28 @@ export default function DashboardPage() {
       .then(r => r.ok ? r.json() : null)
       .then(d => d && setRevenue(d))
       .catch(() => {})
+    fetch('/api/sales/dashboard-widgets')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setWidgetConfigs(d.widgets))
+      .catch(() => {})
   }, [])
+
+  // Helper: check visibility (defaults to true if config not loaded yet)
+  const wVisible = (id: string) => {
+    if (!widgetConfigs) return true
+    const w = widgetConfigs.find(x => x.id === id)
+    return w ? w.visible : true
+  }
+
+  // Ordered widget IDs for sections that can be reordered
+  const wOrder = (ids: string[]) => {
+    if (!widgetConfigs) return ids
+    return [...ids].sort((a, b) => {
+      const oa = widgetConfigs.find(x => x.id === a)?.order ?? 999
+      const ob = widgetConfigs.find(x => x.id === b)?.order ?? 999
+      return oa - ob
+    })
+  }
 
   const role = (session?.user as { role?: string } | undefined)?.role ?? 'rep'
 
@@ -708,7 +733,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {!data ? <DashboardSkeleton /> : role === 'manager' || role === 'admin' ? <ManagerDash data={data} revenue={revenue} /> : <RepDash data={data} revenue={revenue} />}
+      {!data ? <DashboardSkeleton /> : role === 'manager' || role === 'admin' ? <ManagerDash data={data} revenue={revenue} wVisible={wVisible} /> : <RepDash data={data} revenue={revenue} wVisible={wVisible} />}
     </SalesShell>
   )
 }

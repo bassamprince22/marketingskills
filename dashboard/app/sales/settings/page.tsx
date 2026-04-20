@@ -7,6 +7,7 @@ import { AutoAssignCard } from '@/components/sales/AutoAssignCard'
 import { NotificationSettingsCard } from '@/components/sales/NotificationSettingsCard'
 import { ServicesManager } from '@/components/sales/ServicesManager'
 import { ChallengeAdminPanel } from '@/components/sales/ChallengeAdminPanel'
+import { DashboardWidgetSettings } from '@/components/sales/DashboardWidgetSettings'
 
 function Flash({ msg, type }: { msg: string; type: 'ok' | 'err' }) {
   if (!msg) return null
@@ -209,7 +210,7 @@ function CommissionTargetCard() {
   )
 }
 
-type SettingsTab = 'notifications' | 'services' | 'challenges' | 'system'
+type SettingsTab = 'notifications' | 'services' | 'challenges' | 'system' | 'dashboard'
 
 export default function SettingsPage() {
   const { data: session } = useSession()
@@ -249,6 +250,11 @@ export default function SettingsPage() {
             System
           </button>
         )}
+        {isAdmin && (
+          <button className={`tab-underline${tab === 'dashboard' ? ' active' : ''}`} onClick={() => setTab('dashboard')}>
+            Dashboard
+          </button>
+        )}
       </div>
 
       <div style={{ maxWidth: 700, display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -260,6 +266,7 @@ export default function SettingsPage() {
           </>
         )}
         {tab === 'challenges' && isAdmin && <ChallengeAdminPanel />}
+        {tab === 'dashboard' && isAdmin && <DashboardWidgetSettings />}
         {tab === 'system' && isPrivileged && (
           <>
             <AutoAssignCard />
