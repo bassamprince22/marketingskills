@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { WidgetConfig } from '@/app/api/sales/dashboard-widgets/route'
+import type { WidgetConfig } from '@/lib/sales/widgetConfig'
 
 export function DashboardWidgetSettings() {
   const [widgets,  setWidgets]  = useState<WidgetConfig[]>([])

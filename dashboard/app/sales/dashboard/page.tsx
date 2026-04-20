@@ -24,7 +24,7 @@ import type {
 } from '@/lib/sales/types'
 
 interface RevenueData { months: { month: string; value: number }[]; total: number; trend: number }
-interface WidgetConfig  { id: string; label: string; visible: boolean; order: number }
+import type { WidgetConfig } from '@/lib/sales/widgetConfig'
 
 interface DashData {
   type: 'manager' | 'rep'
