@@ -210,9 +210,9 @@ export function LeadCard({ lead, canAssign, reps, onAssign, selected, onSelect }
 
         {/* Company + contact */}
         <div style={{ marginBottom: 8, paddingRight: isNew ? 52 : 0, paddingLeft: onSelect ? 18 : 0 }}>
-          <p className="t-card-title t-truncate" style={{ fontSize: 14 }}>{lead.company_name}</p>
+          <p className="t-card-title t-truncate" style={{ fontSize: 14 }}>{lead.contact_person}</p>
           <p className="t-caption t-truncate" style={{ marginTop: 2 }}>
-            {lead.contact_person}
+            {lead.company_name}
             {lead.phone ? ` · ${lead.phone}` : lead.email ? ` · ${lead.email}` : ''}
           </p>
         </div>
