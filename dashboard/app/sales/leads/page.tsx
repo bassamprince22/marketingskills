@@ -19,7 +19,7 @@ export default function LeadsPage() {
   const [reps,     setReps]     = useState<Rep[]>([])
   const [loading,  setLoading]  = useState(true)
   const [search,   setSearch]   = useState('')
-  const [filters,  setFilters]  = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '' })
+  const [filters,  setFilters]  = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '', dateRange: '' })
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
 
@@ -34,6 +34,7 @@ export default function LeadsPage() {
       source:      sp.get('source')      ?? '',
       priority:    sp.get('priority')    ?? '',
       repId:       sp.get('repId')       ?? '',
+      dateRange:   sp.get('dateRange')   ?? '',
     })
   }, [])
 
@@ -41,12 +42,13 @@ export default function LeadsPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const sp = new URLSearchParams()
-    if (search)              sp.set('search',      search)
-    if (filters.stage)       sp.set('stage',        filters.stage)
-    if (filters.serviceType) sp.set('serviceType',  filters.serviceType)
-    if (filters.source)      sp.set('source',       filters.source)
-    if (filters.priority)    sp.set('priority',     filters.priority)
-    if (filters.repId)       sp.set('repId',        filters.repId)
+    if (search)                sp.set('search',      search)
+    if (filters.stage)         sp.set('stage',        filters.stage)
+    if (filters.serviceType)   sp.set('serviceType',  filters.serviceType)
+    if (filters.source)        sp.set('source',       filters.source)
+    if (filters.priority)      sp.set('priority',     filters.priority)
+    if (filters.repId)         sp.set('repId',        filters.repId)
+    if (filters.dateRange)     sp.set('dateRange',    filters.dateRange)
     const url = sp.toString() ? `/sales/leads?${sp}` : '/sales/leads'
     window.history.replaceState({}, '', url)
   }, [search, filters])
@@ -60,6 +62,7 @@ export default function LeadsPage() {
     if (filters.source)      sp.set('source',       filters.source)
     if (filters.priority)    sp.set('priority',     filters.priority)
     if (filters.repId)       sp.set('repId',        filters.repId)
+    if (filters.dateRange)   sp.set('dateRange',    filters.dateRange)
     fetch(`/api/sales/leads?${sp}`)
       .then(r => r.json())
       .then(d => { setLeads(d.leads ?? []); setLoading(false) })
@@ -112,7 +115,7 @@ export default function LeadsPage() {
     setFilters(f => ({ ...f, [k]: e.target.value }))
 
   const hasFilters = search || Object.values(filters).some(Boolean)
-  const clearAll   = () => { setSearch(''); setFilters({ stage: '', serviceType: '', source: '', priority: '', repId: '' }) }
+  const clearAll   = () => { setSearch(''); setFilters({ stage: '', serviceType: '', source: '', priority: '', repId: '', dateRange: '' }) }
 
   return (
     <SalesShell>
@@ -150,6 +153,16 @@ export default function LeadsPage() {
             onChange={e => setSearch(e.target.value)}
             aria-label="Search leads"
           />
+          <select className="filter-select" value={filters.dateRange} onChange={setFilter('dateRange')} aria-label="Filter by date">
+            <option value="">All Time</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+            <option value="this_month">This month</option>
+            <option value="last_month">Last month</option>
+          </select>
           <select className="filter-select" value={filters.stage}       onChange={setFilter('stage')}       aria-label="Filter by stage">
             <option value="">All Stages</option>
             {PIPELINE_STAGES.map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}

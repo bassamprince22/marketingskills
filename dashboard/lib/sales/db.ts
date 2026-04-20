@@ -39,12 +39,14 @@ export async function getSalesReps(): Promise<SalesUser[]> {
 // ─── Leads ────────────────────────────────────────
 
 export async function getLeads(opts: {
-  repId?: string   // if set, filter by assigned_rep_id
+  repId?: string
   stage?: PipelineStage
   serviceType?: string
   source?: string
   priority?: string
   search?: string
+  dateFrom?: string
+  dateTo?: string
   limit?: number
   offset?: number
 }): Promise<Lead[]> {
@@ -52,7 +54,7 @@ export async function getLeads(opts: {
   let q = db
     .from('sales_leads')
     .select('*, assigned_rep:sales_users!assigned_rep_id(id, name, avatar_url)')
-    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (opts.repId === 'unassigned') q = q.is('assigned_rep_id', null)
   else if (opts.repId)            q = q.eq('assigned_rep_id', opts.repId)
@@ -60,6 +62,8 @@ export async function getLeads(opts: {
   if (opts.serviceType) q = q.eq('service_type', opts.serviceType)
   if (opts.source)      q = q.eq('lead_source', opts.source)
   if (opts.priority)    q = q.eq('priority', opts.priority)
+  if (opts.dateFrom)    q = q.gte('created_at', opts.dateFrom)
+  if (opts.dateTo)      q = q.lte('created_at', opts.dateTo)
   if (opts.search) {
     q = q.or(
       `company_name.ilike.%${opts.search}%,contact_person.ilike.%${opts.search}%,email.ilike.%${opts.search}%`
