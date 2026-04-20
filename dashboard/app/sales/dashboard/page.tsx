@@ -323,6 +323,150 @@ function UnassignedLeadsPanel({ leads }: { leads: Lead[] }) {
   )
 }
 
+const STAGE_COLORS: Record<string, string> = {
+  new_lead:           '#9CA3AF',
+  contacted:          '#60A5FA',
+  discovery:          '#818CF8',
+  meeting_scheduled:  '#A78BFA',
+  meeting_completed:  '#22D3EE',
+  qualified:          '#4ADE80',
+  proposal_sent:      '#38BDF8',
+  negotiation:        '#FB923C',
+  contract_sent:      '#FBBF24',
+  won:                '#34D399',
+  lost:               '#F87171',
+}
+
+const STAGE_DISPLAY: Record<string, string> = {
+  new_lead:           'New Lead',
+  contacted:          'Contacted',
+  discovery:          'Discovery',
+  meeting_scheduled:  'Meeting Booked',
+  meeting_completed:  'Meeting Done',
+  qualified:          'Qualified',
+  proposal_sent:      'Proposal Sent',
+  negotiation:        'Negotiation',
+  contract_sent:      'Contract Sent',
+  won:                'Won',
+  lost:               'Lost',
+}
+
+function PipelineConstellationWidget({ pipeline }: { pipeline: PipelineCount[] }) {
+  const total = pipeline.reduce((s, p) => s + (p.value ?? 0), 0)
+  const totalFmt = total >= 1000000
+    ? `$${(total / 1000000).toFixed(1)}M`
+    : total >= 1000
+    ? `$${Math.round(total / 1000)}k`
+    : `$${total}`
+
+  return (
+    <div
+      className="fadaa-card"
+      style={{
+        background: 'linear-gradient(135deg, rgba(15,15,30,0.95) 0%, rgba(20,18,42,0.95) 100%)',
+        border: '1px solid rgba(99,102,241,0.2)',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '18px 20px 14px',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+        }}
+      >
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: 4 }}>
+            Pipeline
+          </p>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#fff', margin: 0 }}>
+            Your constellation &middot;{' '}
+            <span style={{ color: '#4ADE80' }} className="t-mono">{totalFmt}</span>
+          </h2>
+        </div>
+        <Link
+          href="/sales/pipeline"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '7px 16px',
+            background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 999,
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+        >
+          Open board
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </Link>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          overflowX: 'auto',
+          padding: '16px 20px',
+          gap: 0,
+          scrollbarWidth: 'none',
+        }}
+      >
+        {pipeline.map((p, i) => {
+          const color = STAGE_COLORS[p.stage] ?? '#6366F1'
+          const label = STAGE_DISPLAY[p.stage] ?? p.stage.replace(/_/g, ' ')
+          const val = p.value ?? 0
+          const valFmt = val >= 1000 ? `$${Math.round(val / 1000)}k` : val > 0 ? `$${val}` : '—'
+          return (
+            <div
+              key={p.stage}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 90,
+                padding: '0 8px',
+                borderRight: i < pipeline.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                gap: 4,
+              }}
+            >
+              <span style={{ fontSize: 20, fontWeight: 700, color: '#fff', lineHeight: 1.1 }}>
+                {p.count}
+              </span>
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  background: color,
+                  boxShadow: `0 0 6px ${color}88`,
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', whiteSpace: 'nowrap', marginTop: 2 }}>
+                {label}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--font-mono, monospace)' }}>
+                {valFmt}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function DashboardSkeleton() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -400,6 +544,8 @@ function ManagerDash({ data }: { data: DashData }) {
           <MissionStatCard tone="red" label="Lost" value={stats.lost} icon={<Glyph><path d="m8 8 8 8" /><path d="m16 8-8 8" /></Glyph>} />
         </div>
       </section>
+
+      <PipelineConstellationWidget pipeline={data.pipeline} />
 
       <NotificationPanel />
       <ChallengeRaceWidget />
@@ -509,6 +655,8 @@ function RepDash({ data }: { data: DashData }) {
           <MissionStatCard tone="green" label="My Won" value={stats.my_won} icon={<Glyph><path d="m12 3 2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.8 6.7 19l1-5.8-4.2-4.1 5.9-.9L12 3Z" /></Glyph>} />
         </div>
       </section>
+
+      <PipelineConstellationWidget pipeline={data.pipeline} />
 
       <ChallengeRaceWidget />
       <CommissionWidget />
