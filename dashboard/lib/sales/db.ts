@@ -9,6 +9,7 @@ import type {
   Activity, PipelineStage, ManagerStats, RepStats,
   PipelineCount, RepPerformance,
 } from './types'
+import { hydrateMetaLead } from './meta'
 
 // ─── Users ────────────────────────────────────────
 
@@ -69,7 +70,7 @@ export async function getLeads(opts: {
 
   const { data, error } = await q
   if (error) throw error
-  return data as Lead[]
+  return ((data ?? []) as Lead[]).map(hydrateMetaLead)
 }
 
 export async function getUnassignedLeads(limit = 10): Promise<Lead[]> {
@@ -84,7 +85,7 @@ export async function getLeadById(id: string): Promise<Lead | null> {
     .eq('id', id)
     .single()
   if (error) return null
-  return data as Lead
+  return hydrateMetaLead(data as Lead)
 }
 
 export async function createLead(payload: Partial<Lead>): Promise<Lead> {
