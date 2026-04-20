@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
+import { extractMetaLeadIdentity, isUnknownLeadValue } from '@/lib/sales/meta'
 
 const fmtKey = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
@@ -85,9 +86,11 @@ export async function POST() {
           fields[f.name] = f.values?.[0] ?? ''
         }
 
-        const name  = fields.full_name || fields.name || fields.first_name || 'Unknown'
-        const email = fields.email || ''
-        const phone = fields.phone_number || fields.phone || ''
+        const identity = extractMetaLeadIdentity({ fields })
+        const name = identity.contactPerson ?? identity.companyName ?? 'Unknown'
+        const companyName = identity.companyName ?? name
+        const email = identity.email ?? ''
+        const phone = identity.phone ?? ''
 
         if (!email && !phone) { skipped++; continue }
 
@@ -109,7 +112,7 @@ export async function POST() {
         // Duplicate check — update existing lead with form answers instead of skipping
         const { data: existing } = await db
           .from('sales_leads')
-          .select('id, notes')
+          .select('id, notes, company_name, contact_person')
           .or(
             [email ? `email.eq.${email}` : null, phone ? `phone.eq.${phone}` : null]
               .filter(Boolean).join(',')
@@ -117,8 +120,19 @@ export async function POST() {
           .maybeSingle()
 
         if (existing) {
-          // Always overwrite notes with fresh Q&A from Meta form
-          await db.from('sales_leads').update({ notes }).eq('id', existing.id)
+          const updates: Record<string, unknown> = {
+            notes,
+            meta_raw_payload: metaPayload,
+          }
+
+          if (isUnknownLeadValue(existing.contact_person) && name !== 'Unknown') {
+            updates.contact_person = name
+          }
+          if (isUnknownLeadValue(existing.company_name) && companyName !== 'Unknown') {
+            updates.company_name = companyName
+          }
+
+          await db.from('sales_leads').update(updates).eq('id', existing.id)
           skipped++
           continue
         }
@@ -127,13 +141,14 @@ export async function POST() {
           contact_person:  name,
           email,
           phone,
-          company_name:    name,
+          company_name:    companyName,
           lead_source:     'meta',
           pipeline_stage:  'new_lead',
           service_type:    'marketing',
           priority:        'medium',
           created_by:      userId,
           notes,
+          meta_raw_payload: metaPayload,
         })
 
         if (insertErr) { skipped++; continue }
