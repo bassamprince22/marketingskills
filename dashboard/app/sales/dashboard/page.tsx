@@ -41,11 +41,12 @@ function daysSince(date: string) {
   return Math.floor((Date.now() - new Date(date).getTime()) / 86400000)
 }
 
-function formatValue(value: number, isCurrency = false) {
-  if (!isCurrency) return value.toLocaleString()
-  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`
-  if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`
-  return `$${value}`
+function formatValue(value: number | undefined | null, isCurrency = false) {
+  const v = value ?? 0
+  if (!isCurrency) return v.toLocaleString()
+  if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`
+  if (v >= 1000) return `$${(v / 1000).toFixed(0)}k`
+  return `$${v}`
 }
 
 function Glyph({
@@ -548,7 +549,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetch('/api/sales/stats')
-      .then(response => response.json())
+      .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
       .then(setData)
       .catch(() => setError('Failed to load dashboard'))
   }, [])
