@@ -5,12 +5,14 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useSession } from 'next-auth/react'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { PipelineFunnelChart } from '@/components/sales/PipelineFunnelChart'
-import { RepPerformanceTable } from '@/components/sales/RepPerformanceTable'
-import { ActivityFeed } from '@/components/sales/ActivityFeed'
 import { AutoAssignCard } from '@/components/sales/AutoAssignCard'
 import { NotificationPanel } from '@/components/sales/NotificationPanel'
 import { CommissionWidget } from '@/components/sales/CommissionWidget'
 import { ChallengeRaceWidget } from '@/components/sales/ChallengeRaceWidget'
+import { ClosedRevenueChart } from '@/components/sales/ClosedRevenueChart'
+import { CrewLeaderboard } from '@/components/sales/CrewLeaderboard'
+import { TodaysOrbit } from '@/components/sales/TodaysOrbit'
+import { SignalStream } from '@/components/sales/SignalStream'
 import type {
   ManagerStats,
   RepStats,
@@ -20,6 +22,8 @@ import type {
   Lead,
   Meeting,
 } from '@/lib/sales/types'
+
+interface RevenueData { months: { month: string; value: number }[]; total: number; trend: number }
 
 interface DashData {
   type: 'manager' | 'rep'
@@ -485,7 +489,7 @@ function DashboardSkeleton() {
   )
 }
 
-function ManagerDash({ data }: { data: DashData }) {
+function ManagerDash({ data, revenue }: { data: DashData; revenue: RevenueData | null }) {
   const stats = data.stats as ManagerStats
 
   return (
@@ -559,54 +563,30 @@ function ManagerDash({ data }: { data: DashData }) {
         <StalePanel leads={data.stale} />
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <div className="fadaa-card">
-          <div className="card-header">
-            <div>
-              <h2 className="t-section-title">Pipeline by Stage</h2>
-              <p className="t-caption" style={{ marginTop: 2 }}>Lead counts across all stages</p>
-            </div>
-          </div>
-          <div style={{ padding: '16px 20px' }}>
-            <PipelineFunnelChart data={data.pipeline} />
-          </div>
-        </div>
+      {/* New 2-col: revenue chart + today's orbit */}
+      <section style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
+        {revenue ? (
+          <ClosedRevenueChart months={revenue.months} total={revenue.total} trend={revenue.trend} />
+        ) : (
+          <div className="skeleton fadaa-card" style={{ height: 320 }} />
+        )}
+        <TodaysOrbit meetings={data.todayMeetings} />
+      </section>
 
-        <div className="fadaa-card">
-          <div className="card-header">
-            <div>
-              <h2 className="t-section-title">Rep Leaderboard</h2>
-              <p className="t-caption" style={{ marginTop: 2 }}>Performance across the team</p>
-            </div>
-          </div>
-          <div style={{ padding: '16px 20px' }}>
-            <RepPerformanceTable data={data.performance} />
-          </div>
-        </div>
+      {/* New 2-col: crew leaderboard + signal stream */}
+      <section style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
+        <CrewLeaderboard data={data.performance} />
+        <SignalStream activities={data.activities} />
       </section>
 
       <section>
         <AutoAssignCard />
       </section>
-
-      <section>
-        <div className="fadaa-card">
-          <div className="card-header">
-            <div>
-              <h2 className="t-section-title">Recent Activity</h2>
-              <p className="t-caption" style={{ marginTop: 2 }}>Latest team actions</p>
-            </div>
-          </div>
-          <div style={{ padding: '16px 20px' }}>
-            <ActivityFeed activities={data.activities} />
-          </div>
-        </div>
-      </section>
     </div>
   )
 }
 
-function RepDash({ data }: { data: DashData }) {
+function RepDash({ data, revenue }: { data: DashData; revenue: RevenueData | null }) {
   const stats = data.stats as RepStats
 
   return (
@@ -667,7 +647,16 @@ function RepDash({ data }: { data: DashData }) {
         <AtRiskPanel leads={data.atRisk} />
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
+        {revenue ? (
+          <ClosedRevenueChart months={revenue.months} total={revenue.total} trend={revenue.trend} />
+        ) : (
+          <div className="skeleton fadaa-card" style={{ height: 320 }} />
+        )}
+        <TodaysOrbit meetings={data.todayMeetings} />
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
         <div className="fadaa-card">
           <div className="card-header">
             <h2 className="t-section-title">My Pipeline</h2>
@@ -676,15 +665,7 @@ function RepDash({ data }: { data: DashData }) {
             <PipelineFunnelChart data={data.pipeline} />
           </div>
         </div>
-
-        <div className="fadaa-card">
-          <div className="card-header">
-            <h2 className="t-section-title">Recent Activity</h2>
-          </div>
-          <div style={{ padding: '16px 20px' }}>
-            <ActivityFeed activities={data.activities} />
-          </div>
-        </div>
+        <SignalStream activities={data.activities} />
       </section>
     </div>
   )
@@ -692,14 +673,19 @@ function RepDash({ data }: { data: DashData }) {
 
 export default function DashboardPage() {
   const { data: session } = useSession()
-  const [data, setData] = useState<DashData | null>(null)
-  const [error, setError] = useState('')
+  const [data,    setData]    = useState<DashData | null>(null)
+  const [revenue, setRevenue] = useState<RevenueData | null>(null)
+  const [error,   setError]   = useState('')
 
   useEffect(() => {
     fetch('/api/sales/stats')
       .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
       .then(setData)
       .catch(() => setError('Failed to load dashboard'))
+    fetch('/api/sales/revenue')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setRevenue(d))
+      .catch(() => {})
   }, [])
 
   const role = (session?.user as { role?: string } | undefined)?.role ?? 'rep'
@@ -722,7 +708,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {!data ? <DashboardSkeleton /> : role === 'manager' || role === 'admin' ? <ManagerDash data={data} /> : <RepDash data={data} />}
+      {!data ? <DashboardSkeleton /> : role === 'manager' || role === 'admin' ? <ManagerDash data={data} revenue={revenue} /> : <RepDash data={data} revenue={revenue} />}
     </SalesShell>
   )
 }
