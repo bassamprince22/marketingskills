@@ -32,7 +32,8 @@ function findFieldValue(
   matcher: (key: string) => boolean,
   exclude?: (key: string) => boolean
 ) {
-  for (const [key, value] of map.entries()) {
+  const entries = Array.from(map.entries())
+  for (const [key, value] of entries) {
     if (!isFilled(value)) continue
     if (exclude?.(key)) continue
     if (matcher(key)) return value.trim()
