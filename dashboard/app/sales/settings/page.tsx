@@ -250,7 +250,7 @@ export default function SettingsPage() {
             System
           </button>
         )}
-        {isAdmin && (
+        {isPrivileged && (
           <button className={`tab-underline${tab === 'dashboard' ? ' active' : ''}`} onClick={() => setTab('dashboard')}>
             Dashboard
           </button>
@@ -266,7 +266,7 @@ export default function SettingsPage() {
           </>
         )}
         {tab === 'challenges' && isAdmin && <ChallengeAdminPanel />}
-        {tab === 'dashboard' && isAdmin && <DashboardWidgetSettings />}
+        {tab === 'dashboard' && isPrivileged && <DashboardWidgetSettings />}
         {tab === 'system' && isPrivileged && (
           <>
             <AutoAssignCard />

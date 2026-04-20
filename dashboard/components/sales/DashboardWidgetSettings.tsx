@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { WidgetConfig } from '@/lib/sales/widgetConfig'
+import { type WidgetConfig, DEFAULT_WIDGETS } from '@/lib/sales/widgetConfig'
 
 export function DashboardWidgetSettings() {
   const [widgets,  setWidgets]  = useState<WidgetConfig[]>([])
@@ -12,9 +12,9 @@ export function DashboardWidgetSettings() {
 
   useEffect(() => {
     fetch('/api/sales/dashboard-widgets')
-      .then(r => r.json())
-      .then(d => { setWidgets(d.widgets ?? []); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setWidgets(d?.widgets ?? DEFAULT_WIDGETS); setLoading(false) })
+      .catch(() => { setWidgets(DEFAULT_WIDGETS); setLoading(false) })
   }, [])
 
   function flash(text: string, ok: boolean) {
