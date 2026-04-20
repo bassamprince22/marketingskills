@@ -95,7 +95,7 @@ export default function LeadsPage() {
 
   const bulkAction = useCallback(async (action: 'assign' | 'stage', value: string) => {
     if (!value) return
-    const ids = [...selected]
+    const ids = Array.from(selected)
     await fetch('/api/sales/leads/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
