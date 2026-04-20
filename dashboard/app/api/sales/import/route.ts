@@ -79,8 +79,8 @@ export async function POST(req: NextRequest) {
 
       try {
         const lead = await createLead({
-          company_name:    sanitize(row.company_name) ?? row.contact_person ?? 'Unknown',
-          contact_person:  sanitize(row.contact_person) ?? row.company_name ?? 'Unknown',
+          company_name:    sanitize(row.company_name) ?? sanitize(row.contact_person) ?? 'Imported Lead',
+          contact_person:  sanitize(row.contact_person) ?? sanitize(row.company_name) ?? 'Imported Lead',
           phone:           sanitize(row.phone),
           email:           sanitize(row.email),
           notes:           sanitize(row.notes),

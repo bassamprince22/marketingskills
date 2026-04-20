@@ -140,7 +140,13 @@ export async function POST(req: NextRequest) {
           fields[f.name] = f.values?.[0] ?? ''
         }
 
-        const name  = fields.full_name || fields.name || fields.first_name || 'Unknown'
+        const firstName   = fields.first_name || ''
+        const lastName    = fields.last_name  || ''
+        const contactName = fields.full_name || fields.name
+          || (firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName)
+          || (fields.email ? fields.email.split('@')[0] : '')
+          || 'Meta Lead'
+        const company = fields.company_name || fields.company || fields.organization || contactName
         const email = fields.email || ''
         const phone = fields.phone_number || fields.phone || ''
 
@@ -166,10 +172,10 @@ export async function POST(req: NextRequest) {
         const { data: inserted, error: insertErr } = await db
           .from('sales_leads')
           .insert({
-            contact_person: name,
+            contact_person: contactName,
             email,
             phone,
-            company_name:   name,
+            company_name:   company,
             lead_source:    'meta',
             pipeline_stage: 'new_lead',
             service_type:   'marketing',
