@@ -21,6 +21,36 @@ export default function LeadsPage() {
   const [search,  setSearch]  = useState('')
   const [filters, setFilters] = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '' })
 
+  // Read URL params into state on first mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const sp = new URLSearchParams(window.location.search)
+    const s = sp.get('search') ?? ''
+    const f = {
+      stage:       sp.get('stage')       ?? '',
+      serviceType: sp.get('serviceType') ?? '',
+      source:      sp.get('source')      ?? '',
+      priority:    sp.get('priority')    ?? '',
+      repId:       sp.get('repId')       ?? '',
+    }
+    if (s) setSearch(s)
+    if (Object.values(f).some(Boolean)) setFilters(f)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync active filters back to URL (no navigation, no scroll)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const sp = new URLSearchParams()
+    if (search)              sp.set('search',      search)
+    if (filters.stage)       sp.set('stage',       filters.stage)
+    if (filters.serviceType) sp.set('serviceType', filters.serviceType)
+    if (filters.source)      sp.set('source',      filters.source)
+    if (filters.priority)    sp.set('priority',    filters.priority)
+    if (filters.repId)       sp.set('repId',       filters.repId)
+    const url = sp.toString() ? `/sales/leads?${sp}` : '/sales/leads'
+    window.history.replaceState({}, '', url)
+  }, [search, filters])
+
   const loadLeads = useCallback(() => {
     setLoading(true)
     const sp = new URLSearchParams()
