@@ -119,6 +119,19 @@ export async function deleteLead(id: string): Promise<void> {
 
 // ─── Meetings ─────────────────────────────────────
 
+const MEETING_SELECT =
+  '*, lead:sales_leads(id, company_name, contact_person), rep:sales_users!rep_id(id, name)'
+
+function normalizeMeetingPayload(payload: Partial<Meeting>): Partial<Meeting> {
+  return {
+    ...payload,
+    notes: payload.notes?.trim() || null,
+    outcome: payload.outcome?.trim() || null,
+    next_action: payload.next_action?.trim() || null,
+    next_action_date: payload.next_action_date?.trim() || null,
+  }
+}
+
 export async function getMeetings(opts: {
   repId?:  string
   leadId?: string
@@ -128,7 +141,7 @@ export async function getMeetings(opts: {
   const db = getServiceClient()
   let q = db
     .from('sales_meetings')
-    .select('*, lead:sales_leads(id, company_name, contact_person), rep:sales_users!rep_id(id, name)')
+    .select(MEETING_SELECT)
     .order('meeting_date', { ascending: false })
 
   if (opts.repId)  q = q.eq('rep_id', opts.repId)
@@ -143,10 +156,11 @@ export async function getMeetings(opts: {
 
 export async function createMeeting(payload: Partial<Meeting>): Promise<Meeting> {
   const db = getServiceClient()
+  const normalized = normalizeMeetingPayload(payload)
   const { data, error } = await db
     .from('sales_meetings')
-    .insert(payload)
-    .select()
+    .insert(normalized)
+    .select(MEETING_SELECT)
     .single()
   if (error) throw error
   return data as Meeting
@@ -154,11 +168,12 @@ export async function createMeeting(payload: Partial<Meeting>): Promise<Meeting>
 
 export async function updateMeeting(id: string, payload: Partial<Meeting>): Promise<Meeting> {
   const db = getServiceClient()
+  const normalized = normalizeMeetingPayload(payload)
   const { data, error } = await db
     .from('sales_meetings')
-    .update(payload)
+    .update(normalized)
     .eq('id', id)
-    .select()
+    .select(MEETING_SELECT)
     .single()
   if (error) throw error
   return data as Meeting
