@@ -52,32 +52,36 @@ export async function POST() {
   const pages = (integration.config?.pages as { id: string; name: string; access_token: string }[]) ?? []
   if (pages.length === 0) return NextResponse.json({ error: 'No connected pages found' }, { status: 400 })
 
-  const since = Math.floor((Date.now() - 90 * 24 * 60 * 60 * 1000) / 1000) // 90 days ago in unix seconds
+  // Capture the exact moment this import was triggered (unix seconds)
+  const importedAt = Math.floor(Date.now() / 1000)
+  const since      = importedAt - 30 * 24 * 60 * 60  // exactly 30 days back to the minute
 
-  let total = 0
+  let total    = 0
   let imported = 0
-  let skipped = 0
+  let skipped  = 0
 
   for (const page of pages) {
     const token = page.access_token
     if (!token) continue
 
-    // Get all lead forms for this page
-    const formsRes = await fetch(
+    const formsRes  = await fetch(
       `https://graph.facebook.com/v19.0/${page.id}/leadgen_forms?fields=id,name&access_token=${token}`
     )
     const formsData = await formsRes.json()
-    const forms = formsData.data ?? []
+    const forms     = formsData.data ?? []
 
     for (const form of forms) {
-      // Fetch leads from last 30 days
-      const leadsRes = await fetch(
+      // Fetch leads from (now − 30 days) up to (now), to the exact minute
+      const filtering = JSON.stringify([
+        { field: 'time_created', operator: 'GREATER_THAN',          value: since      },
+        { field: 'time_created', operator: 'LESS_THAN_OR_EQUAL',    value: importedAt },
+      ])
+      const leadsRes  = await fetch(
         `https://graph.facebook.com/v19.0/${form.id}/leads?fields=id,field_data,created_time,ad_name` +
-        `&filtering=[{"field":"time_created","operator":"GREATER_THAN","value":${since}}]` +
-        `&limit=100&access_token=${token}`
+        `&filtering=${encodeURIComponent(filtering)}&limit=100&access_token=${token}`
       )
       const leadsData = await leadsRes.json()
-      const leads = leadsData.data ?? []
+      const leads     = leadsData.data ?? []
       total += leads.length
 
       for (const lead of leads) {
@@ -86,16 +90,16 @@ export async function POST() {
           fields[f.name] = f.values?.[0] ?? ''
         }
 
-        const identity = extractMetaLeadIdentity({ fields })
-        const name = identity.contactPerson ?? identity.companyName ?? 'Unknown'
+        const identity    = extractMetaLeadIdentity({ fields })
+        const name        = identity.contactPerson ?? identity.companyName ?? 'Meta Lead'
         const companyName = identity.companyName ?? name
-        const email = identity.email ?? ''
-        const phone = identity.phone ?? ''
+        const email       = identity.email ?? ''
+        const phone       = identity.phone ?? ''
 
         if (!email && !phone) { skipped++; continue }
 
         const qaLines = Object.entries(fields).filter(([, v]) => v.trim()).map(([k, v]) => `${fmtKey(k)}: ${v}`)
-        const notes = [
+        const notes   = [
           ...qaLines,
           '',
           `Form: ${form.name}`,
@@ -104,12 +108,12 @@ export async function POST() {
 
         const metaPayload = {
           fields,
-          ad_name:   lead.ad_name   ?? null,
+          ad_name:   lead.ad_name ?? null,
           form_id:   null,
           form_name: form.name ?? null,
         }
 
-        // Duplicate check — update existing lead with form answers instead of skipping
+        // Dedup by email or phone — update stale fields on match, never duplicate
         const { data: existing } = await db
           .from('sales_leads')
           .select('id, notes, company_name, contact_person')
@@ -120,24 +124,20 @@ export async function POST() {
           .maybeSingle()
 
         if (existing) {
-          const updates: Record<string, unknown> = {
-            notes,
-            meta_raw_payload: metaPayload,
-          }
-
-          if (isUnknownLeadValue(existing.contact_person) && name !== 'Unknown') {
+          const updates: Record<string, unknown> = { notes }
+          if (isUnknownLeadValue(existing.contact_person) && name !== 'Meta Lead')
             updates.contact_person = name
-          }
-          if (isUnknownLeadValue(existing.company_name) && companyName !== 'Unknown') {
+          if (isUnknownLeadValue(existing.company_name) && companyName !== 'Meta Lead')
             updates.company_name = companyName
-          }
-
           await db.from('sales_leads').update(updates).eq('id', existing.id)
+          // Best-effort payload update (column may not exist yet)
+          await db.from('sales_leads').update({ meta_raw_payload: metaPayload }).eq('id', existing.id)
           skipped++
           continue
         }
 
-        const { error: insertErr } = await db.from('sales_leads').insert({
+        // Insert core fields first — guaranteed columns
+        const { data: newLead, error: insertErr } = await db.from('sales_leads').insert({
           contact_person:  name,
           email,
           phone,
@@ -147,10 +147,12 @@ export async function POST() {
           service_type:    'marketing',
           priority:        'medium',
           notes,
-          meta_raw_payload: metaPayload,
-        })
+        }).select('id').single()
 
         if (insertErr) { skipped++; continue }
+
+        // Best-effort: attach raw payload separately
+        await db.from('sales_leads').update({ meta_raw_payload: metaPayload }).eq('id', newLead.id)
         imported++
       }
     }
@@ -161,7 +163,7 @@ export async function POST() {
     event_type:       'manual_import',
     status:           'success',
     error_message:    null,
-    payload:          { total, imported, skipped, period_days: 30 },
+    payload:          { total, imported, skipped, period_days: 30, imported_at: new Date(importedAt * 1000).toISOString() },
   })
 
   return NextResponse.json({ total, imported, skipped })
