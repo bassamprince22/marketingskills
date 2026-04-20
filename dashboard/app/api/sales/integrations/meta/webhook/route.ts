@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
       }
 
       const identity = extractMetaLeadIdentity({ fields })
-      const name = identity.contactPerson ?? identity.companyName ?? 'Unknown'
+      const name = identity.contactPerson ?? identity.companyName ?? 'Meta Lead'
       const companyName = identity.companyName ?? name
       const email = identity.email ?? ''
       const phone = identity.phone ?? ''
@@ -124,33 +124,41 @@ export async function POST(req: NextRequest) {
         `Form ID: ${leadData.form_id ?? '—'}`,
       ].join('\n').trim()
 
+      // Dedupe by email or phone
+      if (email || phone) {
+        const filter = [email ? `email.eq.${email}` : null, phone ? `phone.eq.${phone}` : null]
+          .filter(Boolean).join(',')
+        const { data: existing } = await db.from('sales_leads').select('id').or(filter).maybeSingle()
+        if (existing) {
+          // Update notes/payload on existing lead but don't duplicate
+          await db.from('sales_leads').update({ notes }).eq('id', existing.id)
+          await appendLog(db, {
+            integration_type: 'meta', event_type: 'lead_duplicate_skipped',
+            status: 'info', error_message: null,
+            payload: { lead_id: existing.id, email, phone },
+          })
+          continue
+        }
+      }
+
       // Auto-assign to next rep if enabled
       const assignedRepId = await getNextAssignee()
 
-      // Build insert payload — meta_raw_payload is optional (requires DB migration)
-      const insertPayload: Record<string, unknown> = {
-        contact_person: name,
-        email,
-        phone,
-        company_name: companyName,
-        lead_source: 'meta',
-        pipeline_stage: 'new_lead',
-        service_type: 'marketing',
-        priority: 'medium',
-        notes,
-        meta_raw_payload: {
-          fields,
-          ad_name: leadData.ad_name ?? null,
-          form_id: leadData.form_id ?? null,
-          form_name: null,
-        },
-        ...(assignedRepId ? { assigned_rep_id: assignedRepId } : {}),
-      }
-
-      // Insert into sales_leads
+      // Insert core fields first (guaranteed columns)
       const { data: lead, error: leadErr } = await db
         .from('sales_leads')
-        .insert(insertPayload)
+        .insert({
+          contact_person: name,
+          email,
+          phone,
+          company_name: companyName,
+          lead_source: 'meta',
+          pipeline_stage: 'new_lead',
+          service_type: 'marketing',
+          priority: 'medium',
+          notes,
+          ...(assignedRepId ? { assigned_rep_id: assignedRepId } : {}),
+        })
         .select('id')
         .single()
 
@@ -161,6 +169,16 @@ export async function POST(req: NextRequest) {
         })
         continue
       }
+
+      // Best-effort: attach raw Meta payload (requires meta_raw_payload column)
+      await db.from('sales_leads').update({
+        meta_raw_payload: {
+          fields,
+          ad_name: leadData.ad_name ?? null,
+          form_id: leadData.form_id ?? null,
+          form_name: null,
+        },
+      }).eq('id', lead.id)
 
       await appendLog(db, {
         integration_type: 'meta', event_type: 'lead_created',
