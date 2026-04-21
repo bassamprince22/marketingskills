@@ -508,6 +508,73 @@ export async function setUserPermissions(userId: string, permissions: Permission
   if (error) throw error
 }
 
+function fullPermission(module: PermissionModule): Permission {
+  return {
+    module,
+    can_view: true,
+    can_create: true,
+    can_edit: true,
+    can_delete: true,
+    can_manage: true,
+  }
+}
+
+function reportsFallback(role: string): Permission {
+  if (role === 'admin') return fullPermission('reports')
+  if (role === 'manager') {
+    return {
+      module: 'reports',
+      can_view: true,
+      can_create: true,
+      can_edit: true,
+      can_delete: false,
+      can_manage: true,
+    }
+  }
+  return {
+    module: 'reports',
+    can_view: true,
+    can_create: true,
+    can_edit: true,
+    can_delete: false,
+    can_manage: false,
+  }
+}
+
+export async function getEffectiveModulePermission(
+  userId: string,
+  role: string,
+  module: PermissionModule
+): Promise<Permission> {
+  if (role === 'admin') return fullPermission(module)
+
+  const db = getServiceClient()
+  const [{ data: userRows }, { data: roleRows }] = await Promise.all([
+    db.from('sales_permissions')
+      .select('module, can_view, can_create, can_edit, can_delete, can_manage')
+      .eq('user_id', userId)
+      .eq('module', module)
+      .limit(1),
+    db.from('sales_role_permissions')
+      .select('module, can_view, can_create, can_edit, can_delete, can_manage')
+      .eq('role', role)
+      .eq('module', module)
+      .limit(1),
+  ])
+
+  const match = (userRows ?? [])[0] ?? (roleRows ?? [])[0]
+  if (match) return match as Permission
+  if (module === 'reports') return reportsFallback(role)
+  return {
+    module,
+    can_view: false,
+    can_create: false,
+    can_edit: false,
+    can_delete: false,
+    can_manage: false,
+  }
+}
+
 // ─── Password reset tokens ────────────────────────
 
 export async function createPasswordResetToken(userId: string): Promise<string> {

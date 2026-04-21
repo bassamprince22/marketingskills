@@ -1,15 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getMetaCallbackUrl } from '@/lib/sales/metaIntegration'
 
 const APP_ID      = process.env.META_APP_ID ?? ''
-const REDIRECT_URI = process.env.NEXTAUTH_URL
-  ? `${process.env.NEXTAUTH_URL}/api/sales/integrations/meta/callback`
-  : ''
 
 // GET /api/sales/integrations/meta/connect
 // Redirects admin to Facebook OAuth
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { role } = session.user as { role: string }
@@ -22,7 +20,8 @@ export async function GET() {
     'pages_read_engagement',
   ].join(',')
 
-  const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${scopes}&response_type=code`
+  const redirectUri = getMetaCallbackUrl(new URL(req.url).origin)
+  const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code`
 
   return NextResponse.redirect(url)
 }

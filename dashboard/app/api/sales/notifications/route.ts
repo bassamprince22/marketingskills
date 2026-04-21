@@ -4,10 +4,11 @@ import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
 import { readSettings, writeSettings, DEFAULT_NOTIFICATIONS } from '@/lib/sales/autoAssign'
 import { sendReportReminderEmail } from '@/lib/sales/emailReporter'
+import { readMetaHealth } from '@/lib/sales/metaIntegration'
 
 export interface Notification {
   id:        string
-  type:      'new_leads' | 'urgent' | 'stuck' | 'overdue' | 'unassigned' | 'hot_deals' | 'daily_report' | 'challenge'
+  type:      'new_leads' | 'urgent' | 'stuck' | 'overdue' | 'unassigned' | 'hot_deals' | 'daily_report' | 'challenge' | 'meta_health'
   severity:  'critical' | 'warning' | 'info'
   title:     string
   message:   string
@@ -26,6 +27,21 @@ export async function GET() {
   const sys = cfg.notifications?.system ?? DEFAULT_NOTIFICATIONS.system
   const now = new Date()
   const notifications: Notification[] = []
+
+  if (role === 'admin') {
+    const metaHealth = await readMetaHealth(db)
+    if (metaHealth.connected && metaHealth.status !== 'healthy') {
+      notifications.push({
+        id: 'meta_health',
+        type: 'meta_health',
+        severity: metaHealth.status === 'broken' ? 'critical' : 'warning',
+        title: `Meta auto-leads are ${metaHealth.status}`,
+        message: metaHealth.status_message,
+        count: 1,
+        filterUrl: '/sales/integrations',
+      })
+    }
+  }
 
   // ── 1. New leads ──────────────────────────────────────────────────
   if (sys.new_leads.enabled) {

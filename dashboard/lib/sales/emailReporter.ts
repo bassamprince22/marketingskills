@@ -47,6 +47,58 @@ async function send(to: string[], subject: string, html: string) {
   }
 }
 
+export async function sendMetaHealthEmail(
+  adminEmails: string[],
+  meta: {
+    status: 'healthy' | 'warning' | 'broken'
+    title: string
+    message: string
+    checkedAt: string
+    lastWebhookAt?: string | null
+    lastSyncAt?: string | null
+  },
+) {
+  if (!getKey() || adminEmails.length === 0) return
+
+  const statusColor =
+    meta.status === 'healthy' ? '#4ADE80' : meta.status === 'warning' ? '#F59E0B' : '#F87171'
+
+  const html = `
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:48px;margin-bottom:10px;">${meta.status === 'healthy' ? '✓' : meta.status === 'warning' ? '!' : '✕'}</div>
+      <h2 style="color:#E2E8F0;font-size:22px;font-weight:800;margin:0 0 6px;">${meta.title}</h2>
+      <p style="color:${statusColor};font-size:15px;font-weight:700;margin:0;text-transform:uppercase;">${meta.status}</p>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:18px 20px;margin-bottom:20px;">
+      <p style="color:#E2E8F0;font-size:14px;line-height:1.7;margin:0 0 10px;">${meta.message}</p>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="padding:6px 0;color:#64748B;font-size:12px;width:42%;">CHECKED AT</td>
+          <td style="padding:6px 0;color:#E2E8F0;font-size:13px;font-weight:600;">${new Date(meta.checkedAt).toLocaleString()}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#64748B;font-size:12px;">LAST WEBHOOK</td>
+          <td style="padding:6px 0;color:#E2E8F0;font-size:13px;font-weight:600;">${meta.lastWebhookAt ? new Date(meta.lastWebhookAt).toLocaleString() : 'Never'}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#64748B;font-size:12px;">LAST SUCCESSFUL SYNC</td>
+          <td style="padding:6px 0;color:#E2E8F0;font-size:13px;font-weight:600;">${meta.lastSyncAt ? new Date(meta.lastSyncAt).toLocaleString() : 'Never'}</td>
+        </tr>
+      </table>
+    </div>
+
+    <p style="color:#64748B;font-size:12px;text-align:center;margin:0;line-height:1.6;">
+      Open the Meta integration screen in Fadaa CRM to reconnect Facebook, review logs, or run a repair sync.
+    </p>
+  `
+
+  const subjectPrefix =
+    meta.status === 'healthy' ? 'Recovered' : meta.status === 'warning' ? 'Warning' : 'Action required'
+
+  await send(adminEmails, `[Fadaa Meta] ${subjectPrefix}: ${meta.title}`, html)
+}
+
 /* ── Report reminder ─────────────────────────────────────────────────── */
 export async function sendReportReminderEmail(
   managerEmails: string[],

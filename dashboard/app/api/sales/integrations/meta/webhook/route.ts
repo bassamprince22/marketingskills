@@ -1,190 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/supabase'
-import { getNextAssignee } from '@/lib/sales/autoAssign'
-import { extractMetaLeadIdentity } from '@/lib/sales/meta'
-
-const fmtKey = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+import { processMetaWebhookLead } from '@/lib/sales/metaIntegration'
 
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? 'fadaa_meta_verify'
-const BUCKET       = 'sales-config'
-const CONFIG_FILE  = 'meta-integration.json'
-const LOGS_FILE    = 'meta-logs.json'
 
-async function readJson(db: ReturnType<typeof getServiceClient>, file: string) {
-  const { data, error } = await db.storage.from(BUCKET).download(file)
-  if (error || !data) return null
-  try {
-    const text = await data.text()
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
-}
-
-async function appendLog(db: ReturnType<typeof getServiceClient>, log: Record<string, unknown>) {
-  try {
-    const existing = (await readJson(db, LOGS_FILE)) ?? []
-    const updated = [
-      { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...log },
-      ...existing,
-    ].slice(0, 100)
-    const blob = new Blob([JSON.stringify(updated)], { type: 'application/json' })
-    await db.storage
-      .from(BUCKET)
-      .upload(LOGS_FILE, blob, { upsert: true, contentType: 'application/json' })
-  } catch {
-    // non-critical
-  }
-}
-
-// ── GET: Facebook webhook verification ───────────
 export async function GET(req: NextRequest) {
-  const sp        = req.nextUrl.searchParams
-  const mode      = sp.get('hub.mode')
-  const token     = sp.get('hub.verify_token')
-  const challenge = sp.get('hub.challenge')
+  const searchParams = req.nextUrl.searchParams
+  const mode = searchParams.get('hub.mode')
+  const token = searchParams.get('hub.verify_token')
+  const challenge = searchParams.get('hub.challenge')
 
   if (mode === 'subscribe' && token === VERIFY_TOKEN && challenge) {
-    console.log('Meta webhook verified')
     return new NextResponse(challenge, {
       status: 200,
       headers: { 'Content-Type': 'text/plain' },
     })
   }
-  console.log('Meta webhook verification failed', { mode, token, expected: VERIFY_TOKEN })
+
   return NextResponse.json({ error: 'Verification failed' }, { status: 403 })
 }
 
-// ── POST: Receive lead events ─────────────────────
 export async function POST(req: NextRequest) {
-  const db   = getServiceClient()
   const body = await req.json()
-
   if (body.object !== 'page') return NextResponse.json({ ok: true })
 
-  // Load integration config from Storage
-  const integration = await readJson(db, CONFIG_FILE)
-  const defaultPageId = (integration?.config?.default_page_id as string | undefined) ?? null
+  const db = getServiceClient()
 
   for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
       if (change.field !== 'leadgen') continue
 
-      const { leadgen_id, page_id } = change.value
+      const leadgenId = change.value?.leadgen_id
+      const pageId = change.value?.page_id
+      if (!leadgenId || !pageId) continue
 
-      // If a default page is configured, only process events from that page
-      if (defaultPageId && page_id !== defaultPageId) continue
-
-      const pages = integration?.config?.pages as { id: string; access_token: string }[] | undefined
-      const pageToken =
-        pages?.find((p) => p.id === page_id)?.access_token ??
-        integration?.config?.page_access_token
-
-      if (!pageToken) {
-        await appendLog(db, {
-          integration_type: 'meta', event_type: 'lead_fetch_failed',
-          status: 'error', error_message: 'No page access token found',
-          payload: { leadgen_id, page_id },
-        })
-        continue
-      }
-
-      // Fetch full lead data from Meta Graph API
-      const leadRes = await fetch(
-        `https://graph.facebook.com/v19.0/${leadgen_id}?fields=field_data,created_time,ad_name,form_id&access_token=${pageToken}`
-      )
-      const leadData = await leadRes.json()
-
-      if (leadData.error) {
-        await appendLog(db, {
-          integration_type: 'meta', event_type: 'lead_fetch_failed',
-          status: 'error', error_message: leadData.error.message, payload: leadData,
-        })
-        continue
-      }
-
-      // Parse field_data into named fields
-      const fields: Record<string, string> = {}
-      for (const f of leadData.field_data ?? []) {
-        fields[f.name] = f.values?.[0] ?? ''
-      }
-
-      const identity = extractMetaLeadIdentity({ fields })
-      const name = identity.contactPerson ?? identity.companyName ?? 'Meta Lead'
-      const companyName = identity.companyName ?? name
-      const email = identity.email ?? ''
-      const phone = identity.phone ?? ''
-
-      // Format every form answer as a readable Q&A block stored in notes
-      const qaLines = Object.entries(fields).filter(([, v]) => v.trim()).map(([k, v]) => `${fmtKey(k)}: ${v}`)
-      const notes = [
-        ...qaLines,
-        '',
-        `Ad: ${leadData.ad_name ?? '—'}`,
-        `Form ID: ${leadData.form_id ?? '—'}`,
-      ].join('\n').trim()
-
-      // Dedupe by email or phone
-      if (email || phone) {
-        const filter = [email ? `email.eq.${email}` : null, phone ? `phone.eq.${phone}` : null]
-          .filter(Boolean).join(',')
-        const { data: existing } = await db.from('sales_leads').select('id').or(filter).maybeSingle()
-        if (existing) {
-          // Update notes/payload on existing lead but don't duplicate
-          await db.from('sales_leads').update({ notes }).eq('id', existing.id)
-          await appendLog(db, {
-            integration_type: 'meta', event_type: 'lead_duplicate_skipped',
-            status: 'info', error_message: null,
-            payload: { lead_id: existing.id, email, phone },
-          })
-          continue
-        }
-      }
-
-      // Auto-assign to next rep if enabled
-      const assignedRepId = await getNextAssignee()
-
-      // Insert core fields first (guaranteed columns)
-      const { data: lead, error: leadErr } = await db
-        .from('sales_leads')
-        .insert({
-          contact_person: name,
-          email,
-          phone,
-          company_name: companyName,
-          lead_source: 'meta',
-          pipeline_stage: 'new_lead',
-          service_type: 'marketing',
-          priority: 'medium',
-          notes,
-          ...(assignedRepId ? { assigned_rep_id: assignedRepId } : {}),
-        })
-        .select('id')
-        .single()
-
-      if (leadErr) {
-        await appendLog(db, {
-          integration_type: 'meta', event_type: 'lead_insert_failed',
-          status: 'error', error_message: leadErr.message, payload: { fields },
-        })
-        continue
-      }
-
-      // Best-effort: attach raw Meta payload (requires meta_raw_payload column)
-      await db.from('sales_leads').update({
-        meta_raw_payload: {
-          fields,
-          ad_name: leadData.ad_name ?? null,
-          form_id: leadData.form_id ?? null,
-          form_name: null,
-        },
-      }).eq('id', lead.id)
-
-      await appendLog(db, {
-        integration_type: 'meta', event_type: 'lead_created',
-        status: 'success', error_message: null,
-        payload: { lead_id: lead.id, name, email, phone },
-      })
+      await processMetaWebhookLead(db, { leadgenId, pageId })
     }
   }
 

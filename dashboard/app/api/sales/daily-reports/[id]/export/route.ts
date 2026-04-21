@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
+import { getEffectiveModulePermission } from '@/lib/sales/db'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -9,6 +10,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const db   = getServiceClient()
   const user = session.user as { id?: string; role?: string }
+  const uid = user.id
+  if (!uid) return NextResponse.json({ error: 'No user id' }, { status: 400 })
+  const reportsPermission = await getEffectiveModulePermission(uid, user.role ?? 'rep', 'reports')
+  if (!reportsPermission.can_view) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: report, error } = await db.from('sales_daily_reports')
     .select('*, sales_users!user_id(id, name)')
@@ -16,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .single()
 
   if (error || !report) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if ((user.role ?? 'rep') === 'rep' && report.user_id !== user.id) {
+  if (!reportsPermission.can_manage && report.user_id !== uid) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

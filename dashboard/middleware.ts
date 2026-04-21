@@ -17,10 +17,6 @@ export default withAuth(
       if (!token) {
         return NextResponse.redirect(new URL('/sales/login', req.url))
       }
-      // Reports are manager/admin only
-      if (pathname.startsWith('/sales/reports') && token.role === 'rep') {
-        return NextResponse.redirect(new URL('/sales/dashboard', req.url))
-      }
       // Admin pages require admin role
       if (pathname.startsWith('/sales/admin') && token.role !== 'admin') {
         return NextResponse.redirect(new URL('/sales/dashboard', req.url))
