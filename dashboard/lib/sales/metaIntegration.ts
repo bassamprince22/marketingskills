@@ -516,33 +516,103 @@ async function updateIntegrationStats(
   return next
 }
 
+interface SalesLeadMetaCapabilities {
+  metaRawPayload: boolean
+  metaLeadId: boolean
+  metaPageId: boolean
+  metaFormId: boolean
+}
+
+interface ExistingLeadMatch {
+  id: string
+  company_name: string | null
+  contact_person: string | null
+  email: string | null
+  phone: string | null
+  notes: string | null
+  lead_source: string | null
+  meta_lead_id?: string | null
+}
+
+async function detectSalesLeadMetaCapabilities(db: DbClient): Promise<SalesLeadMetaCapabilities> {
+  const checks = {
+    metaRawPayload: 'meta_raw_payload',
+    metaLeadId: 'meta_lead_id',
+    metaPageId: 'meta_page_id',
+    metaFormId: 'meta_form_id',
+  } as const
+
+  const results: SalesLeadMetaCapabilities = {
+    metaRawPayload: false,
+    metaLeadId: false,
+    metaPageId: false,
+    metaFormId: false,
+  }
+
+  for (const [key, column] of Object.entries(checks) as Array<[keyof SalesLeadMetaCapabilities, string]>) {
+    const { error } = await db.from('sales_leads').select(column).limit(1)
+    results[key] = !error
+  }
+
+  return results
+}
+
+function getExistingLeadSelect(capabilities: SalesLeadMetaCapabilities) {
+  return [
+    'id',
+    'company_name',
+    'contact_person',
+    'email',
+    'phone',
+    'notes',
+    'lead_source',
+    capabilities.metaLeadId ? 'meta_lead_id' : null,
+  ].filter(Boolean).join(', ')
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message.trim() ? error.message : fallback
+}
+
 async function findExistingLead(
   db: DbClient,
   options: {
     metaLeadId: string | null
     email: string | null
     phone: string | null
-  }
+  },
+  capabilities: SalesLeadMetaCapabilities
 ) {
+  const selectColumns = getExistingLeadSelect(capabilities)
+
   if (options.metaLeadId) {
-    const { data } = await db.from('sales_leads')
-      .select('id, company_name, contact_person, email, phone, notes, lead_source, meta_lead_id')
-      .eq('meta_lead_id', options.metaLeadId)
-      .maybeSingle()
-    if (data) return { match: data, strategy: 'meta_lead_id' as const }
+    if (capabilities.metaLeadId) {
+      const { data, error } = await db.from('sales_leads')
+        .select(selectColumns)
+        .eq('meta_lead_id', options.metaLeadId)
+        .maybeSingle()
+      if (error) throw new Error(`Failed to look up Meta lead by ID: ${error.message}`)
+      const match = data as ExistingLeadMatch | null
+      if (match) return { match, strategy: 'meta_lead_id' as const }
+    }
 
     const filters = [options.email ? `email.eq.${options.email}` : null, options.phone ? `phone.eq.${options.phone}` : null]
       .filter(Boolean)
       .join(',')
     if (filters) {
-      const { data: legacy } = await db.from('sales_leads')
-        .select('id, company_name, contact_person, email, phone, notes, lead_source, meta_lead_id')
+      let query = db.from('sales_leads')
+        .select(selectColumns)
         .eq('lead_source', 'meta')
-        .is('meta_lead_id', null)
         .or(filters)
         .order('created_at', { ascending: false })
         .limit(2)
-      if ((legacy ?? []).length === 1) return { match: legacy?.[0], strategy: 'legacy_contact' as const }
+
+      if (capabilities.metaLeadId) query = query.is('meta_lead_id', null)
+
+      const { data: legacy, error } = await query
+      if (error) throw new Error(`Failed to look up existing Meta leads by contact info: ${error.message}`)
+      const legacyMatches = (legacy ?? []) as unknown as ExistingLeadMatch[]
+      if (legacyMatches.length === 1) return { match: legacyMatches[0], strategy: 'legacy_contact' as const }
     }
     return { match: null, strategy: null }
   }
@@ -553,20 +623,24 @@ async function findExistingLead(
 
   if (!filters) return { match: null, strategy: null }
 
-  const { data } = await db.from('sales_leads')
-    .select('id, company_name, contact_person, email, phone, notes, lead_source, meta_lead_id')
+  const { data, error } = await db.from('sales_leads')
+    .select(selectColumns)
     .or(filters)
     .order('created_at', { ascending: false })
     .limit(2)
+  if (error) throw new Error(`Failed to look up existing leads by contact info: ${error.message}`)
 
-  if ((data ?? []).length === 1) return { match: data?.[0], strategy: 'contact' as const }
+  const matches = (data ?? []) as unknown as ExistingLeadMatch[]
+  if (matches.length === 1) return { match: matches[0], strategy: 'contact' as const }
   return { match: null, strategy: null }
 }
 
 async function ingestMetaLead(
   db: DbClient,
-  payload: MetaLeadPayload
+  payload: MetaLeadPayload,
+  capabilitiesInput?: SalesLeadMetaCapabilities
 ) {
+  const capabilities = capabilitiesInput ?? await detectSalesLeadMetaCapabilities(db)
   const identity = extractMetaLeadIdentity({ fields: payload.fields })
   const fallbackName = identity.contactPerson ?? identity.companyName ?? 'Meta Lead'
   const companyName = identity.companyName ?? fallbackName
@@ -587,16 +661,17 @@ async function ingestMetaLead(
     metaLeadId: payload.leadId,
     email,
     phone,
-  })
+  }, capabilities)
 
   if (match) {
     const updates: Record<string, unknown> = {
       notes: notes || match.notes,
-      meta_raw_payload: metaPayload,
-      meta_lead_id: payload.leadId ?? match.meta_lead_id ?? null,
-      meta_page_id: payload.pageId ?? null,
-      meta_form_id: payload.formId ?? null,
     }
+
+    if (capabilities.metaRawPayload) updates.meta_raw_payload = metaPayload
+    if (capabilities.metaLeadId) updates.meta_lead_id = payload.leadId ?? match.meta_lead_id ?? null
+    if (capabilities.metaPageId) updates.meta_page_id = payload.pageId ?? null
+    if (capabilities.metaFormId) updates.meta_form_id = payload.formId ?? null
 
     if (!nonEmpty(match.email) && email) updates.email = email
     if (!nonEmpty(match.phone) && phone) updates.phone = phone
@@ -617,7 +692,7 @@ async function ingestMetaLead(
   }
 
   const assignedRepId = await getNextAssignee()
-  const insertPayload = {
+  const insertPayload: Record<string, unknown> = {
     contact_person: fallbackName,
     company_name: companyName,
     email,
@@ -627,12 +702,13 @@ async function ingestMetaLead(
     service_type: 'marketing',
     priority: 'medium',
     notes,
-    meta_lead_id: payload.leadId,
-    meta_page_id: payload.pageId,
-    meta_form_id: payload.formId,
-    meta_raw_payload: metaPayload,
     ...(assignedRepId ? { assigned_rep_id: assignedRepId } : {}),
   }
+
+  if (capabilities.metaLeadId) insertPayload.meta_lead_id = payload.leadId
+  if (capabilities.metaPageId) insertPayload.meta_page_id = payload.pageId
+  if (capabilities.metaFormId) insertPayload.meta_form_id = payload.formId
+  if (capabilities.metaRawPayload) insertPayload.meta_raw_payload = metaPayload
 
   const { data, error } = await db.from('sales_leads')
     .insert(insertPayload)
@@ -721,95 +797,153 @@ export async function syncMetaWindow(
     throw new Error(message)
   }
 
-  const summary: MetaSyncSummary = {
-    total: 0,
-    imported: 0,
-    updated: 0,
-    skipped: 0,
-    failed: 0,
-    pages: pages.length,
-    forms: 0,
-    since: new Date(options.since * 1000).toISOString(),
-    until: new Date(options.until * 1000).toISOString(),
-  }
+  try {
+    const capabilities = await detectSalesLeadMetaCapabilities(db)
+    const summary: MetaSyncSummary = {
+      total: 0,
+      imported: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      pages: pages.length,
+      forms: 0,
+      since: new Date(options.since * 1000).toISOString(),
+      until: new Date(options.until * 1000).toISOString(),
+    }
 
-  for (const page of pages) {
-    const forms = await fetchForms(page)
-    summary.forms += forms.length
+    for (const page of pages) {
+      let forms: MetaFormSummary[]
+      try {
+        forms = await fetchForms(page)
+      } catch (error) {
+        throw new Error(`Failed to load lead forms for page "${page.name}" (${page.id}): ${getErrorMessage(error, 'Unknown Meta error')}`)
+      }
+      summary.forms += forms.length
 
-    for (const form of forms) {
-      const leads = await fetchFormLeads(page, form, options.since, options.until)
-      summary.total += leads.length
-
-      for (const lead of leads) {
+      for (const form of forms) {
+        let leads: MetaLeadRow[]
         try {
-          const action = await ingestMetaLead(db, {
-            leadId: lead.id ?? null,
-            pageId: page.id,
-            formId: lead.form_id ?? form.id,
-            formName: form.name ?? null,
-            adName: lead.ad_name ?? null,
-            createdTime: isoOrNull(lead.created_time),
-            fields: parseFieldData(lead.field_data),
-          })
+          leads = await fetchFormLeads(page, form, options.since, options.until)
+        } catch (error) {
+          throw new Error(`Failed to load leads for form "${form.name}" (${form.id}) on page "${page.name}" (${page.id}): ${getErrorMessage(error, 'Unknown Meta error')}`)
+        }
+        summary.total += leads.length
 
-          if (action.action === 'imported') summary.imported += 1
-          else summary.updated += 1
-        } catch {
-          summary.failed += 1
+        for (const lead of leads) {
+          try {
+            const action = await ingestMetaLead(db, {
+              leadId: lead.id ?? null,
+              pageId: page.id,
+              formId: lead.form_id ?? form.id,
+              formName: form.name ?? null,
+              adName: lead.ad_name ?? null,
+              createdTime: isoOrNull(lead.created_time),
+              fields: parseFieldData(lead.field_data),
+            }, capabilities)
+
+            if (action.action === 'imported') summary.imported += 1
+            else summary.updated += 1
+          } catch (error) {
+            summary.failed += 1
+            await appendMetaLog(db, {
+              event_type: 'lead_sync_failed',
+              status: 'error',
+              error_message: `Lead ${lead.id ?? 'unknown'} failed on form "${form.name}" (${form.id}): ${getErrorMessage(error, 'Unknown sync error')}`,
+              payload: {
+                lead_id: lead.id ?? null,
+                form_id: lead.form_id ?? form.id,
+                form_name: form.name ?? null,
+                page_id: page.id,
+                page_name: page.name,
+                source: options.source,
+              },
+            })
+          }
         }
       }
     }
-  }
 
-  const stamp = nowIso()
-  const updatedIntegration = await updateIntegrationStats(db, integration, {
-    source: options.source,
-    imported: summary.imported,
-    updated: summary.updated,
-    at: stamp,
-  })
-
-  await appendMetaLog(db, {
-    event_type: options.source === 'manual_import' ? 'manual_import' : 'scheduled_sync',
-    status: summary.failed > 0 && summary.imported === 0 && summary.updated === 0 ? 'error' : summary.failed > 0 ? 'warning' : 'success',
-    error_message: summary.failed > 0 ? `${summary.failed} lead${summary.failed === 1 ? '' : 's'} failed during sync.` : null,
-    payload: {
+    const stamp = nowIso()
+    const updatedIntegration = await updateIntegrationStats(db, integration, {
+      source: options.source,
       imported: summary.imported,
       updated: summary.updated,
-      skipped: summary.skipped,
-      total: summary.total,
-      pages: summary.pages,
-      forms: summary.forms,
-      since: summary.since,
-      until: summary.until,
-      source: options.source,
-    },
-  })
+      at: stamp,
+    })
 
-  await persistHealth(
-    db,
-    updatedIntegration,
-    {
-      last_checked_at: stamp,
-      last_checked_source: options.source,
-      last_successful_sync_at: stamp,
-      last_sync_source: options.source,
-      last_successful_ingest_at: summary.imported > 0 || summary.updated > 0 ? stamp : undefined,
-      last_failure_at: summary.failed > 0 && summary.imported === 0 && summary.updated === 0 ? stamp : null,
-      last_error_message: summary.failed > 0 && summary.imported === 0 && summary.updated === 0
-        ? `${summary.failed} lead${summary.failed === 1 ? '' : 's'} failed during sync.`
-        : null,
-      consecutive_failures: summary.failed > 0 && summary.imported === 0 && summary.updated === 0
-        ? ((await readMetaHealth(db)).consecutive_failures ?? 0) + 1
-        : 0,
-      total_imported: (await readMetaHealth(db)).total_imported + summary.imported,
-      total_updated: (await readMetaHealth(db)).total_updated + summary.updated,
-    },
-    { notify: options.source === 'cron' }
-  )
+    await appendMetaLog(db, {
+      event_type: options.source === 'manual_import' ? 'manual_import' : 'scheduled_sync',
+      status: summary.failed > 0 && summary.imported === 0 && summary.updated === 0 ? 'error' : summary.failed > 0 ? 'warning' : 'success',
+      error_message: summary.failed > 0 ? `${summary.failed} lead${summary.failed === 1 ? '' : 's'} failed during sync.` : null,
+      payload: {
+        imported: summary.imported,
+        updated: summary.updated,
+        skipped: summary.skipped,
+        total: summary.total,
+        pages: summary.pages,
+        forms: summary.forms,
+        since: summary.since,
+        until: summary.until,
+        source: options.source,
+      },
+    })
 
-  return summary
+    const existingHealth = await readMetaHealth(db)
+    await persistHealth(
+      db,
+      updatedIntegration,
+      {
+        last_checked_at: stamp,
+        last_checked_source: options.source,
+        last_successful_sync_at: stamp,
+        last_sync_source: options.source,
+        last_successful_ingest_at: summary.imported > 0 || summary.updated > 0 ? stamp : undefined,
+        last_failure_at: summary.failed > 0 && summary.imported === 0 && summary.updated === 0 ? stamp : null,
+        last_error_message: summary.failed > 0 && summary.imported === 0 && summary.updated === 0
+          ? `${summary.failed} lead${summary.failed === 1 ? '' : 's'} failed during sync.`
+          : null,
+        consecutive_failures: summary.failed > 0 && summary.imported === 0 && summary.updated === 0
+          ? (existingHealth.consecutive_failures ?? 0) + 1
+          : 0,
+        total_imported: existingHealth.total_imported + summary.imported,
+        total_updated: existingHealth.total_updated + summary.updated,
+      },
+      { notify: options.source === 'cron' }
+    )
+
+    return summary
+  } catch (error) {
+    const message = getErrorMessage(error, 'Meta sync failed.')
+    const stamp = nowIso()
+    const health = await readMetaHealth(db)
+
+    await appendMetaLog(db, {
+      event_type: options.source === 'manual_import' ? 'manual_import' : 'scheduled_sync',
+      status: 'error',
+      error_message: message,
+      payload: {
+        source: options.source,
+        since: new Date(options.since * 1000).toISOString(),
+        until: new Date(options.until * 1000).toISOString(),
+        page_id: options.pageId ?? null,
+      },
+    })
+
+    await persistHealth(
+      db,
+      integration,
+      {
+        last_checked_at: stamp,
+        last_checked_source: options.source,
+        last_failure_at: stamp,
+        last_error_message: message,
+        consecutive_failures: (health.consecutive_failures ?? 0) + 1,
+      },
+      { notify: options.source === 'cron' }
+    )
+
+    throw new Error(message)
+  }
 }
 
 export async function processMetaWebhookLead(
