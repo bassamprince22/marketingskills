@@ -5,19 +5,19 @@ import { getServiceClient } from '@/lib/supabase'
 import { getManualImportWindow, syncMetaWindow } from '@/lib/sales/metaIntegration'
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { role } = session.user as { role: string }
-  if (role !== 'admin' && role !== 'manager') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  const db = getServiceClient()
-  const pageId = req.nextUrl.searchParams.get('page_id')
-  const { since, until } = getManualImportWindow()
-
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { role } = session.user as { role: string }
+    if (role !== 'admin' && role !== 'manager') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const db = getServiceClient()
+    const pageId = req.nextUrl.searchParams.get('page_id')
+    const { since, until } = getManualImportWindow()
+
     const summary = await syncMetaWindow(db, {
       source: 'manual_import',
       since,

@@ -14,21 +14,21 @@ function isAuthorizedCron(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  const role = (session?.user as { role?: string } | undefined)?.role
-  const canUseSession = role === 'admin' || role === 'manager'
-  const canUseCron = isAuthorizedCron(req)
-
-  if (!canUseSession && !canUseCron) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const db = getServiceClient()
-  const pageId = req.nextUrl.searchParams.get('page_id')
-  const health = await readMetaHealth(db)
-  const { since, until } = getCronWindow(health)
-
   try {
+    const session = await getServerSession(authOptions)
+    const role = (session?.user as { role?: string } | undefined)?.role
+    const canUseSession = role === 'admin' || role === 'manager'
+    const canUseCron = isAuthorizedCron(req)
+
+    if (!canUseSession && !canUseCron) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const db = getServiceClient()
+    const pageId = req.nextUrl.searchParams.get('page_id')
+    const health = await readMetaHealth(db)
+    const { since, until } = getCronWindow(health)
+
     const summary = await syncMetaWindow(db, {
       source: 'cron',
       since,
