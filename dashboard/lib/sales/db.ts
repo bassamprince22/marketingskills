@@ -9,7 +9,7 @@ import type {
   Activity, PipelineStage, ManagerStats, RepStats,
   PipelineCount, RepPerformance,
 } from './types'
-import { hydrateMetaLead } from './meta'
+import { hydrateMetaLead, isUnknownLeadValue } from './meta'
 
 // ─── Users ────────────────────────────────────────
 
@@ -74,7 +74,79 @@ export async function getLeads(opts: {
 
   const { data, error } = await q
   if (error) throw error
-  return ((data ?? []) as Lead[]).map(hydrateMetaLead)
+  return dedupeMetaLeads(((data ?? []) as Lead[]).map(hydrateMetaLead))
+}
+
+function normalizeLeadPhone(phone: string | null | undefined) {
+  if (!phone) return null
+  const digits = phone.replace(/[^\d+]+/g, '')
+  return digits || null
+}
+
+function scoreLeadForDedupe(lead: Lead) {
+  let score = 0
+  if (lead.meta_lead_id || lead.meta_raw_payload?.lead_id) score += 8
+  if (lead.email?.trim()) score += 4
+  if (lead.phone?.trim()) score += 4
+  if (!isUnknownLeadValue(lead.contact_person)) score += 2
+  if (!isUnknownLeadValue(lead.company_name)) score += 2
+  if (lead.notes?.trim()) score += 1
+  return score
+}
+
+function pickPreferredLead(existing: Lead, incoming: Lead) {
+  const scoreDiff = scoreLeadForDedupe(incoming) - scoreLeadForDedupe(existing)
+  if (scoreDiff > 0) return incoming
+  if (scoreDiff < 0) return existing
+
+  const existingCreated = new Date(existing.created_at).getTime()
+  const incomingCreated = new Date(incoming.created_at).getTime()
+  if (Number.isFinite(existingCreated) && Number.isFinite(incomingCreated) && incomingCreated < existingCreated) {
+    return incoming
+  }
+
+  return existing
+}
+
+function getMetaLeadDedupeKey(lead: Lead) {
+  if (lead.lead_source !== 'meta') return null
+
+  const metaLeadId = lead.meta_lead_id ?? lead.meta_raw_payload?.lead_id ?? null
+  if (metaLeadId) return `meta-lead:${metaLeadId}`
+
+  const email = lead.email?.trim().toLowerCase() ?? ''
+  const phone = normalizeLeadPhone(lead.phone) ?? ''
+  const formId = lead.meta_form_id ?? lead.meta_raw_payload?.form_id ?? ''
+
+  if (email || phone) {
+    return `meta-contact:${formId}:${email}:${phone}`
+  }
+
+  return null
+}
+
+function dedupeMetaLeads(leads: Lead[]) {
+  const deduped: Lead[] = []
+  const indexByKey = new Map<string, number>()
+
+  for (const lead of leads) {
+    const key = getMetaLeadDedupeKey(lead)
+    if (!key) {
+      deduped.push(lead)
+      continue
+    }
+
+    const existingIndex = indexByKey.get(key)
+    if (existingIndex == null) {
+      indexByKey.set(key, deduped.length)
+      deduped.push(lead)
+      continue
+    }
+
+    deduped[existingIndex] = pickPreferredLead(deduped[existingIndex], lead)
+  }
+
+  return deduped
 }
 
 export async function getUnassignedLeads(limit = 10): Promise<Lead[]> {

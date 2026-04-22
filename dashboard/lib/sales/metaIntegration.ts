@@ -570,6 +570,7 @@ interface SalesLeadMetaCapabilities {
 
 interface ExistingLeadMatch {
   id: string
+  created_at: string
   company_name: string | null
   contact_person: string | null
   email: string | null
@@ -605,6 +606,7 @@ async function detectSalesLeadMetaCapabilities(db: DbClient): Promise<SalesLeadM
 function getExistingLeadSelect(capabilities: SalesLeadMetaCapabilities) {
   return [
     'id',
+    'created_at',
     'company_name',
     'contact_person',
     'email',
@@ -617,6 +619,33 @@ function getExistingLeadSelect(capabilities: SalesLeadMetaCapabilities) {
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message.trim() ? error.message : fallback
+}
+
+function scoreExistingLeadMatch(match: ExistingLeadMatch) {
+  let score = 0
+  if (nonEmpty(match.meta_lead_id)) score += 8
+  if (nonEmpty(match.email)) score += 4
+  if (nonEmpty(match.phone)) score += 4
+  if (!isUnknownLeadValue(match.contact_person)) score += 2
+  if (!isUnknownLeadValue(match.company_name)) score += 2
+  if (nonEmpty(match.notes)) score += 1
+  return score
+}
+
+function selectCanonicalLeadMatch(matches: ExistingLeadMatch[]) {
+  if (matches.length === 0) return null
+  return [...matches].sort((left, right) => {
+    const scoreDiff = scoreExistingLeadMatch(right) - scoreExistingLeadMatch(left)
+    if (scoreDiff !== 0) return scoreDiff
+
+    const leftCreated = new Date(left.created_at).getTime()
+    const rightCreated = new Date(right.created_at).getTime()
+    if (Number.isFinite(leftCreated) && Number.isFinite(rightCreated) && leftCreated !== rightCreated) {
+      return leftCreated - rightCreated
+    }
+
+    return left.id.localeCompare(right.id)
+  })[0]
 }
 
 async function findExistingLead(
@@ -635,9 +664,11 @@ async function findExistingLead(
       const { data, error } = await db.from('sales_leads')
         .select(selectColumns)
         .eq('meta_lead_id', options.metaLeadId)
-        .maybeSingle()
+        .order('created_at', { ascending: true })
+        .limit(10)
       if (error) throw new Error(`Failed to look up Meta lead by ID: ${error.message}`)
-      const match = data as ExistingLeadMatch | null
+      const matches = (data ?? []) as unknown as ExistingLeadMatch[]
+      const match = selectCanonicalLeadMatch(matches)
       if (match) return { match, strategy: 'meta_lead_id' as const }
     }
 
@@ -657,7 +688,8 @@ async function findExistingLead(
       const { data: legacy, error } = await query
       if (error) throw new Error(`Failed to look up existing Meta leads by contact info: ${error.message}`)
       const legacyMatches = (legacy ?? []) as unknown as ExistingLeadMatch[]
-      if (legacyMatches.length === 1) return { match: legacyMatches[0], strategy: 'legacy_contact' as const }
+      const legacyMatch = selectCanonicalLeadMatch(legacyMatches)
+      if (legacyMatch) return { match: legacyMatch, strategy: 'legacy_contact' as const }
     }
     return { match: null, strategy: null }
   }
@@ -672,11 +704,12 @@ async function findExistingLead(
     .select(selectColumns)
     .or(filters)
     .order('created_at', { ascending: false })
-    .limit(2)
+    .limit(10)
   if (error) throw new Error(`Failed to look up existing leads by contact info: ${error.message}`)
 
   const matches = (data ?? []) as unknown as ExistingLeadMatch[]
-  if (matches.length === 1) return { match: matches[0], strategy: 'contact' as const }
+  const match = selectCanonicalLeadMatch(matches)
+  if (match) return { match, strategy: 'contact' as const }
   return { match: null, strategy: null }
 }
 
