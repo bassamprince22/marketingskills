@@ -7,7 +7,7 @@
   "crons": [
     {
       "path": "/api/sales/integrations/meta/sync",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
