@@ -67,12 +67,27 @@ interface SyncResult {
   error?: string
 }
 
-async function parseApiResponse<T extends { error?: string }>(response: Response): Promise<T> {
+function makeSyncErrorResult(error: string): SyncResult {
+  return {
+    imported: 0,
+    updated: 0,
+    skipped: 0,
+    failed: 0,
+    total: 0,
+    pages: 0,
+    forms: 0,
+    since: '',
+    until: '',
+    error,
+  }
+}
+
+async function parseApiResponse(response: Response): Promise<SyncResult> {
   const raw = await response.text()
-  let payload: T | null = null
+  let payload: SyncResult | null = null
 
   try {
-    payload = raw ? JSON.parse(raw) as T : null
+    payload = raw ? JSON.parse(raw) as SyncResult : null
   } catch {
     payload = null
   }
@@ -83,33 +98,11 @@ async function parseApiResponse<T extends { error?: string }>(response: Response
       raw.trim() ||
       `Request failed with HTTP ${response.status}`
 
-    return {
-      imported: 0,
-      updated: 0,
-      skipped: 0,
-      failed: 0,
-      total: 0,
-      pages: 0,
-      forms: 0,
-      since: '',
-      until: '',
-      error: `HTTP ${response.status}: ${detail}`,
-    } as T
+    return makeSyncErrorResult(`HTTP ${response.status}: ${detail}`)
   }
 
   if (!payload) {
-    return {
-      imported: 0,
-      updated: 0,
-      skipped: 0,
-      failed: 0,
-      total: 0,
-      pages: 0,
-      forms: 0,
-      since: '',
-      until: '',
-      error: 'The server returned an empty response.',
-    } as T
+    return makeSyncErrorResult('The server returned an empty response.')
   }
 
   return payload
@@ -230,7 +223,7 @@ function MetaCard({ connectedParam, errorParam }: { connectedParam: string | nul
         `/api/sales/integrations/meta/import?page_id=${encodeURIComponent(selectedPageId)}`,
         { method: 'POST' }
       )
-      const payload = await parseApiResponse<SyncResult>(response)
+      const payload = await parseApiResponse(response)
       setImportResult(payload)
       await load()
     } catch (error) {
@@ -256,7 +249,7 @@ function MetaCard({ connectedParam, errorParam }: { connectedParam: string | nul
     setSyncResult(null)
     try {
       const response = await fetch('/api/sales/integrations/meta/sync')
-      const payload = await parseApiResponse<SyncResult>(response)
+      const payload = await parseApiResponse(response)
       setSyncResult(payload)
       await load()
     } catch (error) {
