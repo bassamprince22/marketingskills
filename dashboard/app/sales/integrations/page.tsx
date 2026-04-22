@@ -68,7 +68,7 @@ interface SyncResult {
 }
 
 const META_APP_ID = '1375549184609507'
-const META_SCOPES = 'pages_show_list,leads_retrieval,pages_manage_ads,pages_read_engagement'
+const META_SCOPES = 'ads_management,pages_show_list,leads_retrieval,pages_manage_ads,pages_read_engagement'
 
 function timeAgo(iso: string | null | undefined): string {
   if (!iso) return 'never'

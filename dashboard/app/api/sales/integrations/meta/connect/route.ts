@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   if (role !== 'admin' && role !== 'manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const scopes = [
+    'ads_management',
     'pages_show_list',
     'leads_retrieval',
     'pages_manage_ads',
