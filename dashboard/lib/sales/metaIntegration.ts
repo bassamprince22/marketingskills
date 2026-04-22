@@ -109,7 +109,13 @@ export interface MetaSyncSummary {
 
 interface MetaGraphPage<T> {
   data?: T[]
-  error?: { message?: string; type?: string; code?: number }
+  error?: {
+    message?: string
+    type?: string
+    code?: number
+    error_subcode?: number
+    fbtrace_id?: string
+  }
   paging?: { next?: string }
 }
 
@@ -210,6 +216,34 @@ function getMetaErrorMessage(error: { message?: string; type?: string; code?: nu
   return [error.message, error.type, error.code].filter(Boolean).join(' · ')
 }
 
+function formatMetaGraphError(error: {
+  message?: string
+  type?: string
+  code?: number
+  error_subcode?: number
+  fbtrace_id?: string
+} | null | undefined) {
+  if (!error) return 'Meta request failed'
+  return [
+    error.message,
+    error.type,
+    error.code != null ? `code ${error.code}` : null,
+    error.error_subcode != null ? `subcode ${error.error_subcode}` : null,
+    error.fbtrace_id ? `trace ${error.fbtrace_id}` : null,
+  ].filter(Boolean).join(' | ')
+}
+
+function isLeadWithinWindow(lead: MetaLeadRow, since: number, until: number) {
+  if (!lead.created_time) return false
+  const timestamp = Math.floor(new Date(lead.created_time).getTime() / 1000)
+  if (!Number.isFinite(timestamp)) return false
+  return timestamp > since && timestamp <= until
+}
+
+function shouldRetryMetaLeadFetchWithoutFiltering(message: string) {
+  return /an unknown error has occurred/i.test(message) || /code 1/i.test(message)
+}
+
 function parseFieldData(fieldData: MetaLeadRow['field_data']): Record<string, string> {
   const fields: Record<string, string> = {}
   for (const field of fieldData ?? []) {
@@ -244,14 +278,25 @@ function isSameOrNewer(left: string | null | undefined, right: string | null | u
 
 async function fetchMetaJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: 'no-store', ...init })
-  const payload = await response.json()
+  const raw = await response.text()
+  let payload: unknown = null
+
+  try {
+    payload = raw ? JSON.parse(raw) : null
+  } catch {
+    payload = null
+  }
+
   if (!response.ok) {
-    const error = payload?.error?.message ?? response.statusText
-    throw new Error(error)
+    const error = (payload as { error?: MetaGraphPage<never>['error'] } | null)?.error
+    if (error) throw new Error(formatMetaGraphError(error))
+    throw new Error(`HTTP ${response.status}: ${raw.trim() || response.statusText || 'Unknown Meta error'}`)
   }
-  if (payload?.error) {
-    throw new Error(getMetaErrorMessage(payload.error))
+  const error = (payload as { error?: MetaGraphPage<never>['error'] } | null)?.error
+  if (error) {
+    throw new Error(formatMetaGraphError(error))
   }
+  if (payload == null) throw new Error('Meta returned an empty response.')
   return payload as T
 }
 
@@ -729,10 +774,19 @@ async function fetchFormLeads(page: MetaPageConfig, form: MetaFormSummary, since
     { field: 'time_created', operator: 'GREATER_THAN', value: since },
     { field: 'time_created', operator: 'LESS_THAN_OR_EQUAL', value: until },
   ])
+  const baseUrl = `https://graph.facebook.com/${META_API_VERSION}/${form.id}/leads?fields=id,field_data,created_time,ad_name,form_id&limit=100&access_token=${page.access_token}`
 
-  return fetchMetaCollection<MetaLeadRow>(
-    `https://graph.facebook.com/${META_API_VERSION}/${form.id}/leads?fields=id,field_data,created_time,ad_name,form_id&filtering=${encodeURIComponent(filtering)}&limit=100&access_token=${page.access_token}`
-  )
+  try {
+    return await fetchMetaCollection<MetaLeadRow>(
+      `${baseUrl}&filtering=${encodeURIComponent(filtering)}`
+    )
+  } catch (error) {
+    const message = getErrorMessage(error, 'Unknown Meta error')
+    if (!shouldRetryMetaLeadFetchWithoutFiltering(message)) throw error
+
+    const leads = await fetchMetaCollection<MetaLeadRow>(baseUrl)
+    return leads.filter((lead) => isLeadWithinWindow(lead, since, until))
+  }
 }
 
 function selectPages(
