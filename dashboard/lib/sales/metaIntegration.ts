@@ -853,6 +853,7 @@ export async function syncMetaWindow(
 
   try {
     const capabilities = await detectSalesLeadMetaCapabilities(db)
+    const syncWarnings: string[] = []
     const summary: MetaSyncSummary = {
       total: 0,
       imported: 0,
@@ -870,7 +871,20 @@ export async function syncMetaWindow(
       try {
         forms = await fetchForms(page)
       } catch (error) {
-        throw new Error(`Failed to load lead forms for page "${page.name}" (${page.id}): ${getErrorMessage(error, 'Unknown Meta error')}`)
+        const message = `Failed to load lead forms for page "${page.name}" (${page.id}): ${getErrorMessage(error, 'Unknown Meta error')}`
+        syncWarnings.push(message)
+        summary.failed += 1
+        await appendMetaLog(db, {
+          event_type: 'page_forms_failed',
+          status: 'error',
+          error_message: message,
+          payload: {
+            page_id: page.id,
+            page_name: page.name,
+            source: options.source,
+          },
+        })
+        continue
       }
       summary.forms += forms.length
 
@@ -879,7 +893,22 @@ export async function syncMetaWindow(
         try {
           leads = await fetchFormLeads(page, form, options.since, options.until)
         } catch (error) {
-          throw new Error(`Failed to load leads for form "${form.name}" (${form.id}) on page "${page.name}" (${page.id}): ${getErrorMessage(error, 'Unknown Meta error')}`)
+          const message = `Failed to load leads for form "${form.name}" (${form.id}) on page "${page.name}" (${page.id}): ${getErrorMessage(error, 'Unknown Meta error')}`
+          syncWarnings.push(message)
+          summary.failed += 1
+          await appendMetaLog(db, {
+            event_type: 'form_sync_failed',
+            status: 'error',
+            error_message: message,
+            payload: {
+              form_id: form.id,
+              form_name: form.name,
+              page_id: page.id,
+              page_name: page.name,
+              source: options.source,
+            },
+          })
+          continue
         }
         summary.total += leads.length
 
@@ -928,7 +957,7 @@ export async function syncMetaWindow(
     await appendMetaLog(db, {
       event_type: options.source === 'manual_import' ? 'manual_import' : 'scheduled_sync',
       status: summary.failed > 0 && summary.imported === 0 && summary.updated === 0 ? 'error' : summary.failed > 0 ? 'warning' : 'success',
-      error_message: summary.failed > 0 ? `${summary.failed} lead${summary.failed === 1 ? '' : 's'} failed during sync.` : null,
+      error_message: syncWarnings[0] ?? (summary.failed > 0 ? `${summary.failed} lead${summary.failed === 1 ? '' : 's'} failed during sync.` : null),
       payload: {
         imported: summary.imported,
         updated: summary.updated,
@@ -954,7 +983,7 @@ export async function syncMetaWindow(
         last_successful_ingest_at: summary.imported > 0 || summary.updated > 0 ? stamp : undefined,
         last_failure_at: summary.failed > 0 && summary.imported === 0 && summary.updated === 0 ? stamp : null,
         last_error_message: summary.failed > 0 && summary.imported === 0 && summary.updated === 0
-          ? `${summary.failed} lead${summary.failed === 1 ? '' : 's'} failed during sync.`
+          ? (syncWarnings[0] ?? `${summary.failed} lead${summary.failed === 1 ? '' : 's'} failed during sync.`)
           : null,
         consecutive_failures: summary.failed > 0 && summary.imported === 0 && summary.updated === 0
           ? (existingHealth.consecutive_failures ?? 0) + 1
