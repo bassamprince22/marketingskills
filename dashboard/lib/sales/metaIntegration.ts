@@ -769,12 +769,24 @@ async function fetchForms(page: MetaPageConfig) {
   )
 }
 
-async function fetchFormLeads(page: MetaPageConfig, form: MetaFormSummary, since: number, until: number) {
+function getCandidateMetaTokens(...tokens: Array<string | null | undefined>) {
+  const seen = new Set<string>()
+  const unique: string[] = []
+  for (const rawToken of tokens) {
+    const token = rawToken?.trim()
+    if (!token || seen.has(token)) continue
+    seen.add(token)
+    unique.push(token)
+  }
+  return unique
+}
+
+async function fetchLeadsForFormWithToken(token: string, form: MetaFormSummary, since: number, until: number) {
   const filtering = JSON.stringify([
     { field: 'time_created', operator: 'GREATER_THAN', value: since },
     { field: 'time_created', operator: 'LESS_THAN_OR_EQUAL', value: until },
   ])
-  const baseUrl = `https://graph.facebook.com/${META_API_VERSION}/${form.id}/leads?fields=id,field_data,created_time,ad_name,form_id&limit=100&access_token=${page.access_token}`
+  const baseUrl = `https://graph.facebook.com/${META_API_VERSION}/${form.id}/leads?fields=id,field_data,created_time,ad_name,form_id&limit=100&access_token=${token}`
 
   try {
     return await fetchMetaCollection<MetaLeadRow>(
@@ -787,6 +799,32 @@ async function fetchFormLeads(page: MetaPageConfig, form: MetaFormSummary, since
     const leads = await fetchMetaCollection<MetaLeadRow>(baseUrl)
     return leads.filter((lead) => isLeadWithinWindow(lead, since, until))
   }
+}
+
+async function fetchFormLeads(
+  integration: MetaIntegrationRecord,
+  page: MetaPageConfig,
+  form: MetaFormSummary,
+  since: number,
+  until: number
+) {
+  const candidateTokens = getCandidateMetaTokens(
+    page.access_token,
+    integration.config.user_token,
+    integration.config.page_access_token
+  )
+
+  let lastError: unknown = null
+
+  for (const token of candidateTokens) {
+    try {
+      return await fetchLeadsForFormWithToken(token, form, since, until)
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError ?? new Error('No Meta access token is available for lead retrieval.')
 }
 
 function selectPages(
@@ -891,7 +929,7 @@ export async function syncMetaWindow(
       for (const form of forms) {
         let leads: MetaLeadRow[]
         try {
-          leads = await fetchFormLeads(page, form, options.since, options.until)
+          leads = await fetchFormLeads(integration, page, form, options.since, options.until)
         } catch (error) {
           const message = `Failed to load leads for form "${form.name}" (${form.id}) on page "${page.name}" (${page.id}): ${getErrorMessage(error, 'Unknown Meta error')}`
           syncWarnings.push(message)
@@ -1066,13 +1104,14 @@ export async function processMetaWebhookLead(
     return { action: 'skipped' as const, reason: 'page_filtered' }
   }
 
-  const pageToken =
-    integration.config.pages?.find((page) => page.id === payload.pageId)?.access_token ??
-    integration.config.page_access_token ??
-    null
+  const candidateTokens = getCandidateMetaTokens(
+    integration.config.pages?.find((page) => page.id === payload.pageId)?.access_token,
+    integration.config.user_token,
+    integration.config.page_access_token
+  )
 
-  if (!pageToken) {
-    const message = 'No page access token found for this Meta page.'
+  if (candidateTokens.length === 0) {
+    const message = 'No Meta access token found for this Meta page.'
     await appendMetaLog(db, {
       event_type: 'lead_fetch_failed',
       status: 'error',
@@ -1096,9 +1135,24 @@ export async function processMetaWebhookLead(
   }
 
   try {
-    const lead = await fetchMetaJson<MetaLeadRow>(
-      `https://graph.facebook.com/${META_API_VERSION}/${payload.leadgenId}?fields=id,field_data,created_time,ad_name,form_id&access_token=${pageToken}`
-    )
+    let lead: MetaLeadRow | null = null
+    let lastError: unknown = null
+
+    for (const token of candidateTokens) {
+      try {
+        lead = await fetchMetaJson<MetaLeadRow>(
+          `https://graph.facebook.com/${META_API_VERSION}/${payload.leadgenId}?fields=id,field_data,created_time,ad_name,form_id&access_token=${token}`
+        )
+        break
+      } catch (error) {
+        lastError = error
+      }
+    }
+
+    if (!lead) {
+      throw lastError ?? new Error('Unable to fetch the Meta lead payload.')
+    }
+
     const outcome = await ingestMetaLead(db, {
       leadId: lead.id ?? payload.leadgenId,
       pageId: payload.pageId,
