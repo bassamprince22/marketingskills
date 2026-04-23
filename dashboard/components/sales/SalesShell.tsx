@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { StarsBackground } from './StarsBackground'
 import { SalesNav } from './SalesNav'
+import { SalesTopbar } from './SalesTopbar'
 import { NotificationToast } from './NotificationToast'
 
 const BOTTOM_NAV = [
@@ -39,6 +40,31 @@ const BOTTOM_NAV = [
 
 export function SalesShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [density, setDensity] = useState<'compact' | 'comfortable'>('comfortable')
+
+  useEffect(() => {
+    const savedTheme = typeof window !== 'undefined'
+      ? (localStorage.getItem('fadaa-ui-theme') as 'dark' | 'light' | null)
+      : null
+    const savedDensity = typeof window !== 'undefined'
+      ? (localStorage.getItem('fadaa-ui-density') as 'compact' | 'comfortable' | null)
+      : null
+
+    if (savedTheme === 'light' || savedTheme === 'dark') setTheme(savedTheme)
+    if (savedDensity === 'compact' || savedDensity === 'comfortable') setDensity(savedDensity)
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-sales-theme', theme)
+    localStorage.setItem('fadaa-ui-theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-sales-density', density)
+    localStorage.setItem('fadaa-ui-density', density)
+  }, [density])
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
     const cards = Array.from((e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('.fadaa-card'))
@@ -54,8 +80,24 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="fadaa-bg sales-shell">
       <StarsBackground />
-      <SalesNav />
+      <SalesNav mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <main className="sales-main" onMouseMove={handleMouseMove}>
+        <Suspense fallback={<div style={{ height: 74 }} />} >
+          <SalesTopbar
+            onOpenMenu={() => setMobileOpen(true)}
+            theme={theme}
+            density={density}
+            onThemeChange={setTheme}
+            onDensityChange={setDensity}
+            pageActionPreset={
+              pathname === '/sales/dashboard'
+                ? 'dashboard'
+                : pathname === '/sales/leads' || pathname === '/sales/pipeline'
+                ? 'records'
+                : 'none'
+            }
+          />
+        </Suspense>
         {children}
       </main>
 

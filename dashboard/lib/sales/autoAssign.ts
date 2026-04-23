@@ -1,4 +1,6 @@
 import { getServiceClient } from '@/lib/supabase'
+import { DEFAULT_PIPELINE_STAGE_CONFIGS, type PipelineStageConfig } from './types'
+import { normalizePipelineStages } from './pipeline'
 
 const BUCKET   = 'sales-config'
 const SETTINGS = 'settings.json'
@@ -42,11 +44,16 @@ export interface CommissionSettings {
   team_target_period:  'monthly' | 'quarterly' | 'yearly'
 }
 
+export interface PipelineSettings {
+  stages: PipelineStageConfig[]
+}
+
 export interface Settings {
   auto_assign:   AutoAssignSettings
   notifications: NotificationSettings
   daily_report:  DailyReportSettings
   commission:    CommissionSettings
+  pipeline:      PipelineSettings
 }
 
 export const DEFAULT_NOTIFICATIONS: NotificationSettings = {
@@ -79,6 +86,7 @@ const DEFAULT: Settings = {
   notifications: DEFAULT_NOTIFICATIONS,
   daily_report:  DEFAULT_DAILY_REPORT,
   commission:    DEFAULT_COMMISSION,
+  pipeline:      { stages: DEFAULT_PIPELINE_STAGE_CONFIGS },
 }
 
 async function readSettings(db: ReturnType<typeof getServiceClient>): Promise<Settings> {
@@ -94,6 +102,9 @@ async function readSettings(db: ReturnType<typeof getServiceClient>): Promise<Se
       },
       daily_report: { ...DEFAULT_DAILY_REPORT, ...(parsed.daily_report ?? {}) },
       commission:   { ...DEFAULT_COMMISSION,   ...(parsed.commission   ?? {}) },
+      pipeline: {
+        stages: normalizePipelineStages(parsed.pipeline?.stages),
+      },
     }
   } catch {
     return DEFAULT

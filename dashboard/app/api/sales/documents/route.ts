@@ -1,19 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getDocuments, createDocument, updateDocument, logActivity } from '@/lib/sales/db'
+import { getDocuments, createDocument, updateDocument, logActivity, getLeads } from '@/lib/sales/db'
 import { getServiceClient } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id, role } = session.user as { id: string; role: string }
 
   const sp = req.nextUrl.searchParams
   try {
+    let repLeadIds: string[] | undefined
+    if (role === 'rep') {
+      const repLeads = await getLeads({ repId: id, limit: 500 })
+      repLeadIds = repLeads.map((lead) => lead.id)
+      if (repLeadIds.length === 0) {
+        return NextResponse.json({ documents: [] })
+      }
+    }
     const documents = await getDocuments({
       leadId:     sp.get('leadId')     ?? undefined,
-      uploadedBy: role === 'rep' ? id : undefined,
+      leadIds:    role === 'rep' && !sp.get('leadId') ? repLeadIds : undefined,
     })
     return NextResponse.json({ documents })
   } catch (err) {
@@ -23,7 +31,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = (await getServerSession(authOptions)) as { user?: { id: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id: userId } = session.user as { id: string }
 
@@ -92,7 +100,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = (await getServerSession(authOptions)) as { user?: { id: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {

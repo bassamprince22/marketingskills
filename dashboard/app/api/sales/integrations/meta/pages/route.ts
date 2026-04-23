@@ -2,77 +2,82 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
+import {
+  markMetaDisconnected,
+  readMetaHealth,
+  readMetaIntegration,
+  readMetaLogs,
+  refreshMetaHealth,
+  type MetaIntegrationRecord,
+  writeMetaIntegration,
+} from '@/lib/sales/metaIntegration'
 
-const BUCKET      = 'sales-config'
-const CONFIG_FILE = 'meta-integration.json'
-const LOGS_FILE   = 'meta-logs.json'
-
-async function readJson(db: ReturnType<typeof getServiceClient>, file: string) {
-  const { data, error } = await db.storage.from(BUCKET).download(file)
-  if (error || !data) return null
-  try {
-    const text = await data.text()
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
-}
-
-async function writeJson(db: ReturnType<typeof getServiceClient>, file: string, value: unknown) {
-  const blob = new Blob([JSON.stringify(value)], { type: 'application/json' })
-  await db.storage
-    .from(BUCKET)
-    .upload(file, blob, { upsert: true, contentType: 'application/json' })
-}
-
-// GET — return integration config + logs from Storage
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const db = getServiceClient()
-  const [integration, logs] = await Promise.all([
-    readJson(db, CONFIG_FILE),
-    readJson(db, LOGS_FILE),
+  const [integration, logs, health] = await Promise.all([
+    readMetaIntegration(db),
+    readMetaLogs(db),
+    readMetaHealth(db),
   ])
 
-  return NextResponse.json({ integration: integration ?? null, logs: logs ?? [] })
+  return NextResponse.json({
+    integration: integration ?? null,
+    logs,
+    health,
+  })
 }
 
-// PATCH — set default auto-import page
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { role } = session.user as { role: string }
-  if (role !== 'admin' && role !== 'manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (role !== 'admin' && role !== 'manager') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const db = getServiceClient()
-  const { default_page_id } = await req.json() as { default_page_id: string }
-
-  const current = await readJson(db, CONFIG_FILE)
+  const { default_page_id } = (await req.json()) as { default_page_id?: string | null }
+  const current = await readMetaIntegration(db)
   if (!current) return NextResponse.json({ error: 'Not connected' }, { status: 400 })
 
-  await writeJson(db, CONFIG_FILE, {
+  const next: MetaIntegrationRecord = {
     ...current,
-    config: { ...current.config, default_page_id },
+    config: {
+      ...current.config,
+      default_page_id: default_page_id ?? null,
+    },
     updated_at: new Date().toISOString(),
-  })
+  }
 
-  return NextResponse.json({ ok: true })
+  await writeMetaIntegration(db, next)
+  const health = await refreshMetaHealth(
+    db,
+    {
+      last_checked_at: new Date().toISOString(),
+      last_checked_source: 'settings',
+    },
+    { notify: false }
+  )
+
+  return NextResponse.json({ ok: true, integration: next, health })
 }
 
-// DELETE — disconnect Meta (set is_active = false)
 export async function DELETE() {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { role } = session.user as { role: string }
-  if (role !== 'admin' && role !== 'manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (role !== 'admin' && role !== 'manager') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const db = getServiceClient()
-  const current = await readJson(db, CONFIG_FILE)
+  const current = await readMetaIntegration(db)
 
   if (current) {
-    await writeJson(db, CONFIG_FILE, {
+    await writeMetaIntegration(db, {
       ...current,
       is_active: false,
       config: {},
@@ -80,9 +85,6 @@ export async function DELETE() {
     })
   }
 
-  // Clear logs too
-  const blob = new Blob([JSON.stringify([])], { type: 'application/json' })
-  await db.storage.from(BUCKET).upload(LOGS_FILE, blob, { upsert: true, contentType: 'application/json' })
-
+  await markMetaDisconnected(db)
   return NextResponse.json({ ok: true })
 }

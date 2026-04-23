@@ -52,17 +52,20 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.username || !credentials?.password) return null
         try {
           const db = getServiceClient()
-          const { data: user } = await db
+          const { data: user, error: dbErr } = await db
             .from('sales_users')
             .select('id, name, email, username, role, password_hash, is_active')
             .eq('username', credentials.username.toLowerCase().trim())
             .eq('is_active', true)
             .single()
+          console.log('[auth] user found:', !!user, '| db error:', dbErr?.message ?? 'none')
           if (!user) return null
           const valid = await bcrypt.compare(credentials.password, user.password_hash)
+          console.log('[auth] password valid:', valid)
           if (!valid) return null
           return { id: user.id, name: user.name, email: user.email, role: user.role }
-        } catch {
+        } catch (e) {
+          console.error('[auth] exception:', e)
           return null
         }
       },

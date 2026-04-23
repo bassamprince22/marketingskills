@@ -47,6 +47,58 @@ async function send(to: string[], subject: string, html: string) {
   }
 }
 
+export async function sendMetaHealthEmail(
+  adminEmails: string[],
+  meta: {
+    status: 'healthy' | 'warning' | 'broken'
+    title: string
+    message: string
+    checkedAt: string
+    lastWebhookAt?: string | null
+    lastSyncAt?: string | null
+  },
+) {
+  if (!getKey() || adminEmails.length === 0) return
+
+  const statusColor =
+    meta.status === 'healthy' ? '#4ADE80' : meta.status === 'warning' ? '#F59E0B' : '#F87171'
+
+  const html = `
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:48px;margin-bottom:10px;">${meta.status === 'healthy' ? '✓' : meta.status === 'warning' ? '!' : '✕'}</div>
+      <h2 style="color:#E2E8F0;font-size:22px;font-weight:800;margin:0 0 6px;">${meta.title}</h2>
+      <p style="color:${statusColor};font-size:15px;font-weight:700;margin:0;text-transform:uppercase;">${meta.status}</p>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:18px 20px;margin-bottom:20px;">
+      <p style="color:#E2E8F0;font-size:14px;line-height:1.7;margin:0 0 10px;">${meta.message}</p>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="padding:6px 0;color:#64748B;font-size:12px;width:42%;">CHECKED AT</td>
+          <td style="padding:6px 0;color:#E2E8F0;font-size:13px;font-weight:600;">${new Date(meta.checkedAt).toLocaleString()}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#64748B;font-size:12px;">LAST WEBHOOK</td>
+          <td style="padding:6px 0;color:#E2E8F0;font-size:13px;font-weight:600;">${meta.lastWebhookAt ? new Date(meta.lastWebhookAt).toLocaleString() : 'Never'}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#64748B;font-size:12px;">LAST SUCCESSFUL SYNC</td>
+          <td style="padding:6px 0;color:#E2E8F0;font-size:13px;font-weight:600;">${meta.lastSyncAt ? new Date(meta.lastSyncAt).toLocaleString() : 'Never'}</td>
+        </tr>
+      </table>
+    </div>
+
+    <p style="color:#64748B;font-size:12px;text-align:center;margin:0;line-height:1.6;">
+      Open the Meta integration screen in Fadaa CRM to reconnect Facebook, review logs, or run a repair sync.
+    </p>
+  `
+
+  const subjectPrefix =
+    meta.status === 'healthy' ? 'Recovered' : meta.status === 'warning' ? 'Warning' : 'Action required'
+
+  await send(adminEmails, `[Fadaa Meta] ${subjectPrefix}: ${meta.title}`, html)
+}
+
 /* ── Report reminder ─────────────────────────────────────────────────── */
 export async function sendReportReminderEmail(
   managerEmails: string[],
@@ -175,4 +227,52 @@ export async function sendRewardAchievedEmail(
   `
 
   await send([repEmail], `${reward.badge_emoji ?? '🏆'} You've earned: ${reward.title}!`, html)
+}
+
+/* ── Team invite ─────────────────────────────────────────────────────── */
+const ROLE_LABELS: Record<string, string> = { manager: 'Sales Manager', rep: 'Sales Rep', admin: 'Admin' }
+
+export async function sendInviteEmail(
+  inviteEmail: string,
+  role: string,
+  inviteUrl: string,
+  expiresAt: string,
+) {
+  if (!getKey()) return
+  const roleLabel = ROLE_LABELS[role] ?? role
+  const expiryDate = new Date(expiresAt).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+
+  const html = `
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="font-size:48px;margin-bottom:12px;">✉</div>
+      <h2 style="color:#E2E8F0;font-size:22px;font-weight:800;margin:0 0 6px;">You're invited to Fadaa Sales</h2>
+      <p style="color:#64748B;font-size:14px;margin:0;">
+        You've been added as <span style="color:#7CB9FC;font-weight:700;">${roleLabel}</span>
+      </p>
+    </div>
+
+    <p style="color:#94A3B8;font-size:14px;line-height:1.7;margin:0 0 24px;text-align:center;">
+      Click the button below to create your account. Choose your own username and password.
+    </p>
+
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${inviteUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,#4F8EF7,#7C3AED);color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 36px;border-radius:12px;letter-spacing:0.03em;">
+        → Create My Account
+      </a>
+    </div>
+
+    <div style="background:rgba(79,142,247,0.06);border:1px solid rgba(79,142,247,0.18);border-radius:10px;padding:14px 18px;margin-top:20px;">
+      <p style="color:#64748B;font-size:12px;margin:0;line-height:1.6;">
+        Or copy this link:<br>
+        <span style="color:#7CB9FC;word-break:break-all;font-size:11px;font-family:monospace;">${inviteUrl}</span>
+      </p>
+    </div>
+
+    <p style="color:#64748B;font-size:12px;text-align:center;margin:20px 0 0;">
+      This invite expires on <strong style="color:#94A3B8;">${expiryDate}</strong> and can only be used once.
+    </p>
+  `
+
+  await send([inviteEmail], '✉ You\'ve been invited to Fadaa Sales CRM', html)
 }

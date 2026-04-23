@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import type { Lead } from '@/lib/sales/types'
-import { PIPELINE_STAGES, STAGE_LABELS, SERVICE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
+import type { Lead, PipelineStageConfig } from '@/lib/sales/types'
+import { DEFAULT_PIPELINE_STAGE_CONFIGS, STAGE_LABELS, SERVICE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
+import { normalizePipelineStages } from '@/lib/sales/pipeline'
 
 interface Rep { id: string; name: string }
 
@@ -117,8 +119,8 @@ function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
           <Link href={`/sales/leads/${lead.id}`} style={{ textDecoration: 'none' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
               <div style={{ minWidth: 0 }}>
-                <p className="t-card-title t-truncate">{lead.company_name}</p>
-                <p className="t-caption" style={{ marginTop: 2 }}>{lead.contact_person}</p>
+                <p className="t-card-title t-truncate">{lead.contact_person}</p>
+                <p className="t-caption" style={{ marginTop: 2 }}>{lead.company_name}</p>
               </div>
               {isNewToday && (
                 <span className="badge badge-new" style={{ fontSize: 9, flexShrink: 0, marginTop: 1 }}>NEW</span>
@@ -159,38 +161,52 @@ function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
   )
 }
 
-export default function PipelinePage() {
+function PipelineContent() {
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const role     = (session?.user as { role?: string })?.role ?? 'rep'
   const canAssign = role === 'admin' || role === 'manager'
+  const dateRange = searchParams.get('dateRange') ?? ''
 
   const [board,   setBoard]   = useState<Board>({})
   const [reps,    setReps]    = useState<Rep[]>([])
+  const [stageConfigs, setStageConfigs] = useState<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
   const [loading, setLoading] = useState(true)
   const [view,    setView]    = useState<'kanban' | 'list'>('kanban')
+  const stageKeys = stageConfigs.map((stage) => stage.key)
 
   const loadLeads = useCallback(() => {
     setLoading(true)
+    const leadQuery = new URLSearchParams()
+    leadQuery.set('limit', '500')
+    if (dateRange) leadQuery.set('dateRange', dateRange)
     Promise.all([
-      fetch('/api/sales/leads?limit=500').then(r => r.json()),
+      fetch(`/api/sales/leads?${leadQuery.toString()}`).then(r => r.json()),
       canAssign ? fetch('/api/sales/users?role=rep').then(r => r.json()) : Promise.resolve({ users: [] }),
     ]).then(([ld, ud]) => {
       const leads: Lead[] = ld.leads ?? []
       const b: Board = {}
-      PIPELINE_STAGES.forEach(s => { b[s] = [] })
+      stageKeys.forEach(s => { b[s] = [] })
       leads.forEach(l => { if (b[l.pipeline_stage]) b[l.pipeline_stage].push(l) })
       setBoard(b)
       setReps(ud.users ?? [])
       setLoading(false)
     })
-  }, [canAssign])
+  }, [canAssign, dateRange, stageKeys.join('|')])
 
   useEffect(() => { loadLeads() }, [loadLeads])
+
+  useEffect(() => {
+    fetch('/api/sales/settings')
+      .then((response) => response.json())
+      .then((payload) => setStageConfigs(normalizePipelineStages(payload.settings?.pipeline?.stages)))
+      .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
+  }, [])
 
   const handleAssign = useCallback(async (leadId: string, repId: string | null) => {
     setBoard(prev => {
       const next = { ...prev }
-      for (const stage of PIPELINE_STAGES) {
+      for (const stage of stageKeys) {
         next[stage] = (prev[stage] ?? []).map(l => {
           if (l.id !== leadId) return l
           const rep = repId ? (reps.find(r => r.id === repId) ?? null) : null
@@ -263,7 +279,7 @@ export default function PipelinePage() {
       ) : view === 'kanban' ? (
         <DragDropContext onDragEnd={onDragEnd}>
           <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
-            {PIPELINE_STAGES.map(stage => {
+            {stageKeys.map(stage => {
               const cards  = board[stage] ?? []
               const accent = STAGE_ACCENT[stage]
               const colVal = cards.reduce((s, l) => s + (l.estimated_value ?? 0), 0)
@@ -280,17 +296,15 @@ export default function PipelinePage() {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <p style={{ color: accent, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                        {STAGE_LABELS[stage]}
+                  {stageConfigs.find((entry) => entry.key === stage)?.label ?? STAGE_LABELS[stage] ?? stage}
                       </p>
                       <span className="badge" style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}28`, fontSize: 10 }}>
                         {cards.length}
                       </span>
                     </div>
-                    {colVal > 0 && (
-                      <p className="t-caption t-mono" style={{ marginTop: 2, fontSize: 10 }}>
-                        ${(colVal / 1000).toFixed(1)}k
-                      </p>
-                    )}
+                    <p className="t-mono" style={{ marginTop: 3, fontSize: 11, color: colVal > 0 ? '#4ADE80' : 'var(--text-faint)' }}>
+                      {colVal > 0 ? `$${(colVal / 1000).toFixed(1)}k` : '—'}
+                    </p>
                   </div>
 
                   {/* Drop zone */}
@@ -337,7 +351,7 @@ export default function PipelinePage() {
               </tr>
             </thead>
             <tbody>
-              {PIPELINE_STAGES.flatMap(stage =>
+              {stageKeys.flatMap(stage =>
                 (board[stage] ?? []).map(lead => (
                   <tr key={lead.id} onClick={() => window.location.href = `/sales/leads/${lead.id}`}>
                     <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{lead.company_name}</td>
@@ -365,5 +379,13 @@ export default function PipelinePage() {
         </div>
       )}
     </SalesShell>
+  )
+}
+
+export default function PipelinePage() {
+  return (
+    <Suspense fallback={<SalesShell><div className="t-caption" style={{ padding: 40 }}>Loading...</div></SalesShell>}>
+      <PipelineContent />
+    </Suspense>
   )
 }

@@ -8,8 +8,9 @@ import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
 import { ActivityFeed } from '@/components/sales/ActivityFeed'
 import { ContractEditor } from '@/components/sales/ContractEditor'
-import type { Lead, Meeting, Document as Doc, Activity } from '@/lib/sales/types'
-import { STAGE_LABELS, PIPELINE_STAGES, SERVICE_LABELS, SOURCE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
+import type { Lead, Meeting, Document as Doc, Activity, PipelineStageConfig } from '@/lib/sales/types'
+import { DEFAULT_PIPELINE_STAGE_CONFIGS, STAGE_LABELS, SERVICE_LABELS, SOURCE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
+import { getSuggestedDocTypesForStage, normalizePipelineStages } from '@/lib/sales/pipeline'
 
 type Tab = 'overview' | 'meetings' | 'documents' | 'activity'
 
@@ -49,6 +50,7 @@ export default function LeadDetailPage() {
   const [updatingStage, setUpdatingStage] = useState(false)
   const [loading,    setLoading]    = useState(true)
   const [showContract, setShowContract] = useState(false)
+  const [stageConfigs, setStageConfigs] = useState<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
 
   const id = params.id as string
 
@@ -67,6 +69,13 @@ export default function LeadDetailPage() {
       setLoading(false)
     })
   }, [id])
+
+  useEffect(() => {
+    fetch('/api/sales/settings')
+      .then((response) => response.json())
+      .then((payload) => setStageConfigs(normalizePipelineStages(payload.settings?.pipeline?.stages)))
+      .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
+  }, [])
 
   async function handleStageChange(newStage: string) {
     setUpdatingStage(true)
@@ -166,7 +175,7 @@ export default function LeadDetailPage() {
           onChange={e => handleStageChange(e.target.value)}
           disabled={updatingStage}
         >
-          {PIPELINE_STAGES.map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
+          {stageConfigs.map(stageOption => <option key={stageOption.key} value={stageOption.key}>{stageOption.label ?? STAGE_LABELS[stageOption.key] ?? stageOption.key}</option>)}
         </select>
         {updatingStage && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--brand-primary)', fontSize: 12 }}>
@@ -232,22 +241,94 @@ export default function LeadDetailPage() {
             </div>
           )}
 
-          {lead.notes && (
-            <div className="fadaa-card" style={{ gridColumn: '1 / -1' }}>
-              <div className="card-header">
-                <h3 className="t-label" style={{ color: '#F59E0B' }}>Notes</h3>
-              </div>
-              <div style={{ padding: '16px 20px' }}>
-                <p className="t-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{lead.notes}</p>
-              </div>
-            </div>
-          )}
+          {(() => {
+            // Build form Q&A from meta_raw_payload if available, or parse from notes
+            let displayFields: Record<string, string> | null = null
+            let adName: string | null = null
+            let formName: string | null = null
+
+            if (lead.lead_source === 'meta') {
+              if (lead.meta_raw_payload && Object.keys(lead.meta_raw_payload.fields ?? {}).length > 0) {
+                displayFields = lead.meta_raw_payload.fields
+                adName   = lead.meta_raw_payload.ad_name ?? null
+                formName = lead.meta_raw_payload.form_name ?? null
+              } else if (lead.notes) {
+                // Parse notes that were written as "Key: Value" lines by the webhook/import
+                const parsed: Record<string, string> = {}
+                for (const line of lead.notes.split('\n')) {
+                  const idx = line.indexOf(':')
+                  if (idx < 1) continue
+                  const rawKey = line.slice(0, idx).trim()
+                  const val    = line.slice(idx + 1).trim()
+                  if (!val) continue
+                  const k = rawKey.toLowerCase()
+                  if (k === 'ad')    { adName   = val; continue }
+                  if (k === 'form' || k === 'form name') { formName = val; continue }
+                  if (k === 'form id' || k === 'source') continue
+                  parsed[rawKey] = val
+                }
+                if (Object.keys(parsed).length > 0) displayFields = parsed
+              }
+            }
+
+            const hasMetaAnswers = displayFields && Object.keys(displayFields).length > 0
+
+            return (
+              <>
+                {hasMetaAnswers && (
+                  <div className="fadaa-card" style={{ gridColumn: '1 / -1', border: '1px solid rgba(79,142,247,0.2)', background: 'rgba(79,142,247,0.03)' }}>
+                    <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <h3 className="t-label" style={{ color: '#4F8EF7' }}>⚡ Meta Form Answers</h3>
+                      {(adName || formName) && (
+                        <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto', paddingRight: 20 }}>
+                          {formName ? `Form: ${formName}` : ''}
+                          {formName && adName ? ' · ' : ''}
+                          {adName ? `Ad: ${adName}` : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ padding: '12px 20px' }}>
+                      {Object.entries(displayFields!).map(([key, value]) => {
+                        if (!value) return null
+                        const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                        return (
+                          <div key={key} className="info-row">
+                            <span className="info-row-label">{label}</span>
+                            <span className="info-row-value" style={{ wordBreak: 'break-word' }}>{value}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {lead.notes && !hasMetaAnswers && (
+                  <div className="fadaa-card" style={{ gridColumn: '1 / -1' }}>
+                    <div className="card-header">
+                      <h3 className="t-label" style={{ color: '#F59E0B' }}>Notes</h3>
+                    </div>
+                    <div style={{ padding: '16px 20px' }}>
+                      <p className="t-body" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{lead.notes}</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       )}
 
       {/* Meetings tab */}
       {tab === 'meetings' && (
         <div>
+          <div className="fadaa-card" style={{ padding: '14px 18px', marginBottom: 16 }}>
+            <p className="t-label" style={{ marginBottom: 6 }}>Suggested next document</p>
+            <p className="t-caption" style={{ color: 'var(--text-secondary)' }}>
+              {getSuggestedDocTypesForStage(lead.pipeline_stage, stageConfigs).length > 0
+                ? `Recommended now: ${getSuggestedDocTypesForStage(lead.pipeline_stage, stageConfigs).join(', ')}.`
+                : 'No specific document is suggested for this stage yet.'}
+            </p>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
             <Link href={`/sales/meetings?leadId=${id}`} className="fadaa-btn" style={{ textDecoration: 'none' }}>+ Log Meeting</Link>
           </div>

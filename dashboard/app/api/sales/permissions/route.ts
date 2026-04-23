@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getUserPermissions, setUserPermissions } from '@/lib/sales/db'
+import { getEffectiveModulePermission, getUserPermissions, setUserPermissions } from '@/lib/sales/db'
+import { getServiceClient } from '@/lib/supabase'
 import type { Permission } from '@/lib/sales/db'
 
 // GET /api/sales/permissions?userId=xxx
@@ -11,9 +12,22 @@ export async function GET(req: NextRequest) {
 
   const { id, role } = session.user as { id: string; role: string }
   const targetId = req.nextUrl.searchParams.get('userId') ?? id
+  const effective = req.nextUrl.searchParams.get('effective') === '1'
+  const module = req.nextUrl.searchParams.get('module')
 
   if (role !== 'admin' && targetId !== id)
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  if (effective && module === 'reports') {
+    let targetRole = role
+    if (targetId !== id) {
+      const db = getServiceClient()
+      const { data } = await db.from('sales_users').select('role').eq('id', targetId).maybeSingle()
+      targetRole = data?.role ?? role
+    }
+    const permission = await getEffectiveModulePermission(targetId, targetRole, 'reports')
+    return NextResponse.json({ permissions: [permission] })
+  }
 
   const permissions = await getUserPermissions(targetId)
   return NextResponse.json({ permissions })

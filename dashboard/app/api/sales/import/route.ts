@@ -87,8 +87,7 @@ export async function POST(req: NextRequest) {
           service_type:    (row.service_type as any) ?? 'marketing',
           lead_source:     (row.lead_source  as any) ?? 'meta',
           pipeline_stage:  'new_lead',
-          assigned_rep_id: assignedRepId || (await getNextAssignee()),
-          created_by:      userId,
+          assigned_rep_id: assignedRepId || null,
         })
         await logActivity({
           lead_id:     lead.id,

@@ -15,6 +15,7 @@ function MeetingForm({ leadId, onSaved, onCancel }: {
 }) {
   const [leads,  setLeads]  = useState<Lead[]>([])
   const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState<string | null>(null)
   const [form,   setForm]   = useState({
     lead_id: leadId ?? '', meeting_date: '', meeting_type: 'discovery',
     status: 'scheduled', notes: '', outcome: '', next_action: '', next_action_date: '',
@@ -32,12 +33,22 @@ function MeetingForm({ leadId, onSaved, onCancel }: {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const res = await fetch('/api/sales/meetings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    if (res.ok) { onSaved() } else { setSaving(false) }
+    setError(null)
+    try {
+      const res = await fetch('/api/sales/meetings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || 'Failed to save meeting')
+      }
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save meeting')
+      setSaving(false)
+    }
   }
 
   return (
@@ -48,6 +59,11 @@ function MeetingForm({ leadId, onSaved, onCancel }: {
       </div>
       <div style={{ padding: '20px 24px' }}>
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {error && (
+            <div className="badge badge-cancelled" style={{ alignSelf: 'flex-start' }}>
+              {error}
+            </div>
+          )}
           {!leadId && (
             <div className="form-field">
               <FormLabel>Lead *</FormLabel>
@@ -120,25 +136,44 @@ function MeetingsContent() {
 
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [loading,  setLoading]  = useState(true)
+  const [error,    setError]    = useState<string | null>(null)
   const [showForm, setShowForm] = useState(!!leadId)
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true)
     const query = leadId ? `?leadId=${leadId}` : ''
-    fetch(`/api/sales/meetings${query}`)
-      .then(r => r.json())
-      .then(d => { setMeetings(d.meetings ?? []); setLoading(false) })
+    setError(null)
+    try {
+      const res = await fetch(`/api/sales/meetings${query}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || 'Failed to load meetings')
+      }
+      const data = await res.json()
+      setMeetings(data.meetings ?? [])
+    } catch (err) {
+      setMeetings([])
+      setError(err instanceof Error ? err.message : 'Failed to load meetings')
+    } finally {
+      setLoading(false)
+    }
   }, [leadId])
 
   useEffect(() => { load() }, [load])
 
   async function updateStatus(id: string, status: string) {
-    await fetch(`/api/sales/meetings/${id}`, {
+    setError(null)
+    const res = await fetch(`/api/sales/meetings/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     })
-    load()
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      setError(data?.error || 'Failed to update meeting')
+      return
+    }
+    await load()
   }
 
   if (showForm) {
@@ -159,6 +194,12 @@ function MeetingsContent() {
         </div>
         <button className="fadaa-btn" onClick={() => setShowForm(true)}>+ Log Meeting</button>
       </div>
+
+      {error && (
+        <div className="fadaa-card" style={{ marginBottom: 12, padding: '12px 16px', color: '#FCA5A5' }}>
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

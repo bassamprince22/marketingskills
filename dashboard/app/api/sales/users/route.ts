@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     .eq('is_active', true)
     .order('name')
 
-  if (role === 'rep') q = q.in('role', ['rep', 'manager'])
+  if (role === 'rep') q = q.in('role', ['rep', 'manager', 'admin'])
 
   const { data, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

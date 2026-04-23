@@ -2,27 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
-
-const BUCKET      = 'sales-config'
-const CONFIG_FILE = 'meta-integration.json'
-
-async function readJson(db: ReturnType<typeof getServiceClient>, file: string) {
-  const { data, error } = await db.storage.from(BUCKET).download(file)
-  if (error || !data) return null
-  try {
-    const text = await data.text()
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
-}
-
-async function writeJson(db: ReturnType<typeof getServiceClient>, file: string, value: unknown) {
-  const blob = new Blob([JSON.stringify(value)], { type: 'application/json' })
-  await db.storage
-    .from(BUCKET)
-    .upload(file, blob, { upsert: true, contentType: 'application/json' })
-}
+import {
+  appendMetaLog,
+  readMetaIntegration,
+  refreshMetaHealth,
+  type MetaIntegrationRecord,
+  writeMetaIntegration,
+} from '@/lib/sales/metaIntegration'
 
 // POST — manually add a Facebook page by its ID
 // Falls back to fetching /{page_id}?fields=access_token when /me/accounts
@@ -40,7 +26,7 @@ export async function POST(req: NextRequest) {
   const cleanId = page_id.trim()
 
   const db = getServiceClient()
-  const config = await readJson(db, CONFIG_FILE)
+  const config = await readMetaIntegration(db)
   if (!config?.is_active) {
     return NextResponse.json({ error: 'Meta not connected — connect Facebook first' }, { status: 400 })
   }
@@ -97,15 +83,33 @@ export async function POST(req: NextRequest) {
     { id: pageData.id, name: pageData.name, access_token: pageData.access_token },
   ]
 
-  await writeJson(db, CONFIG_FILE, {
+  const nextConfig: MetaIntegrationRecord = {
     ...config,
     config: {
       ...config.config,
       pages:             newPages,
       page_access_token: config.config?.page_access_token ?? pageData.access_token,
+      default_page_id: config.config?.default_page_id ?? pageData.id,
     },
     updated_at: new Date().toISOString(),
+  }
+
+  await writeMetaIntegration(db, nextConfig)
+  await appendMetaLog(db, {
+    event_type: 'page_added',
+    status: 'info',
+    error_message: null,
+    payload: { page_id: pageData.id, page_name: pageData.name },
   })
+  await refreshMetaHealth(
+    db,
+    {
+      last_checked_at: new Date().toISOString(),
+      last_checked_source: 'settings',
+      last_error_message: null,
+    },
+    { notify: false }
+  )
 
   return NextResponse.json({ ok: true, page: { id: pageData.id, name: pageData.name } })
 }

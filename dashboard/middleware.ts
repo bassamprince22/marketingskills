@@ -7,13 +7,15 @@ export default withAuth(
     const { pathname } = req.nextUrl
 
     // Sales routes require a real role (not the legacy single-password admin)
-    if (pathname.startsWith('/sales') && !pathname.startsWith('/sales/login')) {
+    if (
+      pathname.startsWith('/sales') &&
+      !pathname.startsWith('/sales/login') &&
+      !pathname.startsWith('/sales/forgot-password') &&
+      !pathname.startsWith('/sales/reset-password') &&
+      !pathname.startsWith('/sales/invite/')
+    ) {
       if (!token) {
         return NextResponse.redirect(new URL('/sales/login', req.url))
-      }
-      // Reports are manager/admin only
-      if (pathname.startsWith('/sales/reports') && token.role === 'rep') {
-        return NextResponse.redirect(new URL('/sales/dashboard', req.url))
       }
       // Admin pages require admin role
       if (pathname.startsWith('/sales/admin') && token.role !== 'admin') {
@@ -52,7 +54,10 @@ export default withAuth(
           // Meta webhook is server-to-server from Facebook — must be public
           pathname.startsWith('/api/sales/integrations/meta/webhook') ||
           // Password reset API endpoint must be public for forgot-password flow
-          pathname === '/api/sales/password'
+          pathname === '/api/sales/password' ||
+          // Invite validate / accept: public (token-authenticated)
+          pathname.startsWith('/sales/invite/') ||
+          /^\/api\/sales\/invites\/[^/]+(\/accept)?$/.test(pathname)
         ) return true
         // All other paths require auth
         return !!token

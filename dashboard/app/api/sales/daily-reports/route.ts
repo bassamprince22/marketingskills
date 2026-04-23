@@ -3,37 +3,46 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
 import { readSettings } from '@/lib/sales/autoAssign'
+import { getEffectiveModulePermission } from '@/lib/sales/db'
 
 function err(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status })
 }
 
+const TODAY = new Date().toISOString().split('T')[0]
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return err('Unauthorized', 401)
 
-  const db   = getServiceClient()
+  const db = getServiceClient()
   const user = session.user as { id?: string; role?: string }
   const role = user.role ?? 'rep'
-  const uid  = user.id
+  const uid = user.id
+  if (!uid) return err('No user id', 400)
+
+  const reportsPermission = await getEffectiveModulePermission(uid, role, 'reports')
+  if (!reportsPermission.can_view) return err('Forbidden', 403)
 
   const { searchParams } = new URL(req.url)
-  const date = searchParams.get('date') // for manager: fetch all reports for a date
+  const date = searchParams.get('date')
   const from = searchParams.get('from')
-  const to   = searchParams.get('to')
+  const to = searchParams.get('to')
+  const targetUserId = searchParams.get('userId')
 
   try {
-    if (role === 'manager' || role === 'admin') {
-      // Manager: get reports + full user list
-      let q = db.from('sales_daily_reports')
+    if (reportsPermission.can_manage) {
+      let query = db
+        .from('sales_daily_reports')
         .select('*, sales_users!user_id(id, name, email, avatar_url)')
         .order('report_date', { ascending: false })
 
-      if (date) q = q.eq('report_date', date)
-      else if (from && to) q = q.gte('report_date', from).lte('report_date', to)
-      else q = q.limit(200)
+      if (targetUserId) query = query.eq('user_id', targetUserId)
+      if (date) query = query.eq('report_date', date)
+      else if (from && to) query = query.gte('report_date', from).lte('report_date', to)
+      else query = query.limit(200)
 
-      const { data, error } = await q
+      const { data, error } = await query
       if (error && error.code !== '42P01') throw error
 
       const { data: reps } = await db.from('sales_users')
@@ -42,26 +51,37 @@ export async function GET(req: NextRequest) {
         .in('role', ['rep', 'manager'])
         .order('name')
 
-      return NextResponse.json({ reports: data ?? [], reps: reps ?? [] })
-    } else {
-      // Rep: own reports within retention window
-      const cfg          = await readSettings(db)
-      const retentionDays = cfg.daily_report.retention_days ?? 7
-      const cutoff       = new Date()
-      cutoff.setDate(cutoff.getDate() - retentionDays)
-      const cutoffStr    = cutoff.toISOString().split('T')[0]
-
-      const { data, error } = await db.from('sales_daily_reports')
-        .select('*')
-        .eq('user_id', uid)
-        .gte('report_date', cutoffStr)
-        .order('report_date', { ascending: false })
-
-      if (error && error.code !== '42P01') throw error
-      return NextResponse.json({ reports: data ?? [] })
+      return NextResponse.json({
+        reports: data ?? [],
+        reps: reps ?? [],
+        permissions: reportsPermission,
+      })
     }
-  } catch (e: unknown) {
-    console.error(e)
+
+    const cfg = await readSettings(db)
+    const retentionDays = cfg.daily_report.retention_days ?? 7
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - retentionDays)
+    const cutoffStr = cutoff.toISOString().split('T')[0]
+
+    let query = db.from('sales_daily_reports')
+      .select('*')
+      .eq('user_id', uid)
+      .order('report_date', { ascending: false })
+
+    if (date) query = query.eq('report_date', date)
+    else if (from && to) query = query.gte('report_date', from).lte('report_date', to)
+    else query = query.gte('report_date', cutoffStr)
+
+    const { data, error } = await query
+    if (error && error.code !== '42P01') throw error
+
+    return NextResponse.json({
+      reports: data ?? [],
+      permissions: reportsPermission,
+    })
+  } catch (error) {
+    console.error(error)
     return err('Server error', 500)
   }
 }
@@ -71,59 +91,52 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return err('Unauthorized', 401)
 
   const user = session.user as { id?: string; role?: string }
-  const uid  = user.id
+  const uid = user.id
+  const role = user.role ?? 'rep'
   if (!uid) return err('No user id', 400)
+
+  const reportsPermission = await getEffectiveModulePermission(uid, role, 'reports')
+  if (!reportsPermission.can_create) return err('Forbidden', 403)
 
   const db = getServiceClient()
   const body = await req.json()
+  const reportDate = body.report_date as string | undefined
+  const targetUserId = role === 'admin' ? body.user_id ?? uid : uid
 
-  const {
-    report_date,
-    leads_total = 0,
-    leads_qualified = 0,
-    leads_waiting = 0,
-    meetings_done = 0,
-    proposals_sent = 0,
-    contracts_generated = 0,
-    won_today = 0,
-    highlights,
-    challenges,
-    next_day_plan,
-    custom_notes,
-    status = 'draft',
-  } = body
-
-  if (!report_date) return err('report_date required')
+  if (!reportDate) return err('report_date required')
+  if (role !== 'admin' && reportDate !== TODAY) {
+    return err('Only today\'s report can be created here', 403)
+  }
 
   const payload: Record<string, unknown> = {
-    user_id: uid,
-    report_date,
-    leads_total,
-    leads_qualified,
-    leads_waiting,
-    meetings_done,
-    proposals_sent,
-    contracts_generated,
-    won_today,
-    highlights,
-    challenges,
-    next_day_plan,
-    custom_notes,
-    status,
+    user_id: targetUserId,
+    report_date: reportDate,
+    leads_total: body.leads_total ?? 0,
+    leads_qualified: body.leads_qualified ?? 0,
+    leads_waiting: body.leads_waiting ?? 0,
+    meetings_done: body.meetings_done ?? 0,
+    proposals_sent: body.proposals_sent ?? 0,
+    contracts_generated: body.contracts_generated ?? 0,
+    won_today: body.won_today ?? 0,
+    highlights: body.highlights,
+    challenges: body.challenges,
+    next_day_plan: body.next_day_plan,
+    custom_notes: body.custom_notes,
+    status: body.status ?? 'draft',
     updated_at: new Date().toISOString(),
   }
-  if (status === 'submitted') payload.submitted_at = new Date().toISOString()
+  if (payload.status === 'submitted') payload.submitted_at = new Date().toISOString()
 
   try {
     const { data, error } = await db.from('sales_daily_reports')
       .upsert(payload, { onConflict: 'user_id,report_date' })
-      .select()
+      .select('*, sales_users!user_id(id, name, email, avatar_url)')
       .single()
 
     if (error) throw error
     return NextResponse.json({ report: data })
-  } catch (e: unknown) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
     return err('Server error', 500)
   }
 }

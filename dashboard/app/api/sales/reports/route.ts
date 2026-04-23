@@ -2,25 +2,62 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
+import { getEffectiveModulePermission } from '@/lib/sales/db'
+
+function getPeriodRange(period: 'month' | 'quarter', anchor?: string | null) {
+  const base = anchor ? new Date(anchor) : new Date()
+  if (Number.isNaN(base.getTime())) return null
+
+  if (period === 'month') {
+    const start = new Date(base.getFullYear(), base.getMonth(), 1)
+    const end = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59, 999)
+    return { from: start.toISOString(), to: end.toISOString() }
+  }
+
+  const quarterStartMonth = Math.floor(base.getMonth() / 3) * 3
+  const start = new Date(base.getFullYear(), quarterStartMonth, 1)
+  const end = new Date(base.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59, 999)
+  return { from: start.toISOString(), to: end.toISOString() }
+}
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { role } = session.user as { role: string }
-  if (role === 'rep') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const sp   = req.nextUrl.searchParams
-  const from = sp.get('from') // ISO date string
-  const to   = sp.get('to')
+  const user = session.user as { id?: string; role?: string }
+  const uid = user.id
+  const role = user.role ?? 'rep'
+  if (!uid) return NextResponse.json({ error: 'No user id' }, { status: 400 })
+
+  const reportsPermission = await getEffectiveModulePermission(uid, role, 'reports')
+  if (!reportsPermission.can_view) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  if (role !== 'admin' || !reportsPermission.can_manage) {
+    return NextResponse.json({ error: 'Analytics are admin only' }, { status: 403 })
+  }
+
+  const searchParams = req.nextUrl.searchParams
+  let from = searchParams.get('from')
+  let to = searchParams.get('to')
+  const period = searchParams.get('period') as 'month' | 'quarter' | null
+  const anchor = searchParams.get('anchor')
+
+  if (period === 'month' || period === 'quarter') {
+    const range = getPeriodRange(period, anchor)
+    if (range) {
+      from = range.from
+      to = range.to
+    }
+  }
 
   const db = getServiceClient()
 
   try {
-    // Fetch everything we need in parallel
     const [
       { data: leads },
       { data: meetings },
-      { data: docs },
+      { data: documents },
       { data: users },
     ] = await Promise.all([
       db.from('sales_leads').select('id, pipeline_stage, lead_source, service_type, assigned_rep_id, is_qualified, estimated_value, created_at'),
@@ -29,82 +66,84 @@ export async function GET(req: NextRequest) {
       db.from('sales_users').select('id, name').eq('role', 'rep'),
     ])
 
-    const L  = (leads    ?? []) as any[]
-    const M  = (meetings ?? []) as any[]
-    const D  = (docs     ?? []) as any[]
-    const U  = (users    ?? []) as any[]
+    const leadRows = (leads ?? []) as Array<Record<string, any>>
+    const meetingRows = (meetings ?? []) as Array<Record<string, any>>
+    const documentRows = (documents ?? []) as Array<Record<string, any>>
+    const usersRows = (users ?? []) as Array<Record<string, any>>
 
-    // Date filter helper
     const inRange = (dateStr: string) => {
       if (!from && !to) return true
-      const d = new Date(dateStr)
-      if (from && d < new Date(from)) return false
-      if (to   && d > new Date(to))   return false
+      const date = new Date(dateStr)
+      if (from && date < new Date(from)) return false
+      if (to && date > new Date(to)) return false
       return true
     }
 
-    const filteredL = L.filter(l => inRange(l.created_at))
-    const filteredM = M.filter(m => inRange(m.meeting_date))
-    const filteredD = D.filter(d => inRange(d.upload_date))
+    const filteredLeads = leadRows.filter((lead) => inRange(lead.created_at))
+    const filteredMeetings = meetingRows.filter((meeting) => inRange(meeting.meeting_date))
+    const filteredDocuments = documentRows.filter((document) => inRange(document.upload_date))
 
-    // 1. Leads by source
     const bySource: Record<string, number> = {}
-    filteredL.forEach(l => { bySource[l.lead_source] = (bySource[l.lead_source] ?? 0) + 1 })
-
-    // 2. Leads by service type
-    const byService: Record<string, number> = {}
-    filteredL.forEach(l => { byService[l.service_type] = (byService[l.service_type] ?? 0) + 1 })
-
-    // 3. Qualified leads by rep
-    const qualByRep = U.map(u => ({
-      rep_id:   u.id,
-      rep_name: u.name,
-      count:    filteredL.filter(l => l.assigned_rep_id === u.id && l.is_qualified).length,
-    }))
-
-    // 4. Meetings by rep
-    const meetingsByRep = U.map(u => ({
-      rep_id:    u.id,
-      rep_name:  u.name,
-      total:     filteredM.filter(m => m.rep_id === u.id).length,
-      completed: filteredM.filter(m => m.rep_id === u.id && m.status === 'completed').length,
-      no_show:   filteredM.filter(m => m.rep_id === u.id && m.status === 'no_show').length,
-    }))
-
-    // 5. Win / loss
-    const won  = filteredL.filter(l => l.pipeline_stage === 'won').length
-    const lost = filteredL.filter(l => l.pipeline_stage === 'lost').length
-    const winRate = (won + lost) > 0 ? Math.round((won / (won + lost)) * 100) : 0
-
-    // 6. Quotations sent / contracts signed
-    const quotations = filteredD.filter(d => d.doc_type === 'quotation').length
-    const contractsSigned = filteredD.filter(d => d.doc_type === 'contract' && d.status === 'signed').length
-
-    // 7. Monthly performance (last 6 months)
-    const monthlyMap: Record<string, { month: string; leads: number; won: number; value: number }> = {}
-    L.forEach(l => {
-      const d = new Date(l.created_at)
-      const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      if (!monthlyMap[k]) monthlyMap[k] = { month: k, leads: 0, won: 0, value: 0 }
-      monthlyMap[k].leads++
-      if (l.pipeline_stage === 'won') { monthlyMap[k].won++; monthlyMap[k].value += l.estimated_value ?? 0 }
+    filteredLeads.forEach((lead) => {
+      bySource[lead.lead_source] = (bySource[lead.lead_source] ?? 0) + 1
     })
-    const monthly = Object.values(monthlyMap).sort((a, b) => a.month.localeCompare(b.month)).slice(-6)
 
-    // 8. Pipeline value by stage
+    const byService: Record<string, number> = {}
+    filteredLeads.forEach((lead) => {
+      byService[lead.service_type] = (byService[lead.service_type] ?? 0) + 1
+    })
+
+    const qualByRep = usersRows.map((rep) => ({
+      rep_id: rep.id,
+      rep_name: rep.name,
+      count: filteredLeads.filter((lead) => lead.assigned_rep_id === rep.id && lead.is_qualified).length,
+    }))
+
+    const meetingsByRep = usersRows.map((rep) => ({
+      rep_id: rep.id,
+      rep_name: rep.name,
+      total: filteredMeetings.filter((meeting) => meeting.rep_id === rep.id).length,
+      completed: filteredMeetings.filter((meeting) => meeting.rep_id === rep.id && meeting.status === 'completed').length,
+      no_show: filteredMeetings.filter((meeting) => meeting.rep_id === rep.id && meeting.status === 'no_show').length,
+    }))
+
+    const won = filteredLeads.filter((lead) => lead.pipeline_stage === 'won').length
+    const lost = filteredLeads.filter((lead) => lead.pipeline_stage === 'lost').length
+    const winRate = won + lost > 0 ? Math.round((won / (won + lost)) * 100) : 0
+
+    const quotations = filteredDocuments.filter((document) => document.doc_type === 'quotation').length
+    const contractsSigned = filteredDocuments.filter((document) => document.doc_type === 'contract' && document.status === 'signed').length
+
+    const monthlyMap: Record<string, { month: string; leads: number; won: number; value: number }> = {}
+    leadRows.forEach((lead) => {
+      const date = new Date(lead.created_at)
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      if (!monthlyMap[key]) monthlyMap[key] = { month: key, leads: 0, won: 0, value: 0 }
+      monthlyMap[key].leads += 1
+      if (lead.pipeline_stage === 'won') {
+        monthlyMap[key].won += 1
+        monthlyMap[key].value += lead.estimated_value ?? 0
+      }
+    })
+    const monthly = Object.values(monthlyMap)
+      .sort((left, right) => left.month.localeCompare(right.month))
+      .slice(-6)
+
     const pipelineValue: Record<string, number> = {}
-    filteredL.forEach(l => {
-      pipelineValue[l.pipeline_stage] = (pipelineValue[l.pipeline_stage] ?? 0) + (l.estimated_value ?? 0)
+    filteredLeads.forEach((lead) => {
+      pipelineValue[lead.pipeline_stage] = (pipelineValue[lead.pipeline_stage] ?? 0) + (lead.estimated_value ?? 0)
     })
 
     return NextResponse.json({
       summary: {
-        total_leads:       filteredL.length,
-        won, lost, winRate,
-        total_meetings:    filteredM.length,
-        quotations_sent:   quotations,
-        contracts_signed:  contractsSigned,
-        total_pipeline_value: filteredL.reduce((s: number, l: any) => s + (l.estimated_value ?? 0), 0),
+        total_leads: filteredLeads.length,
+        won,
+        lost,
+        winRate,
+        total_meetings: filteredMeetings.length,
+        quotations_sent: quotations,
+        contracts_signed: contractsSigned,
+        total_pipeline_value: filteredLeads.reduce((sum, lead) => sum + (lead.estimated_value ?? 0), 0),
       },
       bySource,
       byService,
@@ -112,9 +151,15 @@ export async function GET(req: NextRequest) {
       meetingsByRep,
       monthly,
       pipelineValue,
+      range: {
+        from,
+        to,
+        period: period ?? null,
+        anchor: anchor ?? null,
+      },
     })
-  } catch (err) {
-    console.error(err)
+  } catch (error) {
+    console.error(error)
     return NextResponse.json({ error: 'Failed to generate reports' }, { status: 500 })
   }
 }
