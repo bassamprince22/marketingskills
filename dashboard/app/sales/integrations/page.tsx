@@ -48,6 +48,9 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
   const [addPageId, setAddPageId]     = useState('')
   const [addingPage, setAddingPage]   = useState(false)
   const [addResult, setAddResult]     = useState<{ ok?: boolean; page?: { id: string; name: string }; error?: string; hint?: string } | null>(null)
+  const [refreshToken, setRefreshToken] = useState('')
+  const [refreshing, setRefreshing]   = useState(false)
+  const [refreshResult, setRefreshResult] = useState<{ ok?: boolean; pages_count?: number; pages?: { id: string; name: string }[]; subscriptions?: { page: string; ok: boolean; error?: string }[]; error?: string } | null>(null)
 
   function load() {
     setLoading(true)
@@ -96,6 +99,25 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
     })
     load()
     setSettingDefault(null)
+  }
+
+  async function refreshTokenFn() {
+    if (!refreshToken.trim()) return
+    setRefreshing(true)
+    setRefreshResult(null)
+    try {
+      const res    = await fetch('/api/sales/integrations/meta/refresh', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ access_token: refreshToken.trim() }),
+      })
+      const result = await res.json()
+      setRefreshResult(result)
+      if (result.ok) { setRefreshToken(''); load() }
+    } catch {
+      setRefreshResult({ error: 'Request failed — check your connection' })
+    }
+    setRefreshing(false)
   }
 
   async function addPageManually() {
@@ -271,6 +293,53 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
         </div>
       )}
 
+      {/* ── Refresh Token ───────────────────────────────────────────── */}
+      {connected && (
+        <div style={{ marginBottom: 20, padding: 16, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10 }}>
+          <p style={{ color: '#FCD34D', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>🔑 Refresh Access Token</p>
+          <p style={{ color: '#94A3B8', fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
+            If leads stopped importing automatically, your token expired. Get a new one from{' '}
+            <strong style={{ color: '#E2E8F0' }}>Meta App Dashboard → Tools → Get Token</strong>, paste it here, and click Refresh.
+            This re-subscribes all your pages to the live webhook.
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              className="fadaa-input"
+              style={{ flex: '1 1 260px', minWidth: 0, fontSize: 12, fontFamily: 'monospace' }}
+              placeholder="Paste new access token here…"
+              value={refreshToken}
+              onChange={e => setRefreshToken(e.target.value)}
+            />
+            <button
+              onClick={refreshTokenFn}
+              disabled={refreshing || !refreshToken.trim()}
+              className="fadaa-btn"
+              style={{ flexShrink: 0, fontSize: 12 }}
+            >
+              {refreshing ? '⟳ Refreshing…' : '↺ Refresh Token'}
+            </button>
+          </div>
+          {refreshResult && (
+            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 8, background: refreshResult.error ? 'rgba(239,68,68,0.08)' : 'rgba(74,222,128,0.08)', border: `1px solid ${refreshResult.error ? 'rgba(239,68,68,0.2)' : 'rgba(74,222,128,0.2)'}` }}>
+              {refreshResult.error ? (
+                <p style={{ color: '#F87171', fontSize: 13 }}>✕ {refreshResult.error}</p>
+              ) : (
+                <div>
+                  <p style={{ color: '#4ADE80', fontSize: 13, marginBottom: 6 }}>
+                    ✓ Token refreshed — {refreshResult.pages_count} page{refreshResult.pages_count !== 1 ? 's' : ''} re-subscribed to live webhook
+                  </p>
+                  {refreshResult.subscriptions?.map(s => (
+                    <p key={s.page} style={{ color: s.ok ? '#4ADE80' : '#F87171', fontSize: 12 }}>
+                      {s.ok ? '✓' : '✕'} {s.page}{s.error ? ` — ${s.error}` : ''}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Import last 30 days */}
       <div style={{ marginBottom: 20, padding: 16, background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 10 }}>
         <div style={{ marginBottom: 12 }}>
@@ -365,19 +434,29 @@ function MetaCard({ onRefresh, connectedParam, errorParam }: MetaCardProps) {
       {(data?.logs ?? []).length > 0 && (
         <div style={{ marginTop: 20 }}>
           <p style={{ color: '#64748B', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Recent Activity</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {(data?.logs ?? []).slice(0, 8).map(log => (
-              <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid #1E2D4A' }}>
-                <span style={{ fontSize: 12, color: log.status === 'success' ? '#4ADE80' : log.status === 'error' ? '#F87171' : '#F59E0B' }}>
-                  {log.status === 'success' ? '✓' : log.status === 'error' ? '✕' : '◌'}
-                </span>
-                <p style={{ color: '#94A3B8', fontSize: 12, flex: 1 }}>
-                  {log.event_type?.replace(/_/g, ' ')}
-                  {log.error_message && <span style={{ color: '#F87171' }}> — {log.error_message}</span>}
-                </p>
-                <p style={{ color: '#475569', fontSize: 11 }}>
-                  {new Date(log.created_at).toLocaleString()}
-                </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(data?.logs ?? []).slice(0, 12).map(log => (
+              <div key={log.id} style={{
+                padding: '8px 12px', borderRadius: 8,
+                background: log.status === 'error' ? 'rgba(239,68,68,0.06)' : log.status === 'success' ? 'rgba(74,222,128,0.04)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${log.status === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: log.status === 'success' ? '#4ADE80' : log.status === 'error' ? '#F87171' : '#F59E0B', flexShrink: 0 }}>
+                    {log.status === 'success' ? '✓' : log.status === 'error' ? '✕' : '◌'}
+                  </span>
+                  <p style={{ color: log.status === 'error' ? '#F87171' : '#94A3B8', fontSize: 12, flex: 1, fontWeight: log.status === 'error' ? 600 : 400 }}>
+                    {log.event_type?.replace(/_/g, ' ')}
+                  </p>
+                  <p style={{ color: '#475569', fontSize: 11, flexShrink: 0 }}>
+                    {new Date(log.created_at).toLocaleString()}
+                  </p>
+                </div>
+                {log.error_message && (
+                  <p style={{ color: '#FDA4AF', fontSize: 11, marginTop: 4, paddingLeft: 20, lineHeight: 1.5 }}>
+                    {log.error_message}
+                  </p>
+                )}
               </div>
             ))}
           </div>
