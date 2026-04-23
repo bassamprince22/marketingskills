@@ -8,6 +8,7 @@ import { NotificationSettingsCard } from '@/components/sales/NotificationSetting
 import { ServicesManager } from '@/components/sales/ServicesManager'
 import { ChallengeAdminPanel } from '@/components/sales/ChallengeAdminPanel'
 import { DashboardWidgetSettings } from '@/components/sales/DashboardWidgetSettings'
+import { PipelineSettingsCard } from '@/components/sales/PipelineSettingsCard'
 
 function Flash({ msg, type }: { msg: string; type: 'ok' | 'err' }) {
   if (!msg) return null
@@ -269,6 +270,7 @@ export default function SettingsPage() {
         {tab === 'dashboard' && isPrivileged && <DashboardWidgetSettings />}
         {tab === 'system' && isPrivileged && (
           <>
+            <PipelineSettingsCard />
             <AutoAssignCard />
             <ContractTemplateCard />
           </>

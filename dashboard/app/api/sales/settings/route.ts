@@ -3,9 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
 import { readSettings, writeSettings } from '@/lib/sales/autoAssign'
+import { normalizePipelineStages } from '@/lib/sales/pipeline'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
+  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
@@ -30,7 +31,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { role } = session.user as { role: string }
   if (role !== 'admin' && role !== 'manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -54,6 +55,13 @@ export async function PATCH(req: NextRequest) {
     } : {}),
     ...(body.commission ? {
       commission: { ...current.commission, ...body.commission },
+    } : {}),
+    ...(body.pipeline ? {
+      pipeline: {
+        ...current.pipeline,
+        ...body.pipeline,
+        stages: normalizePipelineStages(body.pipeline.stages ?? current.pipeline.stages),
+      },
     } : {}),
   }
 

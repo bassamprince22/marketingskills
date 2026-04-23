@@ -8,8 +8,9 @@ import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
 import { ActivityFeed } from '@/components/sales/ActivityFeed'
 import { ContractEditor } from '@/components/sales/ContractEditor'
-import type { Lead, Meeting, Document as Doc, Activity } from '@/lib/sales/types'
-import { STAGE_LABELS, PIPELINE_STAGES, SERVICE_LABELS, SOURCE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
+import type { Lead, Meeting, Document as Doc, Activity, PipelineStageConfig } from '@/lib/sales/types'
+import { DEFAULT_PIPELINE_STAGE_CONFIGS, STAGE_LABELS, SERVICE_LABELS, SOURCE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
+import { getSuggestedDocTypesForStage, normalizePipelineStages } from '@/lib/sales/pipeline'
 
 type Tab = 'overview' | 'meetings' | 'documents' | 'activity'
 
@@ -49,6 +50,7 @@ export default function LeadDetailPage() {
   const [updatingStage, setUpdatingStage] = useState(false)
   const [loading,    setLoading]    = useState(true)
   const [showContract, setShowContract] = useState(false)
+  const [stageConfigs, setStageConfigs] = useState<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
 
   const id = params.id as string
 
@@ -67,6 +69,13 @@ export default function LeadDetailPage() {
       setLoading(false)
     })
   }, [id])
+
+  useEffect(() => {
+    fetch('/api/sales/settings')
+      .then((response) => response.json())
+      .then((payload) => setStageConfigs(normalizePipelineStages(payload.settings?.pipeline?.stages)))
+      .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
+  }, [])
 
   async function handleStageChange(newStage: string) {
     setUpdatingStage(true)
@@ -166,7 +175,7 @@ export default function LeadDetailPage() {
           onChange={e => handleStageChange(e.target.value)}
           disabled={updatingStage}
         >
-          {PIPELINE_STAGES.map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
+          {stageConfigs.map(stageOption => <option key={stageOption.key} value={stageOption.key}>{stageOption.label ?? STAGE_LABELS[stageOption.key] ?? stageOption.key}</option>)}
         </select>
         {updatingStage && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--brand-primary)', fontSize: 12 }}>
@@ -312,6 +321,14 @@ export default function LeadDetailPage() {
       {/* Meetings tab */}
       {tab === 'meetings' && (
         <div>
+          <div className="fadaa-card" style={{ padding: '14px 18px', marginBottom: 16 }}>
+            <p className="t-label" style={{ marginBottom: 6 }}>Suggested next document</p>
+            <p className="t-caption" style={{ color: 'var(--text-secondary)' }}>
+              {getSuggestedDocTypesForStage(lead.pipeline_stage, stageConfigs).length > 0
+                ? `Recommended now: ${getSuggestedDocTypesForStage(lead.pipeline_stage, stageConfigs).join(', ')}.`
+                : 'No specific document is suggested for this stage yet.'}
+            </p>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
             <Link href={`/sales/meetings?leadId=${id}`} className="fadaa-btn" style={{ textDecoration: 'none' }}>+ Log Meeting</Link>
           </div>

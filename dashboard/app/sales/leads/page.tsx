@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { SalesShell } from '@/components/sales/SalesShell'
-import type { Lead } from '@/lib/sales/types'
-import { PIPELINE_STAGES } from '@/lib/sales/types'
+import type { Lead, PipelineStageConfig } from '@/lib/sales/types'
+import { DEFAULT_PIPELINE_STAGE_CONFIGS } from '@/lib/sales/types'
+import { normalizePipelineStages } from '@/lib/sales/pipeline'
 
 interface Rep { id: string; name: string }
 
@@ -62,11 +63,13 @@ export default function LeadsPage() {
   const canAssign = role === 'manager' || role === 'admin'
 
   const [leads,    setLeads]    = useState<Lead[]>([])
+  const [total,    setTotal]    = useState(0)
   const [dupeIds,  setDupeIds]  = useState<Set<string>>(new Set())
   const [reps,     setReps]     = useState<Rep[]>([])
+  const [stageConfigs, setStageConfigs] = useState<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
   const [loading,  setLoading]  = useState(true)
   const [search,   setSearch]   = useState('')
-  const [filters,  setFilters]  = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '', dateRange: '' })
+  const [filters,  setFilters]  = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '', dateRange: '', metaOrigin: '' })
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
 
@@ -82,6 +85,7 @@ export default function LeadsPage() {
       priority:    sp.get('priority')    ?? '',
       repId:       sp.get('repId')       ?? '',
       dateRange:   sp.get('dateRange')   ?? '',
+      metaOrigin:  sp.get('metaOrigin')  ?? '',
     })
   }, [])
 
@@ -96,6 +100,7 @@ export default function LeadsPage() {
     if (filters.priority)    sp.set('priority',    filters.priority)
     if (filters.repId)       sp.set('repId',       filters.repId)
     if (filters.dateRange)   sp.set('dateRange',   filters.dateRange)
+    if (filters.metaOrigin)  sp.set('metaOrigin',  filters.metaOrigin)
     const url = sp.toString() ? `/sales/leads?${sp}` : '/sales/leads'
     window.history.replaceState({}, '', url)
   }, [search, filters])
@@ -103,6 +108,7 @@ export default function LeadsPage() {
   const loadLeads = useCallback(() => {
     setLoading(true)
     const sp = new URLSearchParams()
+    sp.set('limit', '500')
     if (search)              sp.set('search',     search)
     if (filters.stage)       sp.set('stage',       filters.stage)
     if (filters.serviceType) sp.set('serviceType', filters.serviceType)
@@ -110,6 +116,7 @@ export default function LeadsPage() {
     if (filters.priority)    sp.set('priority',    filters.priority)
     if (filters.repId)       sp.set('repId',       filters.repId)
     if (filters.dateRange)   sp.set('dateRange',   filters.dateRange)
+    if (filters.metaOrigin)  sp.set('metaOrigin',  filters.metaOrigin)
     fetch(`/api/sales/leads?${sp}`)
       .then(r => r.json())
       .then(d => {
@@ -127,6 +134,7 @@ export default function LeadsPage() {
           ).map(l => l.id)
         ))
         setLeads(list)
+        setTotal(d.total ?? list.length)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -136,6 +144,13 @@ export default function LeadsPage() {
     if (!canAssign) return
     fetch('/api/sales/users?role=rep').then(r => r.json()).then(d => setReps(d.users ?? []))
   }, [canAssign])
+
+  useEffect(() => {
+    fetch('/api/sales/settings')
+      .then(r => r.json())
+      .then(d => setStageConfigs(normalizePipelineStages(d.settings?.pipeline?.stages)))
+      .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
+  }, [])
 
   useEffect(() => { loadLeads() }, [loadLeads])
 
@@ -164,14 +179,18 @@ export default function LeadsPage() {
     setFilters(f => ({ ...f, [k]: e.target.value }))
 
   const hasFilters = search || Object.values(filters).some(Boolean)
-  const clearAll   = () => { setSearch(''); setFilters({ stage: '', serviceType: '', source: '', priority: '', repId: '', dateRange: '' }) }
+  const clearAll   = () => { setSearch(''); setFilters({ stage: '', serviceType: '', source: '', priority: '', repId: '', dateRange: '', metaOrigin: '' }) }
+  const stageOptions = stageConfigs.map(stage => stage.key)
+  const stageMetaMap = Object.fromEntries(
+    stageConfigs.map(stage => [stage.key, { label: stage.label, color: stage.color, bg: `${stage.color}12` }])
+  ) as Record<string, { label: string; color: string; bg: string }>
 
   return (
     <SalesShell>
       {/* Page header */}
       <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 30, fontWeight: 800, color: '#fff', margin: 0 }}>Leads</h1>
+          <h1 style={{ fontSize: 30, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Leads</h1>
           <p style={{ fontSize: 13, color: 'var(--text-faint)', marginTop: 5 }}>
             All prospects across your constellation
           </p>
@@ -219,7 +238,7 @@ export default function LeadsPage() {
 
           <select className="filter-select" value={filters.stage} onChange={setFilter('stage')} style={{ minWidth: 140 }}>
             <option value="">All stages</option>
-            {PIPELINE_STAGES.map(s => <option key={s} value={s}>{STAGE_META[s]?.label ?? s}</option>)}
+            {stageOptions.map(s => <option key={s} value={s}>{stageMetaMap[s]?.label ?? STAGE_META[s]?.label ?? s}</option>)}
           </select>
 
           {canAssign && (
@@ -258,6 +277,12 @@ export default function LeadsPage() {
             <option value="other">Other</option>
           </select>
 
+          <select className="filter-select" value={filters.metaOrigin} onChange={setFilter('metaOrigin')}>
+            <option value="">All Meta types</option>
+            <option value="paid">Meta Paid</option>
+            <option value="organic">Meta Organic</option>
+          </select>
+
           {hasFilters && (
             <button className="fadaa-btn-ghost fadaa-btn-sm" onClick={clearAll}>Clear</button>
           )}
@@ -269,7 +294,7 @@ export default function LeadsPage() {
               </button>
             )}
             <span style={{ fontSize: 12, color: 'var(--text-faint)', fontFamily: 'var(--font-mono, monospace)' }}>
-              {loading ? '…' : `${leads.length} / ${leads.length}`}
+              {loading ? '...' : `${leads.length} / ${total}`}
             </span>
           </div>
         </div>
@@ -320,7 +345,7 @@ export default function LeadsPage() {
               }
             </div>
           ) : leads.map((lead, i) => {
-            const sm     = STAGE_META[lead.pipeline_stage] ?? { label: lead.pipeline_stage, color: '#94A3B8', bg: 'rgba(148,163,184,0.12)' }
+            const sm     = stageMetaMap[lead.pipeline_stage] ?? STAGE_META[lead.pipeline_stage] ?? { label: lead.pipeline_stage, color: '#94A3B8', bg: 'rgba(148,163,184,0.12)' }
             const pm     = PRIORITY_META[lead.priority]   ?? { color: '#94A3B8' }
             const srcm   = SOURCE_META[lead.lead_source ?? 'other'] ?? SOURCE_META.other
             const fu     = followUpDisplay(lead.next_follow_up_date, lead.pipeline_stage)
@@ -328,6 +353,9 @@ export default function LeadsPage() {
             const isDupe = dupeIds.has(lead.id)
             const isSel  = selected.has(lead.id)
             const isLast = i === leads.length - 1
+            const metaOriginLabel = lead.lead_source === 'meta'
+              ? ((lead.meta_origin ?? (lead.meta_raw_payload?.ad_name ? 'paid' : 'organic')) === 'paid' ? 'Paid' : 'Organic')
+              : null
 
             return (
               <div
@@ -369,7 +397,7 @@ export default function LeadsPage() {
                 <div style={{ padding: '14px 0', minWidth: 0 }} onClick={e => e.stopPropagation()}>
                   <Link href={`/sales/leads/${lead.id}`} style={{ textDecoration: 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: '#E2E8F0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>
                         {lead.contact_person}
                       </span>
                       {isDupe && (
@@ -429,7 +457,7 @@ export default function LeadsPage() {
                       }}>
                         {rep.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
-                      <span style={{ fontSize: 13, color: '#CBD5E1', fontWeight: 500 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>
                         {rep.name.split(' ')[0]}
                       </span>
                     </>
@@ -446,7 +474,7 @@ export default function LeadsPage() {
                     fontSize: 11, fontWeight: 600, color: srcm.color,
                     whiteSpace: 'nowrap',
                   }}>
-                    {lead.lead_source ?? 'other'}
+                    {lead.lead_source === 'meta' && metaOriginLabel ? `meta · ${metaOriginLabel}` : (lead.lead_source ?? 'other')}
                   </span>
                 </div>
 
@@ -478,7 +506,7 @@ export default function LeadsPage() {
           padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 100, whiteSpace: 'nowrap',
         }}>
-          <span style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600 }}>{selected.size} selected</span>
+          <span style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>{selected.size} selected</span>
           <div style={{ width: 1, height: 20, background: 'var(--border-subtle)' }} />
           <select className="filter-select" disabled={bulkBusy} defaultValue=""
             onChange={e => { bulkAction('assign', e.target.value); e.target.value = '' }} style={{ fontSize: 12 }}>
@@ -489,7 +517,7 @@ export default function LeadsPage() {
           <select className="filter-select" disabled={bulkBusy} defaultValue=""
             onChange={e => { bulkAction('stage', e.target.value); e.target.value = '' }} style={{ fontSize: 12 }}>
             <option value="" disabled>Move stage…</option>
-            {PIPELINE_STAGES.map(s => <option key={s} value={s}>{STAGE_META[s]?.label ?? s}</option>)}
+            {stageOptions.map(s => <option key={s} value={s}>{stageMetaMap[s]?.label ?? STAGE_META[s]?.label ?? s}</option>)}
           </select>
           <button className="fadaa-btn-ghost fadaa-btn-sm" onClick={clearSelection} style={{ fontSize: 12, padding: '4px 10px' }}>
             ✕ Clear

@@ -45,17 +45,63 @@ export async function getLeads(opts: {
   source?: string
   priority?: string
   search?: string
+  metaOrigin?: string
+  metaForm?: string
+  metaCampaign?: string
   dateFrom?: string
   dateTo?: string
   limit?: number
   offset?: number
 }): Promise<Lead[]> {
   const db = getServiceClient()
-  let q = db
-    .from('sales_leads')
-    .select('*, assigned_rep:sales_users!assigned_rep_id(id, name, avatar_url)')
-    .order('created_at', { ascending: false })
+  let q = applyLeadFilters(
+    db.from('sales_leads').select('*, assigned_rep:sales_users!assigned_rep_id(id, name, avatar_url)').order('created_at', { ascending: false }),
+    opts
+  )
+  if (opts.limit)  q = q.limit(opts.limit)
+  if (opts.offset) q = q.range(opts.offset, opts.offset + (opts.limit ?? 50) - 1)
 
+  const { data, error } = await q
+  if (error) throw error
+  return dedupeMetaLeads(((data ?? []) as Lead[]).map(hydrateMetaLead))
+}
+
+export async function getLeadsTotal(opts: {
+  repId?: string
+  stage?: PipelineStage
+  serviceType?: string
+  source?: string
+  priority?: string
+  search?: string
+  metaOrigin?: string
+  metaForm?: string
+  metaCampaign?: string
+  dateFrom?: string
+  dateTo?: string
+}): Promise<number> {
+  const db = getServiceClient()
+  const query = applyLeadFilters(
+    db.from('sales_leads').select('id', { count: 'exact', head: true }),
+    opts
+  )
+  const { count, error } = await query
+  if (error) throw error
+  return count ?? 0
+}
+
+function applyLeadFilters<T extends { eq: Function; is: Function; gte: Function; lte: Function; or: Function; ilike: Function; not: Function }>(q: T, opts: {
+  repId?: string
+  stage?: string
+  serviceType?: string
+  source?: string
+  priority?: string
+  search?: string
+  metaOrigin?: string
+  metaForm?: string
+  metaCampaign?: string
+  dateFrom?: string
+  dateTo?: string
+}) {
   if (opts.repId === 'unassigned') q = q.is('assigned_rep_id', null)
   else if (opts.repId)            q = q.eq('assigned_rep_id', opts.repId)
   if (opts.stage)       q = q.eq('pipeline_stage', opts.stage)
@@ -66,15 +112,14 @@ export async function getLeads(opts: {
   if (opts.dateTo)      q = q.lte('created_at', opts.dateTo)
   if (opts.search) {
     q = q.or(
-      `company_name.ilike.%${opts.search}%,contact_person.ilike.%${opts.search}%,email.ilike.%${opts.search}%`
+      `company_name.ilike.%${opts.search}%,contact_person.ilike.%${opts.search}%,email.ilike.%${opts.search}%,phone.ilike.%${opts.search}%`
     )
   }
-  if (opts.limit)  q = q.limit(opts.limit)
-  if (opts.offset) q = q.range(opts.offset, opts.offset + (opts.limit ?? 50) - 1)
-
-  const { data, error } = await q
-  if (error) throw error
-  return dedupeMetaLeads(((data ?? []) as Lead[]).map(hydrateMetaLead))
+  if (opts.metaForm) q = q.ilike('notes', `%${opts.metaForm}%`)
+  if (opts.metaCampaign) q = q.ilike('notes', `%${opts.metaCampaign}%`)
+  if (opts.metaOrigin === 'paid') q = q.not('meta_raw_payload->>ad_name', 'is', null)
+  if (opts.metaOrigin === 'organic') q = q.is('meta_raw_payload->>ad_name', null)
+  return q
 }
 
 function normalizeLeadPhone(phone: string | null | undefined) {
@@ -286,7 +331,7 @@ export async function upsertQualification(
 
 // ─── Documents ────────────────────────────────────
 
-export async function getDocuments(opts: { leadId?: string; uploadedBy?: string }): Promise<Document[]> {
+export async function getDocuments(opts: { leadId?: string; leadIds?: string[]; uploadedBy?: string }): Promise<Document[]> {
   const db = getServiceClient()
   let q = db
     .from('sales_documents')
@@ -294,6 +339,7 @@ export async function getDocuments(opts: { leadId?: string; uploadedBy?: string 
     .order('upload_date', { ascending: false })
 
   if (opts.leadId)     q = q.eq('lead_id', opts.leadId)
+  if (opts.leadIds?.length) q = q.in('lead_id', opts.leadIds)
   if (opts.uploadedBy) q = q.eq('uploaded_by', opts.uploadedBy)
 
   const { data, error } = await q

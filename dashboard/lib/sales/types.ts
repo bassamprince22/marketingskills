@@ -4,18 +4,7 @@
 
 export type Role = 'manager' | 'rep' | 'admin'
 
-export type PipelineStage =
-  | 'new_lead'
-  | 'contacted'
-  | 'discovery'
-  | 'meeting_scheduled'
-  | 'meeting_completed'
-  | 'qualified'
-  | 'proposal_sent'
-  | 'negotiation'
-  | 'contract_sent'
-  | 'won'
-  | 'lost'
+export type PipelineStage = string
 
 export type ServiceType = 'marketing' | 'software' | 'both'
 export type LeadSource  = 'meta' | 'referral' | 'website' | 'outbound' | 'other'
@@ -27,6 +16,7 @@ export type MeetingType   = 'discovery' | 'demo' | 'proposal' | 'negotiation' | 
 
 export type DocType   = 'quotation' | 'contract' | 'proposal' | 'other'
 export type DocStatus = 'draft' | 'sent' | 'signed' | 'rejected' | 'expired'
+export type MetaLeadOrigin = 'paid' | 'organic' | 'unknown'
 
 export type ActivityType =
   | 'stage_change'
@@ -78,6 +68,12 @@ export interface Lead {
   meta_lead_id?:        string | null
   meta_page_id?:        string | null
   meta_form_id?:        string | null
+  meta_stage_key?:      string | null
+  meta_stage_label?:    string | null
+  meta_assignee_name?:  string | null
+  meta_origin?:         MetaLeadOrigin | null
+  meta_campaign_name?:  string | null
+  meta_last_synced_at?: string | null
   meta_raw_payload?:    {
     fields: Record<string, string>
     lead_id?: string | null
@@ -86,6 +82,12 @@ export interface Lead {
     ad_name?: string | null
     form_id?: string | null
     form_name?: string | null
+    campaign_name?: string | null
+    stage_key?: string | null
+    stage_label?: string | null
+    assignee_name?: string | null
+    origin?: MetaLeadOrigin | null
+    last_synced_at?: string | null
   } | null
   // joined
   assigned_rep?:        Pick<SalesUser, 'id' | 'name' | 'avatar_url'> | null
@@ -180,6 +182,19 @@ export interface PipelineCount {
   value: number
 }
 
+export interface PipelineStageConfig {
+  key: string
+  label: string
+  color: string
+  order: number
+  is_terminal?: boolean
+  report_bucket?: 'open' | 'qualified' | 'proposal' | 'contract' | 'won' | 'lost'
+  meta_stage_key?: string | null
+  meta_stage_label?: string | null
+  crm_only?: boolean
+  suggested_doc_types?: DocType[]
+}
+
 export interface RepPerformance {
   rep_id:   string
   rep_name: string
@@ -234,7 +249,7 @@ export interface QualificationFormData {
 
 // ─── Display helpers ───────────────────────────────
 
-export const STAGE_LABELS: Record<PipelineStage, string> = {
+export const STAGE_LABELS: Record<string, string> = {
   new_lead:          'New Lead',
   contacted:         'Contacted',
   discovery:         'Discovery',
@@ -253,6 +268,20 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   'meeting_scheduled', 'meeting_completed',
   'qualified', 'proposal_sent', 'negotiation',
   'contract_sent', 'won', 'lost',
+]
+
+export const DEFAULT_PIPELINE_STAGE_CONFIGS: PipelineStageConfig[] = [
+  { key: 'new_lead', label: 'New Lead', color: '#94A3B8', order: 10, report_bucket: 'open', suggested_doc_types: ['proposal'] },
+  { key: 'contacted', label: 'Contacted', color: '#60A5FA', order: 20, report_bucket: 'open', suggested_doc_types: ['proposal'] },
+  { key: 'discovery', label: 'Discovery', color: '#818CF8', order: 30, report_bucket: 'open', suggested_doc_types: ['proposal'] },
+  { key: 'meeting_scheduled', label: 'Meeting Booked', color: '#A78BFA', order: 40, report_bucket: 'open', suggested_doc_types: ['proposal'] },
+  { key: 'meeting_completed', label: 'Meeting Done', color: '#34D399', order: 50, report_bucket: 'open', suggested_doc_types: ['proposal'] },
+  { key: 'qualified', label: 'Qualified', color: '#4ADE80', order: 60, report_bucket: 'qualified', suggested_doc_types: ['proposal'] },
+  { key: 'proposal_sent', label: 'Proposal Sent', color: '#38BDF8', order: 70, report_bucket: 'proposal', suggested_doc_types: ['proposal', 'quotation'] },
+  { key: 'negotiation', label: 'Negotiation', color: '#FB923C', order: 80, report_bucket: 'proposal', suggested_doc_types: ['proposal', 'quotation'] },
+  { key: 'contract_sent', label: 'Contract Sent', color: '#F97316', order: 90, report_bucket: 'contract', suggested_doc_types: ['contract'] },
+  { key: 'won', label: 'Won', color: '#22C55E', order: 100, report_bucket: 'won', is_terminal: true, suggested_doc_types: ['contract'] },
+  { key: 'lost', label: 'Lost', color: '#EF4444', order: 110, report_bucket: 'lost', is_terminal: true, crm_only: true },
 ]
 
 export const SOURCE_LABELS: Record<LeadSource, string> = {

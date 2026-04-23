@@ -175,6 +175,12 @@ export function hydrateMetaLead(lead: Lead): Lead {
           ad_name: lead.meta_raw_payload?.ad_name ?? extracted.adName ?? null,
           form_id: lead.meta_raw_payload?.form_id ?? null,
           form_name: lead.meta_raw_payload?.form_name ?? extracted.formName ?? null,
+          campaign_name: lead.meta_raw_payload?.campaign_name ?? null,
+          stage_key: lead.meta_raw_payload?.stage_key ?? null,
+          stage_label: lead.meta_raw_payload?.stage_label ?? null,
+          assignee_name: lead.meta_raw_payload?.assignee_name ?? null,
+          origin: lead.meta_raw_payload?.origin ?? (lead.meta_raw_payload?.ad_name ? 'paid' : 'organic'),
+          last_synced_at: lead.meta_raw_payload?.last_synced_at ?? null,
         }
       : lead.meta_raw_payload ?? null
 
@@ -182,6 +188,12 @@ export function hydrateMetaLead(lead: Lead): Lead {
     ...lead,
     company_name: companyName ?? lead.company_name,
     contact_person: contactPerson ?? lead.contact_person,
+    meta_origin: lead.meta_origin ?? parsedMetaPayload?.origin ?? null,
+    meta_campaign_name: lead.meta_campaign_name ?? parsedMetaPayload?.campaign_name ?? null,
+    meta_stage_key: lead.meta_stage_key ?? parsedMetaPayload?.stage_key ?? null,
+    meta_stage_label: lead.meta_stage_label ?? parsedMetaPayload?.stage_label ?? null,
+    meta_assignee_name: lead.meta_assignee_name ?? parsedMetaPayload?.assignee_name ?? null,
+    meta_last_synced_at: lead.meta_last_synced_at ?? parsedMetaPayload?.last_synced_at ?? null,
     meta_raw_payload: parsedMetaPayload,
   }
 }

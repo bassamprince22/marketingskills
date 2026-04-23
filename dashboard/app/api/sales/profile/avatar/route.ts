@@ -8,7 +8,7 @@ const MAX_MB  = 5
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = (await getServerSession(authOptions)) as { user?: { id?: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const user = session.user as { id?: string }
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     .upload(path, arrayBuf, { contentType: file.type, upsert: true })
 
   if (uploadErr) {
-    return NextResponse.json({ error: uploadErr.message }, { status: 500 })
+    return NextResponse.json({ error: `Avatar storage failed: ${uploadErr.message}` }, { status: 500 })
   }
 
   // Get public URL
@@ -44,9 +44,13 @@ export async function POST(req: NextRequest) {
   const avatarUrl = `${publicUrl}?t=${Date.now()}`
 
   // Update user record
-  await db.from('sales_users')
+  const { error: updateErr } = await db.from('sales_users')
     .update({ avatar_url: avatarUrl })
     .eq('id', user.id)
+
+  if (updateErr) {
+    return NextResponse.json({ error: `Avatar saved but profile update failed: ${updateErr.message}` }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true, avatar_url: avatarUrl })
 }

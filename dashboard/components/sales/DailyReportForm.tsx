@@ -90,16 +90,19 @@ export function DailyReportForm({
   date = TODAY,
   reportId,
   adminMode = false,
+  targetUserId,
   onSubmitted,
 }: {
   date?: string
   reportId?: string
   adminMode?: boolean
+  targetUserId?: string
   onSubmitted?: () => void
 }) {
   const [report, setReport] = useState<Report>(emptyReport(date))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [generating, setGenerating] = useState(false)
   const [msg, setMsg] = useState('')
   const [msgType, setMsgType] = useState<'ok' | 'err'>('ok')
 
@@ -170,6 +173,23 @@ export function DailyReportForm({
     setReport(payload.report)
     flash(status === 'submitted' ? 'Report submitted!' : 'Draft saved', 'ok')
     if (status === 'submitted') onSubmitted?.()
+  }
+
+  async function generateDraft() {
+    setGenerating(true)
+    const response = await fetch('/api/sales/daily-reports/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ report_date: date, user_id: targetUserId }),
+    })
+    const payload = await response.json()
+    setGenerating(false)
+    if (!response.ok) {
+      flash(payload.error ?? 'Failed to generate draft', 'err')
+      return
+    }
+    setReport((prev) => ({ ...prev, ...payload.draft, report_date: payload.report_date ?? prev.report_date }))
+    flash('Draft generated from today\'s work', 'ok')
   }
 
   async function exportDocx() {
@@ -261,8 +281,20 @@ export function DailyReportForm({
               </button>
             </>
           )}
+          {!isSubmitted && (
+            <button onClick={generateDraft} disabled={generating} className="fadaa-btn-ghost fadaa-btn-sm">
+              {generating ? 'Generating...' : adminMode ? 'Generate Draft' : 'Generate My Report'}
+            </button>
+          )}
         </div>
       </div>
+
+      {report.highlights && (
+        <div style={{ marginBottom: 18, padding: '12px 14px', borderRadius: 10, background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.16)' }}>
+          <p className="t-label" style={{ marginBottom: 6 }}>Generated nutshell</p>
+          <p className="t-caption" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{report.highlights}</p>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 12, marginBottom: 20 }}>
         <NumField label="Total Leads" value={report.leads_total} onChange={(value) => update('leads_total', value)} />

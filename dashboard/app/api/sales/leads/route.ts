@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getLeads, createLead, logActivity } from '@/lib/sales/db'
+import { getLeads, getLeadsTotal, createLead, logActivity } from '@/lib/sales/db'
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id, role } = session.user as { id: string; role: string }
 
@@ -46,19 +46,32 @@ export async function GET(req: NextRequest) {
   const { dateFrom, dateTo } = resolveDateRange(sp.get('dateRange'))
 
   try {
-    const leads = await getLeads({
+    const query = {
       repId:       role === 'rep' ? id : (sp.get('repId') ?? undefined),
       stage:       sp.get('stage') as any  ?? undefined,
       serviceType: sp.get('serviceType')   ?? undefined,
       source:      sp.get('source')        ?? undefined,
       priority:    sp.get('priority')      ?? undefined,
       search:      sp.get('search')        ?? undefined,
+      metaOrigin:  sp.get('metaOrigin')    ?? undefined,
+      metaForm:    sp.get('metaForm')      ?? undefined,
+      metaCampaign: sp.get('metaCampaign') ?? undefined,
       dateFrom,
       dateTo,
       limit:       parseInt(sp.get('limit') ?? '200'),
       offset:      parseInt(sp.get('offset') ?? '0'),
+    }
+    const [leads, total] = await Promise.all([
+      getLeads(query),
+      getLeadsTotal(query),
+    ])
+    return NextResponse.json({
+      leads,
+      total,
+      limit: query.limit,
+      offset: query.offset,
+      hasMore: query.offset + leads.length < total,
     })
-    return NextResponse.json({ leads })
   } catch (err) {
     console.error(err)
     return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 })
@@ -66,7 +79,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id: userId, role } = session.user as { id: string; role: string }
 

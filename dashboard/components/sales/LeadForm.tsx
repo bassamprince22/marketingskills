@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import type { Lead, SalesUser } from '@/lib/sales/types'
-import { PIPELINE_STAGES, STAGE_LABELS } from '@/lib/sales/types'
+import type { Lead, SalesUser, PipelineStageConfig } from '@/lib/sales/types'
+import { DEFAULT_PIPELINE_STAGE_CONFIGS, STAGE_LABELS } from '@/lib/sales/types'
+import { normalizePipelineStages } from '@/lib/sales/pipeline'
 
 interface Props {
   initial?: Partial<Lead>
@@ -29,6 +30,7 @@ export function LeadForm({ initial = {}, mode, leadId }: Props) {
   const role = (session?.user as { role?: string })?.role ?? 'rep'
 
   const [reps, setReps]     = useState<SalesUser[]>([])
+  const [stageConfigs, setStageConfigs] = useState<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -60,6 +62,13 @@ export function LeadForm({ initial = {}, mode, leadId }: Props) {
         .then(d => setReps(d.users ?? []))
     }
   }, [role])
+
+  useEffect(() => {
+    fetch('/api/sales/settings')
+      .then((response) => response.json())
+      .then((payload) => setStageConfigs(normalizePipelineStages(payload.settings?.pipeline?.stages)))
+      .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
+  }, [])
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
@@ -148,8 +157,8 @@ export function LeadForm({ initial = {}, mode, leadId }: Props) {
           <div className="form-field">
             <label className="form-label">Pipeline Stage</label>
             <select className="fadaa-input" value={form.pipeline_stage} onChange={set('pipeline_stage')}>
-              {PIPELINE_STAGES.map(s => (
-                <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+              {stageConfigs.map((stage) => (
+                <option key={stage.key} value={stage.key}>{stage.label ?? STAGE_LABELS[stage.key] ?? stage.key}</option>
               ))}
             </select>
           </div>

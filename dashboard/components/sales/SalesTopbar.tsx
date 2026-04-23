@@ -206,21 +206,21 @@ export function SalesTopbar({
 
       {showPageActions && (
         <div className="mission-page-actions">
-          <button className="mission-page-chip">
+          <Link href="/sales/reports" className="mission-page-chip">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
             <span>Export</span>
-          </button>
-          <button className="mission-page-chip">
+          </Link>
+          <Link href="/sales/leads?dateRange=30d" className="mission-page-chip">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <path d="M16 2v4M8 2v4M3 10h18" />
             </svg>
             <span>Last 30 days</span>
-          </button>
+          </Link>
           <Link href="/sales/leads/new" className="fadaa-btn mission-page-new-lead">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14" />

@@ -733,6 +733,8 @@ async function ingestMetaLead(
     ad_name: payload.adName,
     form_id: payload.formId,
     form_name: payload.formName,
+    origin: payload.adName ? 'paid' : 'organic',
+    last_synced_at: nowIso(),
   }
 
   const { match, strategy } = await findExistingLead(db, {

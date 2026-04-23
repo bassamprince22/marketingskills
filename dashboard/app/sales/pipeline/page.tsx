@@ -6,8 +6,9 @@ import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import type { Lead } from '@/lib/sales/types'
-import { PIPELINE_STAGES, STAGE_LABELS, SERVICE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
+import type { Lead, PipelineStageConfig } from '@/lib/sales/types'
+import { DEFAULT_PIPELINE_STAGE_CONFIGS, STAGE_LABELS, SERVICE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
+import { normalizePipelineStages } from '@/lib/sales/pipeline'
 
 interface Rep { id: string; name: string }
 
@@ -166,8 +167,10 @@ export default function PipelinePage() {
 
   const [board,   setBoard]   = useState<Board>({})
   const [reps,    setReps]    = useState<Rep[]>([])
+  const [stageConfigs, setStageConfigs] = useState<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
   const [loading, setLoading] = useState(true)
   const [view,    setView]    = useState<'kanban' | 'list'>('kanban')
+  const stageKeys = stageConfigs.map((stage) => stage.key)
 
   const loadLeads = useCallback(() => {
     setLoading(true)
@@ -177,20 +180,27 @@ export default function PipelinePage() {
     ]).then(([ld, ud]) => {
       const leads: Lead[] = ld.leads ?? []
       const b: Board = {}
-      PIPELINE_STAGES.forEach(s => { b[s] = [] })
+      stageKeys.forEach(s => { b[s] = [] })
       leads.forEach(l => { if (b[l.pipeline_stage]) b[l.pipeline_stage].push(l) })
       setBoard(b)
       setReps(ud.users ?? [])
       setLoading(false)
     })
-  }, [canAssign])
+  }, [canAssign, stageKeys.join('|')])
 
   useEffect(() => { loadLeads() }, [loadLeads])
+
+  useEffect(() => {
+    fetch('/api/sales/settings')
+      .then((response) => response.json())
+      .then((payload) => setStageConfigs(normalizePipelineStages(payload.settings?.pipeline?.stages)))
+      .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
+  }, [])
 
   const handleAssign = useCallback(async (leadId: string, repId: string | null) => {
     setBoard(prev => {
       const next = { ...prev }
-      for (const stage of PIPELINE_STAGES) {
+      for (const stage of stageKeys) {
         next[stage] = (prev[stage] ?? []).map(l => {
           if (l.id !== leadId) return l
           const rep = repId ? (reps.find(r => r.id === repId) ?? null) : null
@@ -263,7 +273,7 @@ export default function PipelinePage() {
       ) : view === 'kanban' ? (
         <DragDropContext onDragEnd={onDragEnd}>
           <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
-            {PIPELINE_STAGES.map(stage => {
+            {stageKeys.map(stage => {
               const cards  = board[stage] ?? []
               const accent = STAGE_ACCENT[stage]
               const colVal = cards.reduce((s, l) => s + (l.estimated_value ?? 0), 0)
@@ -280,7 +290,7 @@ export default function PipelinePage() {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <p style={{ color: accent, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                        {STAGE_LABELS[stage]}
+                  {stageConfigs.find((entry) => entry.key === stage)?.label ?? STAGE_LABELS[stage] ?? stage}
                       </p>
                       <span className="badge" style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}28`, fontSize: 10 }}>
                         {cards.length}
@@ -335,7 +345,7 @@ export default function PipelinePage() {
               </tr>
             </thead>
             <tbody>
-              {PIPELINE_STAGES.flatMap(stage =>
+              {stageKeys.flatMap(stage =>
                 (board[stage] ?? []).map(lead => (
                   <tr key={lead.id} onClick={() => window.location.href = `/sales/leads/${lead.id}`}>
                     <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{lead.company_name}</td>
