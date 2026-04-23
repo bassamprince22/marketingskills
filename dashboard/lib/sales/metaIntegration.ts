@@ -11,6 +11,7 @@ const META_API_VERSION = 'v19.0'
 const SYNC_STALE_MS = 24 * 60 * 60 * 1000
 const SYNC_BOOTSTRAP_LOOKBACK_SECONDS = 6 * 60 * 60
 const SYNC_OVERLAP_SECONDS = 15 * 60
+const WEBHOOK_REPAIR_LOOKBACK_SECONDS = 4 * 60 * 60
 const MANUAL_IMPORT_LOOKBACK_SECONDS = 30 * 24 * 60 * 60
 
 export type MetaSyncSource = 'webhook' | 'manual_import' | 'cron'
@@ -1279,6 +1280,14 @@ export function getManualImportWindow() {
   const until = Math.floor(Date.now() / 1000)
   return {
     since: until - MANUAL_IMPORT_LOOKBACK_SECONDS,
+    until,
+  }
+}
+
+export function getWebhookRepairWindow() {
+  const until = Math.floor(Date.now() / 1000)
+  return {
+    since: until - WEBHOOK_REPAIR_LOOKBACK_SECONDS,
     until,
   }
 }

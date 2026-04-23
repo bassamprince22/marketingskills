@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/supabase'
-import { processMetaWebhookLead } from '@/lib/sales/metaIntegration'
+import { getWebhookRepairWindow, processMetaWebhookLead, syncMetaWindow } from '@/lib/sales/metaIntegration'
 
 const VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN ?? 'fadaa_meta_verify'
 
@@ -25,6 +25,8 @@ export async function POST(req: NextRequest) {
   if (body.object !== 'page') return NextResponse.json({ ok: true })
 
   const db = getServiceClient()
+  const repairResults = new Map<string, { ok: boolean; message?: string }>()
+  const failures: Array<{ leadgenId: string; pageId: string; reason: string }> = []
 
   for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
@@ -34,8 +36,52 @@ export async function POST(req: NextRequest) {
       const pageId = change.value?.page_id
       if (!leadgenId || !pageId) continue
 
-      await processMetaWebhookLead(db, { leadgenId, pageId })
+      const outcome = await processMetaWebhookLead(db, { leadgenId, pageId })
+      if (outcome.action !== 'failed') continue
+
+      if (!repairResults.has(pageId)) {
+        try {
+          const repairWindow = getWebhookRepairWindow()
+          const repair = await syncMetaWindow(db, {
+            source: 'webhook',
+            pageId,
+            since: repairWindow.since,
+            until: repairWindow.until,
+          })
+          repairResults.set(pageId, {
+            ok: repair.imported > 0 || repair.updated > 0,
+            message: repair.imported > 0 || repair.updated > 0
+              ? `Recovered via repair sync (${repair.imported} imported, ${repair.updated} updated).`
+              : 'Repair sync completed but did not recover any recent leads.',
+          })
+        } catch (error) {
+          repairResults.set(pageId, {
+            ok: false,
+            message: error instanceof Error ? error.message : 'Webhook repair sync failed.',
+          })
+        }
+      }
+
+      const repairResult = repairResults.get(pageId)
+      if (repairResult?.ok) continue
+
+      failures.push({
+        leadgenId,
+        pageId,
+        reason: repairResult?.message ?? (outcome.reason || 'Meta webhook processing failed.'),
+      })
     }
+  }
+
+  if (failures.length > 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'Meta webhook processing failed and needs retry.',
+        failures,
+      },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ ok: true })
