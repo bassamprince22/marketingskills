@@ -54,6 +54,15 @@ function followUpDisplay(date: string | null, stage: string): { text: string; co
   return { text: `in ${diffDays}d`, color: '#94A3B8' }
 }
 
+function createdAtDisplay(date: string) {
+  return new Date(date).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 const COLS = '40px minmax(220px,1fr) 168px 90px 110px 150px 100px 120px 36px'
 
 export default function LeadsPage() {
@@ -408,6 +417,9 @@ export default function LeadsPage() {
                     </div>
                     <span style={{ fontSize: 11, color: 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 240 }}>
                       {lead.company_name}{lead.phone ? ` · ${lead.phone}` : ''}
+                    </span>
+                    <span style={{ fontSize: 10, color: 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: 240, marginTop: 4 }}>
+                      Added {createdAtDisplay(lead.created_at)}
                     </span>
                   </Link>
                 </div>
