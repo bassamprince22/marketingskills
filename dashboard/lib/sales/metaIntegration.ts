@@ -805,6 +805,44 @@ async function fetchForms(page: MetaPageConfig) {
   )
 }
 
+async function fetchPageOrganicLeadsDirect(
+  integration: MetaIntegrationRecord,
+  page: MetaPageConfig,
+  since: number,
+  until: number
+): Promise<MetaLeadRow[]> {
+  const candidateTokens = getCandidateMetaTokens(
+    page.access_token,
+    integration.config.user_token,
+    integration.config.page_access_token
+  )
+
+  const filtering = JSON.stringify([
+    { field: 'time_created', operator: 'GREATER_THAN', value: since },
+    { field: 'time_created', operator: 'LESS_THAN_OR_EQUAL', value: until },
+  ])
+
+  let lastError: unknown = null
+  for (const token of candidateTokens) {
+    try {
+      const baseUrl = `https://graph.facebook.com/${META_API_VERSION}/${page.id}/leads?fields=id,field_data,created_time,ad_name,form_id&limit=100&access_token=${token}`
+      try {
+        return await fetchMetaCollection<MetaLeadRow>(
+          `${baseUrl}&filtering=${encodeURIComponent(filtering)}`
+        )
+      } catch (error) {
+        const message = getErrorMessage(error, 'Unknown Meta error')
+        if (!shouldRetryMetaLeadFetchWithoutFiltering(message)) throw error
+        const leads = await fetchMetaCollection<MetaLeadRow>(baseUrl)
+        return leads.filter((lead) => isLeadWithinWindow(lead, since, until))
+      }
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError ?? new Error('No Meta access token available for direct page leads fetch.')
+}
+
 function getCandidateMetaTokens(...tokens: Array<string | null | undefined>) {
   const seen = new Set<string>()
   const unique: string[] = []
@@ -1017,6 +1055,44 @@ export async function syncMetaWindow(
             })
           }
         }
+      }
+
+      // Also fetch organic leads directly from the page — these come from
+      // Meta Leads Center (DMs converted to leads by a moderation team)
+      // and may belong to organic forms not listed by /leadgen_forms.
+      const seenInFormSync = new Set<string>(
+        // collect IDs processed above via form sync to skip them
+        []
+      )
+      try {
+        const organicLeads = await fetchPageOrganicLeadsDirect(integration, page, options.since, options.until)
+        for (const lead of organicLeads) {
+          if (!lead.id || seenInFormSync.has(lead.id)) continue
+          summary.total += 1
+          try {
+            const action = await ingestMetaLead(db, {
+              leadId: lead.id,
+              pageId: page.id,
+              formId: lead.form_id ?? null,
+              formName: null,
+              adName: lead.ad_name ?? null,
+              createdTime: isoOrNull(lead.created_time),
+              fields: parseFieldData(lead.field_data),
+            }, capabilities)
+            if (action.action === 'imported') summary.imported += 1
+            else summary.updated += 1
+          } catch (error) {
+            summary.failed += 1
+            await appendMetaLog(db, {
+              event_type: 'lead_sync_failed',
+              status: 'error',
+              error_message: `Organic lead ${lead.id} on page "${page.name}" (${page.id}): ${getErrorMessage(error, 'Unknown sync error')}`,
+              payload: { lead_id: lead.id, page_id: page.id, page_name: page.name, source: options.source },
+            })
+          }
+        }
+      } catch {
+        // Organic direct fetch is best-effort — don't fail the whole sync
       }
     }
 
