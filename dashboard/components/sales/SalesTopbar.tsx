@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import type { Notification } from '@/app/api/sales/notifications/route'
 
@@ -18,6 +19,15 @@ interface SalesTopbarProps {
 }
 
 const POLL_INTERVAL = 60_000
+const DASHBOARD_RANGES = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+  { value: '90d', label: 'Last 90 days' },
+  { value: 'this_month', label: 'This month' },
+  { value: 'last_month', label: 'Last month' },
+] as const
 
 const SEVERITY_TONE: Record<string, string> = {
   critical: 'var(--brand-red-text)',
@@ -34,6 +44,9 @@ export function SalesTopbar({
   showPageActions = false,
 }: SalesTopbarProps) {
   const { data: session } = useSession()
+  const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const role = (session?.user as { role?: string } | undefined)?.role ?? 'rep'
   const isAdmin = role === 'admin'
 
@@ -65,6 +78,13 @@ export function SalesTopbar({
     () => notifications.filter(n => n.count > 0),
     [notifications]
   )
+  const currentRange = searchParams.get('dateRange') ?? '30d'
+
+  function setDashboardRange(nextRange: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('dateRange', nextRange)
+    router.replace(`${pathname}?${params.toString()}`)
+  }
 
   return (
     <header className="mission-topbar">
@@ -214,13 +234,32 @@ export function SalesTopbar({
             </svg>
             <span>Export</span>
           </Link>
-          <Link href="/sales/leads?dateRange=30d" className="mission-page-chip">
+          <div className="mission-page-chip" style={{ padding: '0 14px' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <path d="M16 2v4M8 2v4M3 10h18" />
             </svg>
-            <span>Last 30 days</span>
-          </Link>
+            <select
+              value={currentRange}
+              onChange={(event) => setDashboardRange(event.target.value)}
+              aria-label="Dashboard date range"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'inherit',
+                font: 'inherit',
+                outline: 'none',
+                cursor: 'pointer',
+                paddingRight: 4,
+              }}
+            >
+              {DASHBOARD_RANGES.map((range) => (
+                <option key={range.value} value={range.value} style={{ background: 'var(--surface-card)', color: 'var(--text-primary)' }}>
+                  {range.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <Link href="/sales/leads/new" className="fadaa-btn mission-page-new-lead">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14" />

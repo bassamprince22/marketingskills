@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState, type ReactNode } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { PipelineFunnelChart } from '@/components/sales/PipelineFunnelChart'
@@ -676,17 +677,22 @@ function RepDash({ data, revenue, wVisible }: { data: DashData; revenue: Revenue
 
 export default function DashboardPage() {
   const { data: session } = useSession()
+  const searchParams = useSearchParams()
   const [data,          setData]          = useState<DashData | null>(null)
   const [revenue,       setRevenue]       = useState<RevenueData | null>(null)
   const [widgetConfigs, setWidgetConfigs] = useState<WidgetConfig[] | null>(null)
   const [error,         setError]         = useState('')
+  const dateRange = searchParams.get('dateRange') ?? '30d'
 
   useEffect(() => {
-    fetch('/api/sales/stats')
+    setData(null)
+    setRevenue(null)
+    setError('')
+    fetch(`/api/sales/stats?dateRange=${encodeURIComponent(dateRange)}`)
       .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
       .then(setData)
       .catch(() => setError('Failed to load dashboard'))
-    fetch('/api/sales/revenue')
+    fetch(`/api/sales/revenue?dateRange=${encodeURIComponent(dateRange)}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => d && setRevenue(d))
       .catch(() => {})
@@ -694,7 +700,7 @@ export default function DashboardPage() {
       .then(r => r.ok ? r.json() : null)
       .then(d => d && setWidgetConfigs(d.widgets))
       .catch(() => {})
-  }, [])
+  }, [dateRange])
 
   // Helper: check visibility (defaults to true if config not loaded yet)
   const wVisible = (id: string) => {

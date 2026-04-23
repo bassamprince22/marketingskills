@@ -194,8 +194,8 @@ function dedupeMetaLeads(leads: Lead[]) {
   return deduped
 }
 
-export async function getUnassignedLeads(limit = 10): Promise<Lead[]> {
-  return getLeads({ repId: 'unassigned', limit })
+export async function getUnassignedLeads(limit = 10, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
+  return getLeads({ repId: 'unassigned', limit, dateFrom, dateTo })
 }
 
 export async function getLeadById(id: string): Promise<Lead | null> {
@@ -375,6 +375,8 @@ export async function updateDocument(id: string, payload: Partial<Document>): Pr
 export async function getActivities(opts: {
   leadId?: string
   userId?: string
+  dateFrom?: string
+  dateTo?: string
   limit?:  number
 }): Promise<Activity[]> {
   const db = getServiceClient()
@@ -385,6 +387,8 @@ export async function getActivities(opts: {
 
   if (opts.leadId) q = q.eq('lead_id', opts.leadId)
   if (opts.userId) q = q.eq('user_id', opts.userId)
+  if (opts.dateFrom) q = q.gte('created_at', opts.dateFrom)
+  if (opts.dateTo) q = q.lte('created_at', opts.dateTo)
   q = q.limit(opts.limit ?? 20)
 
   const { data, error } = await q
@@ -408,19 +412,20 @@ export async function logActivity(payload: {
 
 // ─── Dashboard stats ──────────────────────────────
 
-export async function getManagerStats(): Promise<ManagerStats> {
+export async function getManagerStats(dateFrom?: string, dateTo?: string): Promise<ManagerStats> {
   const db = getServiceClient()
-  const { data: leads } = await db
+  let leadsQuery = db
     .from('sales_leads')
     .select('pipeline_stage, created_at')
+  if (dateFrom) leadsQuery = leadsQuery.gte('created_at', dateFrom)
+  if (dateTo) leadsQuery = leadsQuery.lte('created_at', dateTo)
+  const { data: leads } = await leadsQuery
 
   const rows = (leads ?? []) as { pipeline_stage: string; created_at: string }[]
-  const now = new Date()
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
   const stats: ManagerStats = {
     total_leads:     rows.length,
-    new_leads:       rows.filter(r => new Date(r.created_at) > weekAgo).length,
+    new_leads:       rows.length,
     qualified_leads: rows.filter(r => r.pipeline_stage === 'qualified').length,
     meetings_booked: 0,
     meetings_done:   0,
@@ -430,7 +435,10 @@ export async function getManagerStats(): Promise<ManagerStats> {
     lost:            rows.filter(r => r.pipeline_stage === 'lost').length,
   }
 
-  const { data: meetings } = await db.from('sales_meetings').select('status')
+  let meetingsQuery = db.from('sales_meetings').select('status, meeting_date')
+  if (dateFrom) meetingsQuery = meetingsQuery.gte('meeting_date', dateFrom)
+  if (dateTo) meetingsQuery = meetingsQuery.lte('meeting_date', dateTo)
+  const { data: meetings } = await meetingsQuery
   const mtgs = (meetings ?? []) as { status: string }[]
   stats.meetings_booked = mtgs.filter(m => m.status === 'scheduled').length
   stats.meetings_done   = mtgs.filter(m => m.status === 'completed').length
@@ -438,18 +446,24 @@ export async function getManagerStats(): Promise<ManagerStats> {
   return stats
 }
 
-export async function getRepStats(repId: string): Promise<RepStats> {
+export async function getRepStats(repId: string, dateFrom?: string, dateTo?: string): Promise<RepStats> {
   const db = getServiceClient()
-  const { data: leads } = await db
+  let leadsQuery = db
     .from('sales_leads')
     .select('pipeline_stage')
     .eq('assigned_rep_id', repId)
+  if (dateFrom) leadsQuery = leadsQuery.gte('created_at', dateFrom)
+  if (dateTo) leadsQuery = leadsQuery.lte('created_at', dateTo)
+  const { data: leads } = await leadsQuery
 
   const rows = (leads ?? []) as { pipeline_stage: string }[]
-  const { data: meetings } = await db
+  let meetingsQuery = db
     .from('sales_meetings')
-    .select('id')
+    .select('id, meeting_date')
     .eq('rep_id', repId)
+  if (dateFrom) meetingsQuery = meetingsQuery.gte('meeting_date', dateFrom)
+  if (dateTo) meetingsQuery = meetingsQuery.lte('meeting_date', dateTo)
+  const { data: meetings } = await meetingsQuery
 
   return {
     my_leads:     rows.length,
@@ -460,10 +474,12 @@ export async function getRepStats(repId: string): Promise<RepStats> {
   }
 }
 
-export async function getPipelineCounts(repId?: string): Promise<PipelineCount[]> {
+export async function getPipelineCounts(repId?: string, dateFrom?: string, dateTo?: string): Promise<PipelineCount[]> {
   const db = getServiceClient()
   let q = db.from('sales_leads').select('pipeline_stage, estimated_value')
   if (repId) q = q.eq('assigned_rep_id', repId)
+  if (dateFrom) q = q.gte('created_at', dateFrom)
+  if (dateTo) q = q.lte('created_at', dateTo)
   const { data } = await q
   const rows = (data ?? []) as { pipeline_stage: string; estimated_value: number | null }[]
 
@@ -476,12 +492,22 @@ export async function getPipelineCounts(repId?: string): Promise<PipelineCount[]
   return Object.values(map)
 }
 
-export async function getRepPerformance(): Promise<RepPerformance[]> {
+export async function getRepPerformance(dateFrom?: string, dateTo?: string): Promise<RepPerformance[]> {
   const db = getServiceClient()
+  const leadsQuery = db.from('sales_leads').select('assigned_rep_id, pipeline_stage, estimated_value, created_at')
+  const meetingsQuery = db.from('sales_meetings').select('rep_id, status, meeting_date')
+  if (dateFrom) {
+    leadsQuery.gte('created_at', dateFrom)
+    meetingsQuery.gte('meeting_date', dateFrom)
+  }
+  if (dateTo) {
+    leadsQuery.lte('created_at', dateTo)
+    meetingsQuery.lte('meeting_date', dateTo)
+  }
   const [{ data: users }, { data: leads }, { data: meetings }] = await Promise.all([
     db.from('sales_users').select('id, name').eq('role', 'rep'),
-    db.from('sales_leads').select('assigned_rep_id, pipeline_stage, estimated_value'),
-    db.from('sales_meetings').select('rep_id, status'),
+    leadsQuery,
+    meetingsQuery,
   ])
 
   return ((users ?? []) as SalesUser[]).map(u => {
@@ -502,7 +528,7 @@ export async function getRepPerformance(): Promise<RepPerformance[]> {
 // ─── Action Intelligence ──────────────────────────
 // These power the "Sales OS" layer: overdue, stale, at-risk, today
 
-export async function getOverdueFollowups(repId?: string): Promise<Lead[]> {
+export async function getOverdueFollowups(repId?: string, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
   const db = getServiceClient()
   const today = new Date().toISOString().slice(0, 10)
   let q = db
@@ -514,11 +540,13 @@ export async function getOverdueFollowups(repId?: string): Promise<Lead[]> {
     .order('next_follow_up_date', { ascending: true })
     .limit(20)
   if (repId) q = q.eq('assigned_rep_id', repId)
+  if (dateFrom) q = q.gte('created_at', dateFrom)
+  if (dateTo) q = q.lte('created_at', dateTo)
   const { data } = await q
   return (data ?? []) as Lead[]
 }
 
-export async function getStaleLeads(repId?: string): Promise<Lead[]> {
+export async function getStaleLeads(repId?: string, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
   const db = getServiceClient()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   let q = db
@@ -529,14 +557,18 @@ export async function getStaleLeads(repId?: string): Promise<Lead[]> {
     .order('updated_at', { ascending: true })
     .limit(20)
   if (repId) q = q.eq('assigned_rep_id', repId)
+  if (dateFrom) q = q.gte('created_at', dateFrom)
+  if (dateTo) q = q.lte('created_at', dateTo)
   const { data } = await q
   return (data ?? []) as Lead[]
 }
 
-export async function getMeetingsToday(repId?: string): Promise<Meeting[]> {
+export async function getMeetingsToday(repId?: string, dateFrom?: string, dateTo?: string): Promise<Meeting[]> {
   const db = getServiceClient()
-  const start = new Date(); start.setHours(0,0,0,0)
-  const end   = new Date(); end.setHours(23,59,59,999)
+  const start = dateFrom ? new Date(dateFrom) : new Date()
+  const end   = dateTo ? new Date(dateTo) : new Date()
+  if (!dateFrom) start.setHours(0,0,0,0)
+  if (!dateTo) end.setHours(23,59,59,999)
   let q = db
     .from('sales_meetings')
     .select('*, lead:sales_leads(id, company_name, contact_person), rep:sales_users!rep_id(id, name)')
@@ -548,7 +580,7 @@ export async function getMeetingsToday(repId?: string): Promise<Meeting[]> {
   return (data ?? []) as Meeting[]
 }
 
-export async function getHighValueAtRisk(repId?: string): Promise<Lead[]> {
+export async function getHighValueAtRisk(repId?: string, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
   const db = getServiceClient()
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
   let q = db
@@ -560,6 +592,8 @@ export async function getHighValueAtRisk(repId?: string): Promise<Lead[]> {
     .order('estimated_value', { ascending: false })
     .limit(10)
   if (repId) q = q.eq('assigned_rep_id', repId)
+  if (dateFrom) q = q.gte('created_at', dateFrom)
+  if (dateTo) q = q.lte('created_at', dateTo)
   const { data } = await q
   return (data ?? []) as Lead[]
 }
