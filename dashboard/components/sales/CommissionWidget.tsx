@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { readSettings } from '@/lib/sales/autoAssign'
 
 interface Totals {
   total:   number

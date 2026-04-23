@@ -172,6 +172,9 @@ function MetaCard({ connectedParam, errorParam }: { connectedParam: string | nul
   const [addResult, setAddResult] = useState<{ ok?: boolean; page?: { id: string; name: string }; error?: string; hint?: string } | null>(null)
   const [importResult, setImportResult] = useState<SyncResult | null>(null)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
+  const [refreshTokenInput, setRefreshTokenInput] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshResult, setRefreshResult] = useState<{ ok?: boolean; pages_count?: number; pages?: { id: string; name: string }[]; subscriptions?: { page: string; ok: boolean; error?: string }[]; app_level_ok?: boolean; error?: string } | null>(null)
 
   const metaOAuthUrl = useMemo(() => getMetaOauthUrl(), [])
 
@@ -279,6 +282,29 @@ function MetaCard({ connectedParam, errorParam }: { connectedParam: string | nul
     })
     setSettingDefault(null)
     await load()
+  }
+
+  async function refreshTokenFn() {
+    if (!refreshTokenInput.trim()) return
+    setRefreshing(true)
+    setRefreshResult(null)
+    try {
+      const response = await fetch('/api/sales/integrations/meta/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: refreshTokenInput.trim() }),
+      })
+      const payload = await response.json()
+      setRefreshResult(payload)
+      if (payload.ok) {
+        setRefreshTokenInput('')
+        await load()
+      }
+    } catch {
+      setRefreshResult({ error: 'Request failed. Check your network and try again.' })
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   async function addPageManually() {
@@ -599,6 +625,75 @@ function MetaCard({ connectedParam, errorParam }: { connectedParam: string | nul
           )}
         </div>
       )}
+
+      <div
+        style={{
+          marginBottom: 20,
+          padding: 16,
+          background: 'rgba(245,158,11,0.06)',
+          border: '1px solid rgba(245,158,11,0.2)',
+          borderRadius: 10,
+        }}
+      >
+        <div style={{ marginBottom: 10 }}>
+          <p style={{ color: '#FCD34D', fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
+            Refresh Access Token
+          </p>
+          <p style={{ color: '#94A3B8', fontSize: 12, lineHeight: 1.6 }}>
+            If webhooks stopped working or the health shows &quot;broken&quot;, your token has likely expired.
+            Paste a fresh Meta user token below — the system will exchange it for a long-lived token,
+            fetch all page tokens, and re-subscribe each page to leadgen events automatically.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            className="fadaa-input"
+            style={{ flex: '1 1 260px', minWidth: 0, fontSize: 13 }}
+            placeholder="Paste Meta user access token here…"
+            value={refreshTokenInput}
+            onChange={(e) => setRefreshTokenInput(e.target.value)}
+          />
+          <button
+            onClick={refreshTokenFn}
+            disabled={refreshing || !refreshTokenInput.trim()}
+            className="fadaa-btn"
+            style={{ flexShrink: 0, fontSize: 12, padding: '8px 16px' }}
+          >
+            {refreshing ? 'Refreshing…' : 'Refresh Token'}
+          </button>
+        </div>
+        {refreshResult && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: '10px 14px',
+              borderRadius: 8,
+              background: refreshResult.ok ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)',
+              border: `1px solid ${refreshResult.ok ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.2)'}`,
+            }}
+          >
+            {refreshResult.ok ? (
+              <div>
+                <p style={{ color: '#4ADE80', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  Token refreshed — {refreshResult.pages_count} page(s) reconnected and subscribed to leadgen.
+                </p>
+                {(refreshResult.subscriptions ?? []).map((s) => (
+                  <p key={s.page} style={{ color: s.ok ? '#94A3B8' : '#F87171', fontSize: 12 }}>
+                    {s.ok ? '✓' : '✕'} {s.page}{s.error ? ` — ${s.error}` : ''}
+                  </p>
+                ))}
+                {refreshResult.app_level_ok === false && (
+                  <p style={{ color: '#F59E0B', fontSize: 12, marginTop: 4 }}>
+                    App-level webhook subscription was not updated (META_APP_SECRET not set in Vercel env).
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p style={{ color: '#F87171', fontSize: 13 }}>{refreshResult.error}</p>
+            )}
+          </div>
+        )}
+      </div>
 
       <div
         style={{
