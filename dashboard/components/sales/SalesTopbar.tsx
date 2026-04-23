@@ -8,6 +8,7 @@ import type { Notification } from '@/app/api/sales/notifications/route'
 
 type ThemeMode = 'dark' | 'light'
 type DensityMode = 'compact' | 'comfortable'
+type PageActionPreset = 'none' | 'dashboard' | 'records'
 
 interface SalesTopbarProps {
   onOpenMenu: () => void
@@ -15,7 +16,7 @@ interface SalesTopbarProps {
   density: DensityMode
   onThemeChange: (theme: ThemeMode) => void
   onDensityChange: (density: DensityMode) => void
-  showPageActions?: boolean
+  pageActionPreset?: PageActionPreset
 }
 
 const POLL_INTERVAL = 60_000
@@ -27,6 +28,11 @@ const DASHBOARD_RANGES = [
   { value: '90d', label: 'Last 90 days' },
   { value: 'this_month', label: 'This month' },
   { value: 'last_month', label: 'Last month' },
+] as const
+
+const RECORD_RANGES = [
+  { value: '', label: 'All time' },
+  ...DASHBOARD_RANGES,
 ] as const
 
 const SEVERITY_TONE: Record<string, string> = {
@@ -41,7 +47,7 @@ export function SalesTopbar({
   density,
   onThemeChange,
   onDensityChange,
-  showPageActions = false,
+  pageActionPreset = 'none',
 }: SalesTopbarProps) {
   const { data: session } = useSession()
   const pathname = usePathname()
@@ -78,12 +84,18 @@ export function SalesTopbar({
     () => notifications.filter(n => n.count > 0),
     [notifications]
   )
-  const currentRange = searchParams.get('dateRange') ?? '30d'
+  const rangeOptions = pageActionPreset === 'records' ? RECORD_RANGES : DASHBOARD_RANGES
+  const currentRange = searchParams.get('dateRange') ?? (pageActionPreset === 'records' ? '' : '30d')
 
   function setDashboardRange(nextRange: string) {
     const params = new URLSearchParams(searchParams.toString())
-    params.set('dateRange', nextRange)
-    router.replace(`${pathname}?${params.toString()}`)
+    if (nextRange) {
+      params.set('dateRange', nextRange)
+    } else {
+      params.delete('dateRange')
+    }
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
   }
 
   return (
@@ -224,16 +236,18 @@ export function SalesTopbar({
         </Link>
       </div>
 
-      {showPageActions && (
+      {pageActionPreset !== 'none' && (
         <div className="mission-page-actions">
-          <Link href="/sales/reports" className="mission-page-chip">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            <span>Export</span>
-          </Link>
+          {pageActionPreset === 'dashboard' && (
+            <Link href="/sales/reports" className="mission-page-chip">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Export</span>
+            </Link>
+          )}
           <div className="mission-page-chip" style={{ padding: '0 14px' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -253,20 +267,22 @@ export function SalesTopbar({
                 paddingRight: 4,
               }}
             >
-              {DASHBOARD_RANGES.map((range) => (
+              {rangeOptions.map((range) => (
                 <option key={range.value} value={range.value} style={{ background: 'var(--surface-card)', color: 'var(--text-primary)' }}>
                   {range.label}
                 </option>
               ))}
             </select>
           </div>
-          <Link href="/sales/leads/new" className="fadaa-btn mission-page-new-lead">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
-            <span>New Lead</span>
-          </Link>
+          {pageActionPreset === 'dashboard' && (
+            <Link href="/sales/leads/new" className="fadaa-btn mission-page-new-lead">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+              <span>New Lead</span>
+            </Link>
+          )}
         </div>
       )}
     </header>

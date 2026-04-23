@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import type { Lead, PipelineStageConfig } from '@/lib/sales/types'
 import { DEFAULT_PIPELINE_STAGE_CONFIGS, STAGE_LABELS, SERVICE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
@@ -160,10 +161,12 @@ function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
   )
 }
 
-export default function PipelinePage() {
+function PipelineContent() {
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const role     = (session?.user as { role?: string })?.role ?? 'rep'
   const canAssign = role === 'admin' || role === 'manager'
+  const dateRange = searchParams.get('dateRange') ?? ''
 
   const [board,   setBoard]   = useState<Board>({})
   const [reps,    setReps]    = useState<Rep[]>([])
@@ -174,8 +177,11 @@ export default function PipelinePage() {
 
   const loadLeads = useCallback(() => {
     setLoading(true)
+    const leadQuery = new URLSearchParams()
+    leadQuery.set('limit', '500')
+    if (dateRange) leadQuery.set('dateRange', dateRange)
     Promise.all([
-      fetch('/api/sales/leads?limit=500').then(r => r.json()),
+      fetch(`/api/sales/leads?${leadQuery.toString()}`).then(r => r.json()),
       canAssign ? fetch('/api/sales/users?role=rep').then(r => r.json()) : Promise.resolve({ users: [] }),
     ]).then(([ld, ud]) => {
       const leads: Lead[] = ld.leads ?? []
@@ -186,7 +192,7 @@ export default function PipelinePage() {
       setReps(ud.users ?? [])
       setLoading(false)
     })
-  }, [canAssign, stageKeys.join('|')])
+  }, [canAssign, dateRange, stageKeys.join('|')])
 
   useEffect(() => { loadLeads() }, [loadLeads])
 
@@ -373,5 +379,13 @@ export default function PipelinePage() {
         </div>
       )}
     </SalesShell>
+  )
+}
+
+export default function PipelinePage() {
+  return (
+    <Suspense fallback={<SalesShell><div className="t-caption" style={{ padding: 40 }}>Loading...</div></SalesShell>}>
+      <PipelineContent />
+    </Suspense>
   )
 }

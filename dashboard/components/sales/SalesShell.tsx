@@ -89,7 +89,13 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
             density={density}
             onThemeChange={setTheme}
             onDensityChange={setDensity}
-            showPageActions={pathname === '/sales/dashboard'}
+            pageActionPreset={
+              pathname === '/sales/dashboard'
+                ? 'dashboard'
+                : pathname === '/sales/leads' || pathname === '/sales/pipeline'
+                ? 'records'
+                : 'none'
+            }
           />
         </Suspense>
         {children}

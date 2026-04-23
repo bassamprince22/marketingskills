@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { SalesShell } from '@/components/sales/SalesShell'
 import type { Lead, PipelineStageConfig } from '@/lib/sales/types'
@@ -65,11 +65,13 @@ function createdAtDisplay(date: string) {
 
 const COLS = '40px minmax(220px,1fr) 168px 90px 110px 150px 100px 120px 36px'
 
-export default function LeadsPage() {
+function LeadsContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const role      = (session?.user as { role?: string })?.role ?? 'rep'
   const canAssign = role === 'manager' || role === 'admin'
+  const dateRange = searchParams.get('dateRange') ?? ''
 
   const [leads,    setLeads]    = useState<Lead[]>([])
   const [total,    setTotal]    = useState(0)
@@ -78,7 +80,7 @@ export default function LeadsPage() {
   const [stageConfigs, setStageConfigs] = useState<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
   const [loading,  setLoading]  = useState(true)
   const [search,   setSearch]   = useState('')
-  const [filters,  setFilters]  = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '', dateRange: '', metaOrigin: '' })
+  const [filters,  setFilters]  = useState({ stage: '', serviceType: '', source: '', priority: '', repId: '', metaOrigin: '' })
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
 
@@ -93,7 +95,6 @@ export default function LeadsPage() {
       source:      sp.get('source')      ?? '',
       priority:    sp.get('priority')    ?? '',
       repId:       sp.get('repId')       ?? '',
-      dateRange:   sp.get('dateRange')   ?? '',
       metaOrigin:  sp.get('metaOrigin')  ?? '',
     })
   }, [])
@@ -108,11 +109,11 @@ export default function LeadsPage() {
     if (filters.source)      sp.set('source',      filters.source)
     if (filters.priority)    sp.set('priority',    filters.priority)
     if (filters.repId)       sp.set('repId',       filters.repId)
-    if (filters.dateRange)   sp.set('dateRange',   filters.dateRange)
     if (filters.metaOrigin)  sp.set('metaOrigin',  filters.metaOrigin)
+    if (dateRange)           sp.set('dateRange',   dateRange)
     const url = sp.toString() ? `/sales/leads?${sp}` : '/sales/leads'
     window.history.replaceState({}, '', url)
-  }, [search, filters])
+  }, [search, filters, dateRange])
 
   const loadLeads = useCallback(() => {
     setLoading(true)
@@ -124,8 +125,8 @@ export default function LeadsPage() {
     if (filters.source)      sp.set('source',      filters.source)
     if (filters.priority)    sp.set('priority',    filters.priority)
     if (filters.repId)       sp.set('repId',       filters.repId)
-    if (filters.dateRange)   sp.set('dateRange',   filters.dateRange)
     if (filters.metaOrigin)  sp.set('metaOrigin',  filters.metaOrigin)
+    if (dateRange)           sp.set('dateRange',   dateRange)
     fetch(`/api/sales/leads?${sp}`)
       .then(r => r.json())
       .then(d => {
@@ -147,7 +148,7 @@ export default function LeadsPage() {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [search, filters])
+  }, [search, filters, dateRange])
 
   useEffect(() => {
     if (!canAssign) return
@@ -187,8 +188,12 @@ export default function LeadsPage() {
   const setFilter = (k: string) => (e: React.ChangeEvent<HTMLSelectElement>) =>
     setFilters(f => ({ ...f, [k]: e.target.value }))
 
-  const hasFilters = search || Object.values(filters).some(Boolean)
-  const clearAll   = () => { setSearch(''); setFilters({ stage: '', serviceType: '', source: '', priority: '', repId: '', dateRange: '', metaOrigin: '' }) }
+  const hasFilters = search || dateRange || Object.values(filters).some(Boolean)
+  const clearAll   = () => {
+    setSearch('')
+    setFilters({ stage: '', serviceType: '', source: '', priority: '', repId: '', metaOrigin: '' })
+    router.replace('/sales/leads')
+  }
   const stageOptions = stageConfigs.map(stage => stage.key)
   const stageMetaMap = Object.fromEntries(
     stageConfigs.map(stage => [stage.key, { label: stage.label, color: stage.color, bg: `${stage.color}12` }])
@@ -257,17 +262,6 @@ export default function LeadsPage() {
               {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           )}
-
-          <select className="filter-select" value={filters.dateRange} onChange={setFilter('dateRange')}>
-            <option value="">All time</option>
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="7d">Last 7 days</option>
-            <option value="30d">Last 30 days</option>
-            <option value="90d">Last 90 days</option>
-            <option value="this_month">This month</option>
-            <option value="last_month">Last month</option>
-          </select>
 
           <select className="filter-select" value={filters.priority} onChange={setFilter('priority')}>
             <option value="">All priorities</option>
@@ -537,5 +531,13 @@ export default function LeadsPage() {
         </div>
       )}
     </SalesShell>
+  )
+}
+
+export default function LeadsPage() {
+  return (
+    <Suspense fallback={<SalesShell><div className="t-caption" style={{ padding: 40 }}>Loading...</div></SalesShell>}>
+      <LeadsContent />
+    </Suspense>
   )
 }
