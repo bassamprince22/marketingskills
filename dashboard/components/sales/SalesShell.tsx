@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { StarsBackground } from './StarsBackground'
@@ -82,14 +82,16 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
       <StarsBackground />
       <SalesNav mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <main className="sales-main" onMouseMove={handleMouseMove}>
-        <SalesTopbar
-          onOpenMenu={() => setMobileOpen(true)}
-          theme={theme}
-          density={density}
-          onThemeChange={setTheme}
-          onDensityChange={setDensity}
-          showPageActions={pathname === '/sales/dashboard'}
-        />
+        <Suspense fallback={<div style={{ height: 74 }} />} >
+          <SalesTopbar
+            onOpenMenu={() => setMobileOpen(true)}
+            theme={theme}
+            density={density}
+            onThemeChange={setTheme}
+            onDensityChange={setDensity}
+            showPageActions={pathname === '/sales/dashboard'}
+          />
+        </Suspense>
         {children}
       </main>
 

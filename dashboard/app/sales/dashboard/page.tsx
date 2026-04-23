@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { SalesShell } from '@/components/sales/SalesShell'
@@ -675,7 +675,7 @@ function RepDash({ data, revenue, wVisible }: { data: DashData; revenue: Revenue
   )
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { data: session } = useSession()
   const searchParams = useSearchParams()
   const [data,          setData]          = useState<DashData | null>(null)
@@ -741,5 +741,13 @@ export default function DashboardPage() {
 
       {!data ? <DashboardSkeleton /> : role === 'manager' || role === 'admin' ? <ManagerDash data={data} revenue={revenue} wVisible={wVisible} /> : <RepDash data={data} revenue={revenue} wVisible={wVisible} />}
     </SalesShell>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<SalesShell><DashboardSkeleton /></SalesShell>}>
+      <DashboardContent />
+    </Suspense>
   )
 }
