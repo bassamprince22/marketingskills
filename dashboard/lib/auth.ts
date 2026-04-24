@@ -11,6 +11,8 @@ declare module 'next-auth' {
       name: string
       email: string
       role: 'manager' | 'rep' | 'admin'
+      orgId: string
+      image?: string | null
     } & DefaultSession['user']
   }
   interface User {
@@ -18,6 +20,7 @@ declare module 'next-auth' {
     name: string
     email: string
     role: 'manager' | 'rep' | 'admin'
+    orgId: string
   }
 }
 
@@ -27,6 +30,7 @@ declare module 'next-auth/jwt' {
     role: 'manager' | 'rep' | 'admin'
     name: string
     email: string
+    orgId: string
   }
 }
 
@@ -54,7 +58,7 @@ export const authOptions: NextAuthOptions = {
           const db = getServiceClient()
           const { data: user, error: dbErr } = await db
             .from('sales_users')
-            .select('id, name, email, username, role, password_hash, is_active')
+            .select('id, name, email, username, role, password_hash, is_active, org_id')
             .eq('username', credentials.username.toLowerCase().trim())
             .eq('is_active', true)
             .single()
@@ -63,7 +67,13 @@ export const authOptions: NextAuthOptions = {
           const valid = await bcrypt.compare(credentials.password, user.password_hash)
           console.log('[auth] password valid:', valid)
           if (!valid) return null
-          return { id: user.id, name: user.name, email: user.email, role: user.role }
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            orgId: user.org_id ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          }
         } catch (e) {
           console.error('[auth] exception:', e)
           return null
@@ -81,7 +91,13 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.password) return null
         if (credentials.password === process.env.DASHBOARD_PASSWORD) {
-          return { id: '1', name: 'Admin', email: 'admin@local', role: 'admin' as const }
+          return {
+            id: '1',
+            name: 'Admin',
+            email: 'admin@local',
+            role: 'admin' as const,
+            orgId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          }
         }
         return null
       },
@@ -92,10 +108,11 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id    = user.id
-        token.role  = user.role
-        token.name  = user.name
-        token.email = user.email
+        token.id     = user.id
+        token.role   = user.role
+        token.name   = user.name
+        token.email  = user.email
+        token.orgId  = user.orgId
       }
       return token
     },
@@ -105,6 +122,7 @@ export const authOptions: NextAuthOptions = {
         name:  token.name,
         email: token.email ?? '',
         role:  token.role,
+        orgId: token.orgId,
         image: null,
       }
       return session
