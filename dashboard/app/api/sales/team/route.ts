@@ -19,7 +19,7 @@ export async function GET() {
 
   const { data: profiles } = await db
     .from('sales_user_profiles')
-    .select('*')
+    .select('user_id, job_title, department, phone, bio, manager_id, join_date, avatar_url')
 
   const profileMap = Object.fromEntries((profiles ?? []).map((p: Record<string, unknown>) => [p.user_id, p]))
 

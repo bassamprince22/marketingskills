@@ -145,7 +145,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Workspace',
     items: [
-      { href: '/sales/documents', label: 'Documents', icon: Icons.Documents, roles: ['manager', 'rep', 'admin'], badge: '4' },
+      { href: '/sales/documents', label: 'Documents', icon: Icons.Documents, roles: ['manager', 'rep', 'admin'] },
       { href: '/sales/challenges', label: 'Automations', icon: Icons.Challenges, roles: ['manager', 'rep', 'admin'] },
       { href: '/sales/settings', label: 'Settings', icon: Icons.Settings, roles: ['manager', 'rep', 'admin'] },
     ],

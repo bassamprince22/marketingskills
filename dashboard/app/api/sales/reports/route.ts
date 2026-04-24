@@ -53,35 +53,47 @@ export async function GET(req: NextRequest) {
 
   const db = getServiceClient()
 
+  // Build server-side date-filtered queries to avoid fetching all rows
+  let leadsQ = db.from('sales_leads').select('id, pipeline_stage, lead_source, service_type, assigned_rep_id, is_qualified, estimated_value, created_at')
+  let meetingsQ = db.from('sales_meetings').select('id, rep_id, status, meeting_date')
+  let docsQ = db.from('sales_documents').select('id, doc_type, status, upload_date')
+
+  if (from) { leadsQ = leadsQ.gte('created_at', from); meetingsQ = meetingsQ.gte('meeting_date', from); docsQ = docsQ.gte('upload_date', from) }
+  if (to)   { leadsQ = leadsQ.lte('created_at', to);   meetingsQ = meetingsQ.lte('meeting_date', to);   docsQ = docsQ.lte('upload_date', to) }
+
+  // Monthly trend always shows last 6 months regardless of date filter
+  const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5); sixMonthsAgo.setDate(1); sixMonthsAgo.setHours(0,0,0,0)
+  const trendQ = db.from('sales_leads')
+    .select('pipeline_stage, estimated_value, created_at')
+    .gte('created_at', sixMonthsAgo.toISOString())
+
   try {
     const [
       { data: leads },
       { data: meetings },
       { data: documents },
       { data: users },
+      { data: trendLeads },
     ] = await Promise.all([
-      db.from('sales_leads').select('id, pipeline_stage, lead_source, service_type, assigned_rep_id, is_qualified, estimated_value, created_at'),
-      db.from('sales_meetings').select('id, rep_id, status, meeting_date'),
-      db.from('sales_documents').select('id, doc_type, status, upload_date'),
+      leadsQ,
+      meetingsQ,
+      docsQ,
       db.from('sales_users').select('id, name').eq('role', 'rep'),
+      trendQ,
     ])
 
-    const leadRows = (leads ?? []) as Array<Record<string, any>>
-    const meetingRows = (meetings ?? []) as Array<Record<string, any>>
-    const documentRows = (documents ?? []) as Array<Record<string, any>>
-    const usersRows = (users ?? []) as Array<Record<string, any>>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    type Row = Record<string, any>
+    const leadRows = (leads ?? []) as Row[]
+    const meetingRows = (meetings ?? []) as Row[]
+    const documentRows = (documents ?? []) as Row[]
+    const usersRows = (users ?? []) as Row[]
+    const trendRows = (trendLeads ?? []) as Row[]
 
-    const inRange = (dateStr: string) => {
-      if (!from && !to) return true
-      const date = new Date(dateStr)
-      if (from && date < new Date(from)) return false
-      if (to && date > new Date(to)) return false
-      return true
-    }
-
-    const filteredLeads = leadRows.filter((lead) => inRange(lead.created_at))
-    const filteredMeetings = meetingRows.filter((meeting) => inRange(meeting.meeting_date))
-    const filteredDocuments = documentRows.filter((document) => inRange(document.upload_date))
+    // No JS filtering needed — DB already applied date range
+    const filteredLeads = leadRows
+    const filteredMeetings = meetingRows
+    const filteredDocuments = documentRows
 
     const bySource: Record<string, number> = {}
     filteredLeads.forEach((lead) => {
@@ -115,14 +127,14 @@ export async function GET(req: NextRequest) {
     const contractsSigned = filteredDocuments.filter((document) => document.doc_type === 'contract' && document.status === 'signed').length
 
     const monthlyMap: Record<string, { month: string; leads: number; won: number; value: number }> = {}
-    leadRows.forEach((lead) => {
-      const date = new Date(lead.created_at)
+    trendRows.forEach((lead) => {
+      const date = new Date(lead.created_at as string)
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
       if (!monthlyMap[key]) monthlyMap[key] = { month: key, leads: 0, won: 0, value: 0 }
       monthlyMap[key].leads += 1
       if (lead.pipeline_stage === 'won') {
         monthlyMap[key].won += 1
-        monthlyMap[key].value += lead.estimated_value ?? 0
+        monthlyMap[key].value += (lead.estimated_value as number) ?? 0
       }
     })
     const monthly = Object.values(monthlyMap)
