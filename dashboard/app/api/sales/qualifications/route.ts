@@ -6,11 +6,12 @@ import { getLeads, upsertQualification, logActivity } from '@/lib/sales/db'
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id, role } = session.user as { id: string; role: string }
+  const { id, role, orgId } = session.user as { id: string; role: string; orgId: string }
 
   const sp = req.nextUrl.searchParams
   try {
     const leads = await getLeads({
+      orgId,
       repId:       role === 'rep' ? id : (sp.get('repId') ?? undefined),
       serviceType: sp.get('serviceType') ?? undefined,
     })
@@ -25,13 +26,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id: userId } = session.user as { id: string }
+  const { id: userId, orgId } = session.user as { id: string; orgId: string }
 
   try {
     const { lead_id, ...payload } = await req.json()
     if (!lead_id) return NextResponse.json({ error: 'lead_id required' }, { status: 400 })
-    const qual = await upsertQualification(lead_id, userId, payload)
+    const qual = await upsertQualification(lead_id, userId, { ...payload, org_id: orgId })
     await logActivity({
+      org_id:      orgId,
       lead_id,
       user_id:     userId,
       action_type: 'qualified',

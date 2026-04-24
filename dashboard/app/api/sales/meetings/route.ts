@@ -6,11 +6,12 @@ import { getMeetings, createMeeting, logActivity } from '@/lib/sales/db'
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id, role } = session.user as { id: string; role: string }
+  const { id, role, orgId } = session.user as { id: string; role: string; orgId: string }
 
   const sp = req.nextUrl.searchParams
   try {
     const meetings = await getMeetings({
+      orgId,
       repId:  role === 'rep' ? id : (sp.get('repId') ?? undefined),
       leadId: sp.get('leadId') ?? undefined,
       status: sp.get('status') ?? undefined,
@@ -26,13 +27,15 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id: userId } = session.user as { id: string }
+  const { id: userId, orgId } = session.user as { id: string; orgId: string }
 
   try {
     const body = await req.json()
     body.rep_id = userId
+    body.org_id = orgId
     const meeting = await createMeeting(body)
     await logActivity({
+      org_id:      orgId,
       lead_id:     meeting.lead_id,
       user_id:     userId,
       action_type: 'meeting_logged',

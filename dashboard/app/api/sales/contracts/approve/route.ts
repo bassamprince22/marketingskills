@@ -13,7 +13,7 @@ const TEMPLATE      = 'contract-template.docx'
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id: userId } = session.user as { id: string }
+  const { id: userId, orgId } = session.user as { id: string; orgId: string }
 
   const { leadId, fields, filename } = await req.json() as {
     leadId:   string
@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
 
     // Create document record
     const { data: docRecord } = await db.from('sales_documents').insert({
+      org_id:       orgId,
       lead_id:      leadId,
       uploaded_by:  userId,
       doc_type:     'contract',
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
     }).select().single()
 
     await logActivity({
+      org_id:      orgId,
       lead_id:     leadId,
       user_id:     userId,
       action_type: 'doc_uploaded',

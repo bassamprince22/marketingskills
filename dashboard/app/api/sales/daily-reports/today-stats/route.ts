@@ -7,13 +7,13 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const user = session.user as { id?: string }
-  if (!user.id) return NextResponse.json({ error: 'No user id' }, { status: 400 })
+  const user = session.user as { id?: string; orgId?: string }
+  if (!user.id || !user.orgId) return NextResponse.json({ error: 'No user/org id' }, { status: 400 })
 
   try {
     const [stats, meetings] = await Promise.all([
-      getRepStats(user.id),
-      getMeetingsToday(user.id),
+      getRepStats(user.orgId, user.id),
+      getMeetingsToday(user.orgId, user.id),
     ])
 
     return NextResponse.json({

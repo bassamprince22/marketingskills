@@ -18,7 +18,7 @@ interface ImportRow {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id: userId, role } = session.user as { id: string; role: string }
+  const { id: userId, role, orgId } = session.user as { id: string; role: string; orgId: string }
   if (role === 'rep') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
 
       try {
         const lead = await createLead({
+          org_id:          orgId,
           company_name:    sanitize(row.company_name) ?? row.contact_person ?? 'Unknown',
           contact_person:  sanitize(row.contact_person) ?? row.company_name ?? 'Unknown',
           phone:           sanitize(row.phone),
@@ -88,8 +89,9 @@ export async function POST(req: NextRequest) {
           lead_source:     (row.lead_source  as any) ?? 'meta',
           pipeline_stage:  'new_lead',
           assigned_rep_id: assignedRepId || null,
-        })
+        } as any)
         await logActivity({
+          org_id:      orgId,
           lead_id:     lead.id,
           user_id:     userId,
           action_type: 'lead_created',

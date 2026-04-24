@@ -7,9 +7,9 @@ import { getServiceClient } from '@/lib/supabase'
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id: userId, role } = session.user as { id: string; role: string }
+  const { id: userId, role, orgId } = session.user as { id: string; role: string; orgId: string }
 
-  const lead = await getLeadById(params.id)
+  const lead = await getLeadById(params.id, orgId)
   if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (role === 'rep' && lead.assigned_rep_id !== userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -20,9 +20,9 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id: userId, role } = session.user as { id: string; role: string }
+  const { id: userId, role, orgId } = session.user as { id: string; role: string; orgId: string }
 
-  const lead = await getLeadById(params.id)
+  const lead = await getLeadById(params.id, orgId)
   if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (role === 'rep' && lead.assigned_rep_id !== userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const body = await req.json()
     // Reps cannot reassign leads
     if (role === 'rep') delete body.assigned_rep_id
-    const updated = await updateLead(params.id, body)
+    const updated = await updateLead(params.id, orgId, body)
 
     // Auto-create commission when lead is marked won
     if (body.pipeline_stage === 'won' && lead.pipeline_stage !== 'won') {
@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     if (body.notes) {
-      await logActivity({ lead_id: params.id, user_id: userId, action_type: 'note_added', description: 'Updated notes' })
+      await logActivity({ org_id: orgId, lead_id: params.id, user_id: userId, action_type: 'note_added', description: 'Updated notes' })
     }
     return NextResponse.json({ lead: updated })
   } catch (err) {
@@ -83,9 +83,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { role } = session.user as { role: string }
+  const { role, orgId } = session.user as { role: string; orgId: string }
   if (role === 'rep') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  await deleteLead(params.id)
+  await deleteLead(params.id, orgId)
   return NextResponse.json({ ok: true })
 }

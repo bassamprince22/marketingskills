@@ -4,9 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { getLeads, getLeadsTotal, createLead, logActivity } from '@/lib/sales/db'
 
 export async function GET(req: NextRequest) {
-  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string } } | null
+  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string; orgId: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id, role } = session.user as { id: string; role: string }
+  const { id, role, orgId } = session.user
 
   const sp = req.nextUrl.searchParams
 
@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const query = {
+      orgId,
       repId:       role === 'rep' ? id : (sp.get('repId') ?? undefined),
       stage:       sp.get('stage') as any  ?? undefined,
       serviceType: sp.get('serviceType')   ?? undefined,
@@ -79,9 +80,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string } } | null
+  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string; orgId: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id: userId, role } = session.user as { id: string; role: string }
+  const { id: userId, role, orgId } = session.user
 
   try {
     const body = await req.json()
@@ -89,10 +90,12 @@ export async function POST(req: NextRequest) {
     if (role === 'rep') {
       body.assigned_rep_id = userId
     }
+    body.org_id = orgId
     // managers/admins: only assign if they explicitly chose a rep
 
     const lead = await createLead(body)
     await logActivity({
+      org_id:      orgId,
       lead_id:     lead.id,
       user_id:     userId,
       action_type: 'lead_created',

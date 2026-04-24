@@ -6,11 +6,12 @@ import { getActivities } from '@/lib/sales/db'
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id, role } = session.user as { id: string; role: string }
+  const { id, role, orgId } = session.user as { id: string; role: string; orgId: string }
 
   const sp = req.nextUrl.searchParams
   try {
     const activities = await getActivities({
+      orgId,
       leadId: sp.get('leadId') ?? undefined,
       userId: role === 'rep' ? id : (sp.get('userId') ?? undefined),
       limit:  parseInt(sp.get('limit') ?? '20'),

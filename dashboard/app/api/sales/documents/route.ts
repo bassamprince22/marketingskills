@@ -5,21 +5,22 @@ import { getDocuments, createDocument, updateDocument, logActivity, getLeads } f
 import { getServiceClient } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
-  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string } } | null
+  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string; orgId: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id, role } = session.user as { id: string; role: string }
+  const { id, role, orgId } = session.user
 
   const sp = req.nextUrl.searchParams
   try {
     let repLeadIds: string[] | undefined
     if (role === 'rep') {
-      const repLeads = await getLeads({ repId: id, limit: 500 })
+      const repLeads = await getLeads({ orgId, repId: id, limit: 500 })
       repLeadIds = repLeads.map((lead) => lead.id)
       if (repLeadIds.length === 0) {
         return NextResponse.json({ documents: [] })
       }
     }
     const documents = await getDocuments({
+      orgId,
       leadId:     sp.get('leadId')     ?? undefined,
       leadIds:    role === 'rep' && !sp.get('leadId') ? repLeadIds : undefined,
     })
@@ -31,9 +32,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = (await getServerSession(authOptions)) as { user?: { id: string } } | null
+  const session = (await getServerSession(authOptions)) as { user?: { id: string; orgId: string } } | null
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id: userId } = session.user as { id: string }
+  const { id: userId, orgId } = session.user
 
   try {
     // Expects multipart/form-data with file + metadata
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
     const fileUrl = signedData?.signedUrl ?? ''
 
     const doc = await createDocument({
+      org_id:      orgId,
       lead_id:     leadId,
       uploaded_by: userId,
       doc_type:    docType as any,
@@ -83,9 +85,10 @@ export async function POST(req: NextRequest) {
       file_name:   file.name,
       file_size_kb: Math.round(file.size / 1024),
       notes: notes || null,
-    })
+    } as any)
 
     await logActivity({
+      org_id:      orgId,
       lead_id:     leadId,
       user_id:     userId,
       action_type: 'doc_uploaded',

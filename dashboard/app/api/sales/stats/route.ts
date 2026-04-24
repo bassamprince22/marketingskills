@@ -50,38 +50,38 @@ function resolveDateRange(range: string | null): { dateFrom?: string; dateTo?: s
 }
 
 export async function GET(req: Request) {
-  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string } } | null
+  const session = (await getServerSession(authOptions)) as { user?: { id: string; role: string; orgId: string } } | null
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { id, role } = session.user as { id: string; role: string }
+  const { id, role, orgId } = session.user
   const { searchParams } = new URL(req.url)
   const { dateFrom, dateTo } = resolveDateRange(searchParams.get('dateRange'))
 
   try {
     if (role === 'manager' || role === 'admin') {
       const [stats, pipeline, performance, activities, overdue, stale, todayMeetings, atRisk, unassignedLeads] = await Promise.all([
-        getManagerStats(dateFrom, dateTo),
-        getPipelineCounts(undefined, dateFrom, dateTo),
-        getRepPerformance(dateFrom, dateTo),
-        getActivities({ limit: 15, dateFrom, dateTo }),
-        getOverdueFollowups(undefined, dateFrom, dateTo),
-        getStaleLeads(undefined, dateFrom, dateTo),
-        getMeetingsToday(undefined, dateFrom, dateTo),
-        getHighValueAtRisk(undefined, dateFrom, dateTo),
-        getUnassignedLeads(10, dateFrom, dateTo),
+        getManagerStats(orgId, dateFrom, dateTo),
+        getPipelineCounts(orgId, undefined, dateFrom, dateTo),
+        getRepPerformance(orgId, dateFrom, dateTo),
+        getActivities({ orgId, limit: 15, dateFrom, dateTo }),
+        getOverdueFollowups(orgId, undefined, dateFrom, dateTo),
+        getStaleLeads(orgId, undefined, dateFrom, dateTo),
+        getMeetingsToday(orgId, undefined, dateFrom, dateTo),
+        getHighValueAtRisk(orgId, undefined, dateFrom, dateTo),
+        getUnassignedLeads(orgId, 10, dateFrom, dateTo),
       ])
       return NextResponse.json({ type: 'manager', stats, pipeline, performance, activities, overdue, stale, todayMeetings, atRisk, unassignedLeads })
     } else {
       const [stats, pipeline, activities, overdue, stale, todayMeetings, atRisk] = await Promise.all([
-        getRepStats(id, dateFrom, dateTo),
-        getPipelineCounts(id, dateFrom, dateTo),
-        getActivities({ userId: id, limit: 10, dateFrom, dateTo }),
-        getOverdueFollowups(id, dateFrom, dateTo),
-        getStaleLeads(id, dateFrom, dateTo),
-        getMeetingsToday(id, dateFrom, dateTo),
-        getHighValueAtRisk(id, dateFrom, dateTo),
+        getRepStats(orgId, id, dateFrom, dateTo),
+        getPipelineCounts(orgId, id, dateFrom, dateTo),
+        getActivities({ orgId, userId: id, limit: 10, dateFrom, dateTo }),
+        getOverdueFollowups(orgId, id, dateFrom, dateTo),
+        getStaleLeads(orgId, id, dateFrom, dateTo),
+        getMeetingsToday(orgId, id, dateFrom, dateTo),
+        getHighValueAtRisk(orgId, id, dateFrom, dateTo),
       ])
       return NextResponse.json({ type: 'rep', stats, pipeline, activities, overdue, stale, todayMeetings, atRisk })
     }
