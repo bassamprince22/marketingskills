@@ -13,22 +13,24 @@ import { hydrateMetaLead, isUnknownLeadValue } from './meta'
 
 // ─── Users ────────────────────────────────────────
 
-export async function getSalesUsers(): Promise<SalesUser[]> {
+export async function getSalesUsers(orgId: string): Promise<SalesUser[]> {
   const db = getServiceClient()
   const { data, error } = await db
     .from('sales_users')
     .select('id, username, email, name, role, avatar_url, is_active, created_at')
+    .eq('org_id', orgId)
     .eq('is_active', true)
     .order('name')
   if (error) throw error
   return data as SalesUser[]
 }
 
-export async function getSalesReps(): Promise<SalesUser[]> {
+export async function getSalesReps(orgId: string): Promise<SalesUser[]> {
   const db = getServiceClient()
   const { data, error } = await db
     .from('sales_users')
     .select('id, username, email, name, role, avatar_url, is_active, created_at')
+    .eq('org_id', orgId)
     .in('role', ['rep', 'manager'])
     .eq('is_active', true)
     .order('name')
@@ -39,6 +41,7 @@ export async function getSalesReps(): Promise<SalesUser[]> {
 // ─── Leads ────────────────────────────────────────
 
 export async function getLeads(opts: {
+  orgId: string
   repId?: string
   stage?: PipelineStage
   serviceType?: string
@@ -67,6 +70,7 @@ export async function getLeads(opts: {
 }
 
 export async function getLeadsTotal(opts: {
+  orgId: string
   repId?: string
   stage?: PipelineStage
   serviceType?: string
@@ -90,6 +94,7 @@ export async function getLeadsTotal(opts: {
 }
 
 function applyLeadFilters<T extends { eq: Function; is: Function; gte: Function; lte: Function; or: Function; ilike: Function; not: Function }>(q: T, opts: {
+  orgId: string
   repId?: string
   stage?: string
   serviceType?: string
@@ -102,6 +107,7 @@ function applyLeadFilters<T extends { eq: Function; is: Function; gte: Function;
   dateFrom?: string
   dateTo?: string
 }) {
+  q = q.eq('org_id', opts.orgId)
   if (opts.repId === 'unassigned') q = q.is('assigned_rep_id', null)
   else if (opts.repId)            q = q.eq('assigned_rep_id', opts.repId)
   if (opts.stage)       q = q.eq('pipeline_stage', opts.stage)
@@ -194,16 +200,17 @@ function dedupeMetaLeads(leads: Lead[]) {
   return deduped
 }
 
-export async function getUnassignedLeads(limit = 10, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
-  return getLeads({ repId: 'unassigned', limit, dateFrom, dateTo })
+export async function getUnassignedLeads(orgId: string, limit = 10, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
+  return getLeads({ orgId, repId: 'unassigned', limit, dateFrom, dateTo })
 }
 
-export async function getLeadById(id: string): Promise<Lead | null> {
+export async function getLeadById(id: string, orgId: string): Promise<Lead | null> {
   const db = getServiceClient()
   const { data, error } = await db
     .from('sales_leads')
     .select('*, assigned_rep:sales_users!assigned_rep_id(id, name, avatar_url)')
     .eq('id', id)
+    .eq('org_id', orgId)
     .single()
   if (error) return null
   return hydrateMetaLead(data as Lead)
@@ -220,21 +227,22 @@ export async function createLead(payload: Partial<Lead>): Promise<Lead> {
   return data as Lead
 }
 
-export async function updateLead(id: string, payload: Partial<Lead>): Promise<Lead> {
+export async function updateLead(id: string, orgId: string, payload: Partial<Lead>): Promise<Lead> {
   const db = getServiceClient()
   const { data, error } = await db
     .from('sales_leads')
     .update(payload)
     .eq('id', id)
+    .eq('org_id', orgId)
     .select()
     .single()
   if (error) throw error
   return data as Lead
 }
 
-export async function deleteLead(id: string): Promise<void> {
+export async function deleteLead(id: string, orgId: string): Promise<void> {
   const db = getServiceClient()
-  const { error } = await db.from('sales_leads').delete().eq('id', id)
+  const { error } = await db.from('sales_leads').delete().eq('id', id).eq('org_id', orgId)
   if (error) throw error
 }
 
@@ -254,6 +262,7 @@ function normalizeMeetingPayload(payload: Partial<Meeting>): Partial<Meeting> {
 }
 
 export async function getMeetings(opts: {
+  orgId:   string
   repId?:  string
   leadId?: string
   status?: string
@@ -263,6 +272,7 @@ export async function getMeetings(opts: {
   let q = db
     .from('sales_meetings')
     .select(MEETING_SELECT)
+    .eq('org_id', opts.orgId)
     .order('meeting_date', { ascending: false })
 
   if (opts.repId)  q = q.eq('rep_id', opts.repId)
@@ -331,11 +341,12 @@ export async function upsertQualification(
 
 // ─── Documents ────────────────────────────────────
 
-export async function getDocuments(opts: { leadId?: string; leadIds?: string[]; uploadedBy?: string }): Promise<Document[]> {
+export async function getDocuments(opts: { orgId: string; leadId?: string; leadIds?: string[]; uploadedBy?: string }): Promise<Document[]> {
   const db = getServiceClient()
   let q = db
     .from('sales_documents')
     .select('*, lead:sales_leads(id, company_name), uploader:sales_users!uploaded_by(id, name)')
+    .eq('org_id', opts.orgId)
     .order('upload_date', { ascending: false })
 
   if (opts.leadId)     q = q.eq('lead_id', opts.leadId)
@@ -373,6 +384,7 @@ export async function updateDocument(id: string, payload: Partial<Document>): Pr
 // ─── Activities ───────────────────────────────────
 
 export async function getActivities(opts: {
+  orgId:   string
   leadId?: string
   userId?: string
   dateFrom?: string
@@ -383,6 +395,7 @@ export async function getActivities(opts: {
   let q = db
     .from('sales_activities')
     .select('*, lead:sales_leads(id, company_name), user:sales_users(id, name)')
+    .eq('org_id', opts.orgId)
     .order('created_at', { ascending: false })
 
   if (opts.leadId) q = q.eq('lead_id', opts.leadId)
@@ -397,6 +410,7 @@ export async function getActivities(opts: {
 }
 
 export async function logActivity(payload: {
+  org_id?:     string
   lead_id?:    string
   user_id?:    string
   action_type: Activity['action_type']
@@ -412,11 +426,12 @@ export async function logActivity(payload: {
 
 // ─── Dashboard stats ──────────────────────────────
 
-export async function getManagerStats(dateFrom?: string, dateTo?: string): Promise<ManagerStats> {
+export async function getManagerStats(orgId: string, dateFrom?: string, dateTo?: string): Promise<ManagerStats> {
   const db = getServiceClient()
   let leadsQuery = db
     .from('sales_leads')
     .select('pipeline_stage, created_at')
+    .eq('org_id', orgId)
   if (dateFrom) leadsQuery = leadsQuery.gte('created_at', dateFrom)
   if (dateTo) leadsQuery = leadsQuery.lte('created_at', dateTo)
   const { data: leads } = await leadsQuery
@@ -435,7 +450,7 @@ export async function getManagerStats(dateFrom?: string, dateTo?: string): Promi
     lost:            rows.filter(r => r.pipeline_stage === 'lost').length,
   }
 
-  let meetingsQuery = db.from('sales_meetings').select('status, meeting_date')
+  let meetingsQuery = db.from('sales_meetings').select('status, meeting_date').eq('org_id', orgId)
   if (dateFrom) meetingsQuery = meetingsQuery.gte('meeting_date', dateFrom)
   if (dateTo) meetingsQuery = meetingsQuery.lte('meeting_date', dateTo)
   const { data: meetings } = await meetingsQuery
@@ -446,11 +461,12 @@ export async function getManagerStats(dateFrom?: string, dateTo?: string): Promi
   return stats
 }
 
-export async function getRepStats(repId: string, dateFrom?: string, dateTo?: string): Promise<RepStats> {
+export async function getRepStats(orgId: string, repId: string, dateFrom?: string, dateTo?: string): Promise<RepStats> {
   const db = getServiceClient()
   let leadsQuery = db
     .from('sales_leads')
     .select('pipeline_stage')
+    .eq('org_id', orgId)
     .eq('assigned_rep_id', repId)
   if (dateFrom) leadsQuery = leadsQuery.gte('created_at', dateFrom)
   if (dateTo) leadsQuery = leadsQuery.lte('created_at', dateTo)
@@ -460,6 +476,7 @@ export async function getRepStats(repId: string, dateFrom?: string, dateTo?: str
   let meetingsQuery = db
     .from('sales_meetings')
     .select('id, meeting_date')
+    .eq('org_id', orgId)
     .eq('rep_id', repId)
   if (dateFrom) meetingsQuery = meetingsQuery.gte('meeting_date', dateFrom)
   if (dateTo) meetingsQuery = meetingsQuery.lte('meeting_date', dateTo)
@@ -474,9 +491,9 @@ export async function getRepStats(repId: string, dateFrom?: string, dateTo?: str
   }
 }
 
-export async function getPipelineCounts(repId?: string, dateFrom?: string, dateTo?: string): Promise<PipelineCount[]> {
+export async function getPipelineCounts(orgId: string, repId?: string, dateFrom?: string, dateTo?: string): Promise<PipelineCount[]> {
   const db = getServiceClient()
-  let q = db.from('sales_leads').select('pipeline_stage, estimated_value')
+  let q = db.from('sales_leads').select('pipeline_stage, estimated_value').eq('org_id', orgId)
   if (repId) q = q.eq('assigned_rep_id', repId)
   if (dateFrom) q = q.gte('created_at', dateFrom)
   if (dateTo) q = q.lte('created_at', dateTo)
@@ -492,10 +509,10 @@ export async function getPipelineCounts(repId?: string, dateFrom?: string, dateT
   return Object.values(map)
 }
 
-export async function getRepPerformance(dateFrom?: string, dateTo?: string): Promise<RepPerformance[]> {
+export async function getRepPerformance(orgId: string, dateFrom?: string, dateTo?: string): Promise<RepPerformance[]> {
   const db = getServiceClient()
-  const leadsQuery = db.from('sales_leads').select('assigned_rep_id, pipeline_stage, estimated_value, created_at')
-  const meetingsQuery = db.from('sales_meetings').select('rep_id, status, meeting_date')
+  const leadsQuery = db.from('sales_leads').select('assigned_rep_id, pipeline_stage, estimated_value, created_at').eq('org_id', orgId)
+  const meetingsQuery = db.from('sales_meetings').select('rep_id, status, meeting_date').eq('org_id', orgId)
   if (dateFrom) {
     leadsQuery.gte('created_at', dateFrom)
     meetingsQuery.gte('meeting_date', dateFrom)
@@ -505,7 +522,7 @@ export async function getRepPerformance(dateFrom?: string, dateTo?: string): Pro
     meetingsQuery.lte('meeting_date', dateTo)
   }
   const [{ data: users }, { data: leads }, { data: meetings }] = await Promise.all([
-    db.from('sales_users').select('id, name').eq('role', 'rep'),
+    db.from('sales_users').select('id, name').eq('org_id', orgId).eq('role', 'rep'),
     leadsQuery,
     meetingsQuery,
   ])
@@ -528,12 +545,13 @@ export async function getRepPerformance(dateFrom?: string, dateTo?: string): Pro
 // ─── Action Intelligence ──────────────────────────
 // These power the "Sales OS" layer: overdue, stale, at-risk, today
 
-export async function getOverdueFollowups(repId?: string, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
+export async function getOverdueFollowups(orgId: string, repId?: string, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
   const db = getServiceClient()
   const today = new Date().toISOString().slice(0, 10)
   let q = db
     .from('sales_leads')
     .select('*, assigned_rep:sales_users!assigned_rep_id(id, name)')
+    .eq('org_id', orgId)
     .lt('next_follow_up_date', today)
     .not('next_follow_up_date', 'is', null)
     .not('pipeline_stage', 'in', '("won","lost")')
@@ -546,12 +564,13 @@ export async function getOverdueFollowups(repId?: string, dateFrom?: string, dat
   return (data ?? []) as Lead[]
 }
 
-export async function getStaleLeads(repId?: string, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
+export async function getStaleLeads(orgId: string, repId?: string, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
   const db = getServiceClient()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   let q = db
     .from('sales_leads')
     .select('*, assigned_rep:sales_users!assigned_rep_id(id, name)')
+    .eq('org_id', orgId)
     .lt('updated_at', sevenDaysAgo)
     .not('pipeline_stage', 'in', '("won","lost")')
     .order('updated_at', { ascending: true })
@@ -563,7 +582,7 @@ export async function getStaleLeads(repId?: string, dateFrom?: string, dateTo?: 
   return (data ?? []) as Lead[]
 }
 
-export async function getMeetingsToday(repId?: string, dateFrom?: string, dateTo?: string): Promise<Meeting[]> {
+export async function getMeetingsToday(orgId: string, repId?: string, dateFrom?: string, dateTo?: string): Promise<Meeting[]> {
   const db = getServiceClient()
   const start = dateFrom ? new Date(dateFrom) : new Date()
   const end   = dateTo ? new Date(dateTo) : new Date()
@@ -572,6 +591,7 @@ export async function getMeetingsToday(repId?: string, dateFrom?: string, dateTo
   let q = db
     .from('sales_meetings')
     .select('*, lead:sales_leads(id, company_name, contact_person), rep:sales_users!rep_id(id, name)')
+    .eq('org_id', orgId)
     .gte('meeting_date', start.toISOString())
     .lte('meeting_date', end.toISOString())
     .order('meeting_date', { ascending: true })
@@ -580,12 +600,13 @@ export async function getMeetingsToday(repId?: string, dateFrom?: string, dateTo
   return (data ?? []) as Meeting[]
 }
 
-export async function getHighValueAtRisk(repId?: string, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
+export async function getHighValueAtRisk(orgId: string, repId?: string, dateFrom?: string, dateTo?: string): Promise<Lead[]> {
   const db = getServiceClient()
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
   let q = db
     .from('sales_leads')
     .select('*, assigned_rep:sales_users!assigned_rep_id(id, name)')
+    .eq('org_id', orgId)
     .lt('updated_at', fourteenDaysAgo)
     .not('pipeline_stage', 'in', '("won","lost","new_lead")')
     .gt('estimated_value', 0)
