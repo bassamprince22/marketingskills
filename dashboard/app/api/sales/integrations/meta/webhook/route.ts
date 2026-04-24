@@ -73,16 +73,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (failures.length > 0) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: 'Meta webhook processing failed and needs retry.',
-        failures,
-      },
-      { status: 500 }
-    )
-  }
-
-  return NextResponse.json({ ok: true })
+  // Always return 200 — Meta disables the webhook after repeated non-200 responses.
+  // Failures are logged internally; Meta will not retry successfully-acknowledged events.
+  return NextResponse.json({ ok: true, failures: failures.length > 0 ? failures : undefined })
 }

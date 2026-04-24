@@ -155,7 +155,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/sales/meetings', label: 'Meetings', icon: Icons.Meetings, roles: ['manager', 'rep', 'admin'] },
       { href: '/sales/qualified', label: 'Qualified', icon: Icons.Qualified, roles: ['manager', 'rep', 'admin'] },
-      { href: '/sales/marketing', label: 'Marketing', icon: Icons.Marketing, roles: ['admin'] },
+      { href: '/sales/marketing', label: 'Marketing', icon: Icons.Marketing, roles: ['manager', 'admin'] },
       { href: '/sales/import', label: 'Import', icon: Icons.Import, roles: ['manager', 'admin'] },
       { href: '/sales/integrations', label: 'Integrations', icon: Icons.Integrations, roles: ['manager', 'admin'] },
       { href: '/sales/team', label: 'Team', icon: Icons.Team, roles: ['manager', 'admin'] },
