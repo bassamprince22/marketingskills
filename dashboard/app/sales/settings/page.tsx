@@ -9,6 +9,8 @@ import { ServicesManager } from '@/components/sales/ServicesManager'
 import { ChallengeAdminPanel } from '@/components/sales/ChallengeAdminPanel'
 import { DashboardWidgetSettings } from '@/components/sales/DashboardWidgetSettings'
 import { PipelineSettingsCard } from '@/components/sales/PipelineSettingsCard'
+import { BrandSettingsCard } from '@/components/sales/BrandSettings'
+import { TemplateEditor } from '@/components/sales/TemplateEditor'
 
 function Flash({ msg, type }: { msg: string; type: 'ok' | 'err' }) {
   if (!msg) return null
@@ -211,7 +213,7 @@ function CommissionTargetCard() {
   )
 }
 
-type SettingsTab = 'notifications' | 'services' | 'challenges' | 'system' | 'dashboard'
+type SettingsTab = 'notifications' | 'services' | 'challenges' | 'system' | 'dashboard' | 'templates'
 
 export default function SettingsPage() {
   const { data: session } = useSession()
@@ -256,9 +258,14 @@ export default function SettingsPage() {
             Dashboard
           </button>
         )}
+        {isPrivileged && (
+          <button className={`tab-underline${tab === 'templates' ? ' active' : ''}`} onClick={() => setTab('templates')}>
+            Templates & Brand
+          </button>
+        )}
       </div>
 
-      <div style={{ maxWidth: 700, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ maxWidth: tab === 'templates' ? 1000 : 700, display: 'flex', flexDirection: 'column', gap: 20 }}>
         {tab === 'notifications' && <NotificationSettingsCard role={role} />}
         {tab === 'services' && isPrivileged && (
           <>
@@ -268,6 +275,12 @@ export default function SettingsPage() {
         )}
         {tab === 'challenges' && isAdmin && <ChallengeAdminPanel />}
         {tab === 'dashboard' && isPrivileged && <DashboardWidgetSettings />}
+        {tab === 'templates' && isPrivileged && (
+          <>
+            <BrandSettingsCard />
+            <TemplateEditor />
+          </>
+        )}
         {tab === 'system' && isPrivileged && (
           <>
             <PipelineSettingsCard />

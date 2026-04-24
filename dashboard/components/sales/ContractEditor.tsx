@@ -66,25 +66,14 @@ export function ContractEditor({ lead, onClose, onSaved }: Props) {
     refreshPreview(next)
   }
 
-  async function handleDownload() {
-    setDownloading(true)
-    try {
-      const res = await fetch('/api/sales/contracts/download', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ fields, filename: lead.company_name }),
-      })
-      if (!res.ok) { alert('Download failed'); return }
-      const blob = await res.blob()
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href     = url
-      a.download = `contract_${lead.company_name.replace(/\s+/g, '_')}.docx`
-      a.click()
-      URL.revokeObjectURL(url)
-    } finally {
-      setDownloading(false)
-    }
+  function handleDownload() {
+    // Open the full HTML contract in a new window — user can Ctrl+P / Save as PDF
+    const win = window.open('', '_blank', 'width=900,height=1000')
+    if (!win) return
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 600)
   }
 
   async function handleApprove() {
@@ -135,8 +124,8 @@ export function ContractEditor({ lead, onClose, onSaved }: Props) {
           <button onClick={handlePrint} disabled={view !== 'ready'} className="contract-btn contract-btn-ghost">
             🖨 Print
           </button>
-          <button onClick={handleDownload} disabled={downloading || view !== 'ready'} className="contract-btn contract-btn-download">
-            {downloading ? '…' : '📥 Download .docx'}
+          <button onClick={handleDownload} disabled={view !== 'ready'} className="contract-btn contract-btn-download">
+            📄 Download PDF
           </button>
           <button
             onClick={handleApprove}
@@ -160,7 +149,7 @@ export function ContractEditor({ lead, onClose, onSaved }: Props) {
             <div style={{ padding: '16px 0' }}>
               <p style={{ color: 'var(--brand-red-text)', fontWeight: 600, fontSize: 13, marginBottom: 8 }}>No template uploaded</p>
               <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6 }}>
-                Go to <strong style={{ color: 'var(--text-primary)' }}>Settings</strong> and upload your contract template (.docx) first.
+                Go to <strong style={{ color: 'var(--text-primary)' }}>Settings → Templates & Brand</strong> and create your first contract template.
               </p>
             </div>
           )}
@@ -199,7 +188,7 @@ export function ContractEditor({ lead, onClose, onSaved }: Props) {
               <div style={{ textAlign: 'center', padding: 48 }}>
                 <p style={{ fontSize: 40, marginBottom: 16 }}>📄</p>
                 <p style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No Template Yet</p>
-                <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Upload a .docx template in Settings to get started.</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Go to Settings → Templates & Brand to create one.</p>
               </div>
             </div>
           ) : (
