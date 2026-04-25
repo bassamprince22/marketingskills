@@ -25,18 +25,56 @@ type FadaaAiAssistantProps = {
   starterPrompts?: string[]
 }
 
-const REP_PROMPTS = [
-  'Build my follow-up plan for today.',
-  'Draft a WhatsApp follow-up for a lead who did not answer.',
-  'Turn my work today into a daily report draft.',
-  'Help me qualify a new Meta lead quickly.',
+type PromptCard = {
+  title: string
+  description: string
+  prompt: string
+}
+
+const REP_PROMPTS: PromptCard[] = [
+  {
+    title: 'Plan my day',
+    description: 'Prioritize leads, meetings, and follow-ups.',
+    prompt: 'Build my follow-up plan for today using my CRM context.',
+  },
+  {
+    title: 'Write follow-up',
+    description: 'WhatsApp, email, or call recap in seconds.',
+    prompt: 'Draft a WhatsApp follow-up for a lead who did not answer.',
+  },
+  {
+    title: 'Daily report',
+    description: 'Turn today work into a clean report draft.',
+    prompt: 'Turn my work today into a daily report draft.',
+  },
+  {
+    title: 'Qualify a lead',
+    description: 'Questions and next action for a new lead.',
+    prompt: 'Help me qualify a new Meta lead quickly.',
+  },
 ]
 
-const MANAGER_PROMPTS = [
-  'Summarize today pipeline risks and priorities.',
-  'Which reps or leads need attention first?',
-  'Draft a short team update from this dashboard.',
-  'Create coaching notes for overdue follow-ups.',
+const MANAGER_PROMPTS: PromptCard[] = [
+  {
+    title: 'Pipeline risks',
+    description: 'Find weak spots and stuck opportunities.',
+    prompt: 'Summarize today pipeline risks and priorities from this dashboard.',
+  },
+  {
+    title: 'Team focus',
+    description: 'Who needs attention, coaching, or assignment.',
+    prompt: 'Which reps or leads need attention first?',
+  },
+  {
+    title: 'Team update',
+    description: 'Create a concise update for the sales team.',
+    prompt: 'Draft a short team update from this dashboard.',
+  },
+  {
+    title: 'Coaching notes',
+    description: 'Turn overdue work into manager actions.',
+    prompt: 'Create coaching notes for overdue follow-ups.',
+  },
 ]
 
 function SparkIcon() {
@@ -59,6 +97,15 @@ function Capability({ title, children }: { title: string; children: ReactNode })
       </div>
     </div>
   )
+}
+
+function promptCardsFromStrings(prompts?: string[]): PromptCard[] | null {
+  if (!prompts?.length) return null
+  return prompts.map((prompt, index) => ({
+    title: `Prompt ${index + 1}`,
+    description: 'Use this example as a fast starting point.',
+    prompt,
+  }))
 }
 
 export function FadaaAiAssistant({
@@ -84,7 +131,7 @@ export function FadaaAiAssistant({
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const role = (session?.user as { role?: string } | undefined)?.role ?? 'rep'
   const isManagerView = role === 'admin' || role === 'manager'
-  const prompts = starterPrompts ?? (isManagerView ? MANAGER_PROMPTS : REP_PROMPTS)
+  const prompts = promptCardsFromStrings(starterPrompts) ?? (isManagerView ? MANAGER_PROMPTS : REP_PROMPTS)
   const visible = mode === 'widget' || open
 
   const quickIntro = useMemo(() => {
@@ -93,6 +140,9 @@ export function FadaaAiAssistant({
     }
     return 'Built for rep execution: follow-up scripts, daily report drafts, lead qualification, meeting prep, and next actions.'
   }, [isManagerView])
+
+  const roleLabel = isManagerView ? 'Manager mode' : 'Rep mode'
+  const usagePercent = usage ? Math.min(100, Math.round((usage.used / Math.max(usage.limit, 1)) * 100)) : 0
 
   useEffect(() => {
     setMounted(true)
@@ -178,7 +228,19 @@ export function FadaaAiAssistant({
     void sendMessage()
   }
 
+  function resetChat() {
+    setError('')
+    setMessages([
+      {
+        role: 'assistant',
+        content: 'Fresh thread ready. Tell me what you want to move forward: follow-up, daily update, meeting notes, proposal text, or next action.',
+      },
+    ])
+  }
+
   function renderPanel(surface: AssistantMode) {
+    const compact = surface === 'launcher'
+
     return (
       <aside
         className={`mission-ai-${surface === 'widget' ? 'widget' : 'panel'}`}
@@ -190,25 +252,44 @@ export function FadaaAiAssistant({
           <div className="mission-ai-title-row">
             <span className="mission-ai-logo"><SparkIcon /></span>
             <div>
-              <p className="mission-ai-eyebrow">Fadaa sales copilot</p>
+              <p className="mission-ai-eyebrow">Fadaa AI Assistant</p>
               <h2>Fadaa AI Assistant</h2>
               <p>{quickIntro}</p>
+              <div className="mission-ai-status-row" aria-label="AI assistant status">
+                <span>{roleLabel}</span>
+                <span>CRM context aware</span>
+                <span>Drafts only - you approve</span>
+              </div>
             </div>
           </div>
-          {surface === 'launcher' && (
-            <button className="mission-ai-close" onClick={() => setOpen(false)} aria-label="Close">
-              x
+          <div className="mission-ai-header-actions">
+            <button className="mission-ai-ghost" onClick={resetChat} type="button">
+              New chat
             </button>
-          )}
+            {surface === 'launcher' && (
+              <button className="mission-ai-close" onClick={() => setOpen(false)} aria-label="Close">
+                x
+              </button>
+            )}
+          </div>
         </div>
 
         {surface === 'widget' && (
-          <div className="mission-ai-capability-grid">
-            <Capability title="Follow-up help">Draft WhatsApp, email, and call notes using CRM context.</Capability>
-            <Capability title="Daily updates">Turn sales work into a clean daily report draft.</Capability>
-            <Capability title={isManagerView ? 'Team intelligence' : 'Next best action'}>
-              {isManagerView ? 'Spot risk, assignments, and coaching priorities.' : 'Prioritize what to work on next and why.'}
-            </Capability>
+          <div className="mission-ai-command-deck">
+            <div>
+              <p className="mission-ai-deck-label">Start here</p>
+              <h3>Your CRM copilot is open</h3>
+              <p>
+                Ask for a useful output, then edit it before sending or submitting. Fadaa AI can reason from this dashboard, but it will not change records without you.
+              </p>
+            </div>
+            <div className="mission-ai-capability-grid">
+              <Capability title="Follow-up help">Draft WhatsApp, email, and call notes using CRM context.</Capability>
+              <Capability title="Daily updates">Turn sales work into a clean daily report draft.</Capability>
+              <Capability title={isManagerView ? 'Team intelligence' : 'Next best action'}>
+                {isManagerView ? 'Spot risk, assignments, and coaching priorities.' : 'Prioritize what to work on next and why.'}
+              </Capability>
+            </div>
           </div>
         )}
 
@@ -222,15 +303,21 @@ export function FadaaAiAssistant({
           {loading && (
             <div className="mission-ai-message assistant">
               <div className="mission-ai-message-role">Fadaa AI</div>
-              <div className="mission-ai-message-content">Thinking through the best next move...</div>
+              <div className="mission-ai-thinking" aria-label="Fadaa AI is thinking">
+                <span />
+                <span />
+                <span />
+                <em>Thinking through the best next move...</em>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="mission-ai-quick" aria-label="AI prompt examples">
+        <div className={`mission-ai-quick${compact ? ' compact' : ''}`} aria-label="AI prompt examples">
           {prompts.map(prompt => (
-            <button key={prompt} onClick={() => void sendMessage(prompt)} disabled={loading}>
-              {prompt}
+            <button key={prompt.prompt} onClick={() => void sendMessage(prompt.prompt)} disabled={loading}>
+              <strong>{prompt.title}</strong>
+              {!compact && <span>{prompt.description}</span>}
             </button>
           ))}
         </div>
@@ -239,6 +326,9 @@ export function FadaaAiAssistant({
         {usage && (
           <div className="mission-ai-usage">
             <span>AI usage: {usage.used} / {usage.limit} calls</span>
+            <span className="mission-ai-usage-bar" aria-hidden="true">
+              <i style={{ width: `${usagePercent}%` }} />
+            </span>
             {usage.remaining <= 0 && <strong>No calls remaining</strong>}
           </div>
         )}
@@ -258,8 +348,9 @@ export function FadaaAiAssistant({
             }}
           />
           <button type="submit" disabled={loading || !input.trim()}>
-            {loading ? 'Sending...' : 'Send'}
+            {loading ? 'Sending...' : 'Ask AI'}
           </button>
+          <p className="mission-ai-form-hint">Enter to send. Shift + Enter for a new line.</p>
         </form>
       </aside>
     )
