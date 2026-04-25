@@ -7,6 +7,7 @@ import { StarsBackground } from './StarsBackground'
 import { SalesNav } from './SalesNav'
 import { SalesTopbar } from './SalesTopbar'
 import { NotificationToast } from './NotificationToast'
+import { SupportButton } from './SupportButton'
 
 const BOTTOM_NAV = [
   { href: '/sales/dashboard', label: 'Home',     icon: (
@@ -102,6 +103,7 @@ export function SalesShell({ children }: { children: React.ReactNode }) {
       </main>
 
       <NotificationToast />
+      <SupportButton />
 
       {/* Mobile bottom nav */}
       <nav className="sales-bottom-nav">
