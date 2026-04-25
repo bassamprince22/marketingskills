@@ -31,26 +31,62 @@ export default function ProposalsPage() {
   const [filter, setFilter]       = useState('')
   const [search, setSearch]       = useState('')
   const [creating, setCreating]   = useState(false)
+  const [error, setError]         = useState('')
 
   useEffect(() => {
+    let active = true
     const q = filter ? `?status=${filter}` : ''
+    setLoading(true)
+    setError('')
+
     fetch(`/api/sales/proposals${q}`)
-      .then(r => r.ok ? r.json() : [])
-      .then(d => setProposals(Array.isArray(d) ? d : []))
-      .catch(() => setProposals([]))
-      .finally(() => setLoading(false))
+      .then(async response => {
+        const payload = await response.json().catch(() => null)
+        if (!response.ok) {
+          const message = [payload?.error, payload?.details].filter(Boolean).join(' ')
+          throw new Error(message || `Failed to load proposals (${response.status})`)
+        }
+        if (!Array.isArray(payload)) throw new Error('Unexpected proposals response.')
+        return payload
+      })
+      .then(data => {
+        if (active) setProposals(data)
+      })
+      .catch(err => {
+        if (!active) return
+        setProposals([])
+        setError(err instanceof Error ? err.message : 'Failed to load proposals.')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
   }, [filter])
 
   async function createNew() {
-    setCreating(true)
-    const res = await fetch('/api/sales/proposals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'New Proposal', status: 'draft' }),
-    })
-    const data = await res.json()
-    if (data.id) router.push(`/sales/proposals/${data.id}`)
-    setCreating(false)
+    try {
+      setCreating(true)
+      setError('')
+      const res = await fetch('/api/sales/proposals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'New Proposal', status: 'draft' }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        const message = [data?.error, data?.details].filter(Boolean).join(' ')
+        throw new Error(message || `Failed to create proposal (${res.status})`)
+      }
+      if (!data?.id) throw new Error('Proposal was created but the server did not return an id.')
+      router.push(`/sales/proposals/${data.id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create proposal.')
+    } finally {
+      setCreating(false)
+    }
   }
 
   const filtered = proposals.filter(p =>
@@ -79,17 +115,24 @@ export default function ProposalsPage() {
             disabled={creating}
             className="rounded-lg bg-gradient-to-r from-[#7C3AED] to-[#4F8EF7] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 disabled:opacity-60"
           >
-            {creating ? 'Creating…' : '+ New Proposal'}
+            {creating ? 'Creating...' : '+ New Proposal'}
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <p className="font-semibold text-red-100">Proposal setup needs attention</p>
+          <p className="mt-1 leading-relaxed">{error}</p>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search proposals…"
+          placeholder="Search proposals..."
           className="w-64 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-purple-500/50"
         />
         <div className="flex flex-wrap gap-2">
@@ -122,13 +165,13 @@ export default function ProposalsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="py-16 text-center text-sm text-white/30">Loading…</td></tr>
+              <tr><td colSpan={6} className="py-16 text-center text-sm text-white/30">Loading...</td></tr>
             ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-16 text-center">
                   <p className="text-white/30">No proposals yet.</p>
                   <button onClick={createNew} disabled={creating} className="mt-3 text-sm text-purple-400 hover:text-purple-300">
-                    Create your first proposal →
+                    Create your first proposal -&gt;
                   </button>
                 </td>
               </tr>
@@ -142,12 +185,12 @@ export default function ProposalsPage() {
                 >
                   <td className="px-4 py-3 font-mono text-xs text-white/50">{p.proposal_number}</td>
                   <td className="px-4 py-3 font-medium text-white">{p.title}</td>
-                  <td className="px-4 py-3 text-white/60">{p.sales_leads?.company_name ?? '—'}</td>
+                  <td className="px-4 py-3 text-white/60">{p.sales_leads?.company_name ?? '-'}</td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.class}`}>{s.label}</span>
                   </td>
-                  <td className="px-4 py-3 text-white/50">{p.proposal_date ? new Date(p.proposal_date).toLocaleDateString() : '—'}</td>
-                  <td className="px-4 py-3 text-white/50">{p.valid_until ? new Date(p.valid_until).toLocaleDateString() : '—'}</td>
+                  <td className="px-4 py-3 text-white/50">{p.proposal_date ? new Date(p.proposal_date).toLocaleDateString() : '-'}</td>
+                  <td className="px-4 py-3 text-white/50">{p.valid_until ? new Date(p.valid_until).toLocaleDateString() : '-'}</td>
                 </tr>
               )
             })}

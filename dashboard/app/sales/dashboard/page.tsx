@@ -14,6 +14,7 @@ import { ClosedRevenueChart } from '@/components/sales/ClosedRevenueChart'
 import { CrewLeaderboard } from '@/components/sales/CrewLeaderboard'
 import { TodaysOrbit } from '@/components/sales/TodaysOrbit'
 import { SignalStream } from '@/components/sales/SignalStream'
+import { AiPipelineInsight } from '@/components/sales/AiPipelineInsight'
 import type {
   ManagerStats,
   RepStats,
@@ -554,6 +555,18 @@ function ManagerDash({ data, revenue, wVisible }: { data: DashData; revenue: Rev
       </section>}
 
       {wVisible('pipeline_constellation') && <PipelineConstellationWidget pipeline={data.pipeline} />}
+
+      {wVisible('ai_pipeline') && (
+        <AiPipelineInsight
+          stats={stats}
+          pipeline={data.pipeline}
+          topReps={data.performance}
+          overdueCount={data.overdue.length}
+          staleCount={data.stale.length}
+          atRiskCount={data.atRisk.length}
+          meetingsToday={data.todayMeetings.length}
+        />
+      )}
 
       {wVisible('notifications') && <NotificationPanel />}
       {wVisible('challenges')    && <ChallengeRaceWidget />}

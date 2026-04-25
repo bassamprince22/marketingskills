@@ -18,11 +18,62 @@ const createSchema = z.object({
   is_template:   z.boolean().default(false),
 })
 
+type DbErrorLike = {
+  code?: string
+  message?: string
+  details?: string
+  hint?: string
+}
+
+function normalizeDbError(error: unknown): DbErrorLike {
+  if (error && typeof error === 'object') return error as DbErrorLike
+  if (error instanceof Error) return { message: error.message }
+  return { message: String(error ?? 'Unknown database error') }
+}
+
+function missingProposalTablesPayload(error: unknown) {
+  const dbError = normalizeDbError(error)
+  const text = [
+    dbError.code,
+    dbError.message,
+    dbError.details,
+    dbError.hint,
+  ].filter(Boolean).join(' ').toLowerCase()
+
+  const missing =
+    dbError.code === '42P01' ||
+    dbError.code === 'PGRST205' ||
+    text.includes('relation "proposals" does not exist') ||
+    text.includes("relation 'proposals' does not exist") ||
+    text.includes('could not find the table') ||
+    (text.includes('schema cache') && text.includes('proposals'))
+
+  if (!missing) return null
+
+  return {
+    error: 'Proposals database tables are not installed yet.',
+    details: 'Run dashboard/supabase/009_proposals_safe_install.sql in the Supabase SQL Editor. If Supabase says orgs does not exist, run dashboard/supabase/006_multi_tenancy.sql first.',
+    migration: 'dashboard/supabase/009_proposals_safe_install.sql',
+  }
+}
+
+function proposalDbErrorResponse(error: unknown, fallback: string) {
+  const installPayload = missingProposalTablesPayload(error)
+  if (installPayload) return NextResponse.json(installPayload, { status: 503 })
+
+  const dbError = normalizeDbError(error)
+  return NextResponse.json({
+    error: dbError.message ?? fallback,
+    details: dbError.details ?? dbError.hint,
+  }, { status: 500 })
+}
+
 async function nextProposalNumber(db: ReturnType<typeof getServiceClient>, orgId: string): Promise<string> {
-  const { count } = await db
+  const { count, error } = await db
     .from('proposals')
     .select('id', { count: 'exact', head: true })
     .eq('org_id', orgId)
+  if (error) throw error
   const n = (count ?? 0) + 1
   return `PROP-${String(n).padStart(5, '0')}`
 }
@@ -31,7 +82,7 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { orgId } = session.user as { orgId: string }
-  if (!orgId) return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 })
+  if (!orgId) return NextResponse.json({ error: 'Session expired - please sign in again' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const status     = searchParams.get('status')
@@ -50,7 +101,7 @@ export async function GET(req: NextRequest) {
   if (status) q = q.eq('status', status)
 
   const { data, error } = await q
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return proposalDbErrorResponse(error, 'Failed to load proposals')
   return NextResponse.json(data)
 }
 
@@ -61,13 +112,18 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id: userId, orgId } = session.user as { id: string; orgId: string }
-  if (!orgId) return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 })
+  if (!orgId) return NextResponse.json({ error: 'Session expired - please sign in again' }, { status: 401 })
 
   const parsed = createSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
   const db = getServiceClient()
-  const proposalNumber = await nextProposalNumber(db, orgId)
+  let proposalNumber: string
+  try {
+    proposalNumber = await nextProposalNumber(db, orgId)
+  } catch (error) {
+    return proposalDbErrorResponse(error, 'Failed to prepare proposal number')
+  }
 
   const { data, error } = await db
     .from('proposals')
@@ -80,6 +136,6 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return proposalDbErrorResponse(error, 'Failed to create proposal')
   return NextResponse.json(data, { status: 201 })
 }
