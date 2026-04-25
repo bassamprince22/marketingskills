@@ -65,7 +65,7 @@ export async function getLeads(opts: {
   if (opts.offset) q = q.range(opts.offset, opts.offset + (opts.limit ?? 50) - 1)
 
   const { data, error } = await q
-  if (error) throw error
+  if (error) return []
   return dedupeMetaLeads(((data ?? []) as Lead[]).map(hydrateMetaLead))
 }
 
@@ -405,7 +405,7 @@ export async function getActivities(opts: {
   q = q.limit(opts.limit ?? 20)
 
   const { data, error } = await q
-  if (error) throw error
+  if (error) return []
   return data as Activity[]
 }
 
