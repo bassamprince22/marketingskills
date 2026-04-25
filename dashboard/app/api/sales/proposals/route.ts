@@ -31,8 +31,18 @@ function normalizeDbError(error: unknown): DbErrorLike {
   return { message: String(error ?? 'Unknown database error') }
 }
 
+function getSupabaseProjectRef() {
+  try {
+    const host = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname
+    return host.endsWith('.supabase.co') ? host.replace('.supabase.co', '') : host
+  } catch {
+    return 'unknown'
+  }
+}
+
 function missingProposalTablesPayload(error: unknown) {
   const dbError = normalizeDbError(error)
+  const projectRef = getSupabaseProjectRef()
   const text = [
     dbError.code,
     dbError.message,
@@ -56,15 +66,19 @@ function missingProposalTablesPayload(error: unknown) {
   if (schemaCache) {
     return {
       error: 'Supabase schema cache has not reloaded the proposals tables yet.',
-      details: "Run this in Supabase SQL Editor: NOTIFY pgrst, 'reload schema'; Then wait 10 seconds and refresh Proposals.",
+      details: `Production is connected to Supabase project "${projectRef}". If you already ran SELECT pg_notify('pgrst', 'reload schema') and this still appears, the SQL was likely run in a different Supabase project or the proposals table is not in the public schema.`,
       migration: "NOTIFY pgrst, 'reload schema';",
+      projectRef,
+      originalError: dbError.message,
     }
   }
 
   return {
     error: 'Proposals database tables are not installed yet.',
-    details: 'Run dashboard/supabase/009_proposals_safe_install.sql in the Supabase SQL Editor. If Supabase says orgs does not exist, run dashboard/supabase/006_multi_tenancy.sql first.',
+    details: `Production is connected to Supabase project "${projectRef}". Run dashboard/supabase/009_proposals_safe_install.sql in that exact project. If Supabase says orgs does not exist, run dashboard/supabase/006_multi_tenancy.sql first.`,
     migration: 'dashboard/supabase/009_proposals_safe_install.sql',
+    projectRef,
+    originalError: dbError.message,
   }
 }
 
