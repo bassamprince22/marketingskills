@@ -209,6 +209,7 @@ export function SalesNav({ mobileOpen, onClose }: SalesNavProps) {
   const role = (session?.user as { role?: string } | undefined)?.role ?? 'rep'
   const name = session?.user?.name ?? 'Fadaa User'
   const avatarUrl = (session?.user as { image?: string } | undefined)?.image
+  const orgName = (session?.user as { orgName?: string } | undefined)?.orgName ?? 'Fadaa'
 
   const visibleSections = NAV_SECTIONS.map(section => ({
     ...section,
@@ -231,8 +232,8 @@ export function SalesNav({ mobileOpen, onClose }: SalesNavProps) {
     <Link href="/sales/dashboard" onClick={onClose} className="mission-sidebar-logo">
       <div className="mission-sidebar-logo-mark">*</div>
       <div>
-        <p className="mission-sidebar-logo-wordmark">FADAA</p>
-        <p className="mission-sidebar-logo-sub">Mission Control</p>
+        <p className="mission-sidebar-logo-wordmark">{orgName}</p>
+        <p className="mission-sidebar-logo-sub">Sales OS</p>
       </div>
     </Link>
   )

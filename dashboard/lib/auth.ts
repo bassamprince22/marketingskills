@@ -12,6 +12,7 @@ declare module 'next-auth' {
       email: string
       role: 'manager' | 'rep' | 'admin'
       orgId: string
+      orgName: string
       image?: string | null
     } & DefaultSession['user']
   }
@@ -21,6 +22,7 @@ declare module 'next-auth' {
     email: string
     role: 'manager' | 'rep' | 'admin'
     orgId: string
+    orgName: string
   }
 }
 
@@ -31,6 +33,7 @@ declare module 'next-auth/jwt' {
     name: string
     email: string
     orgId: string
+    orgName: string
   }
 }
 
@@ -67,12 +70,21 @@ export const authOptions: NextAuthOptions = {
           const valid = await bcrypt.compare(credentials.password, user.password_hash)
           console.log('[auth] password valid:', valid)
           if (!valid) return null
+
+          const orgId = user.org_id ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+          const { data: org } = await db
+            .from('orgs')
+            .select('name')
+            .eq('id', orgId)
+            .single()
+
           return {
             id: user.id,
             name: user.name,
             email: user.email,
             role: user.role,
-            orgId: user.org_id ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            orgId,
+            orgName: org?.name ?? 'Fadaa',
           }
         } catch (e) {
           console.error('[auth] exception:', e)
@@ -97,6 +109,7 @@ export const authOptions: NextAuthOptions = {
             email: 'admin@local',
             role: 'admin' as const,
             orgId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            orgName: 'Fadaa',
           }
         }
         return null
@@ -108,22 +121,24 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id     = user.id
-        token.role   = user.role
-        token.name   = user.name
-        token.email  = user.email
-        token.orgId  = user.orgId
+        token.id      = user.id
+        token.role    = user.role
+        token.name    = user.name
+        token.email   = user.email
+        token.orgId   = user.orgId
+        token.orgName = user.orgName
       }
       return token
     },
     async session({ session, token }) {
       session.user = {
-        id:    token.id,
-        name:  token.name,
-        email: token.email ?? '',
-        role:  token.role,
-        orgId: token.orgId,
-        image: null,
+        id:      token.id,
+        name:    token.name,
+        email:   token.email ?? '',
+        role:    token.role,
+        orgId:   token.orgId,
+        orgName: token.orgName,
+        image:   null,
       }
       return session
     },
