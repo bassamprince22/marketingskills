@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import type { Notification } from '@/app/api/sales/notifications/route'
+import { FadaaAiAssistant } from './FadaaAiAssistant'
 
 type ThemeMode = 'dark' | 'light'
 type DensityMode = 'compact' | 'comfortable'
@@ -124,6 +125,8 @@ export function SalesTopbar({
       </div>
 
       <div className="mission-topbar-actions">
+        <FadaaAiAssistant />
+
         <div className="mission-pill-group" aria-label="Language controls">
           <button className="mission-pill active">EN</button>
         </div>

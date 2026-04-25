@@ -1805,6 +1805,227 @@ select {
   cursor: pointer;
 }
 
+.mission-ai-btn {
+  min-height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(155, 107, 255, 0.32);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(79, 142, 247, 0.14));
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 12px 26px rgba(124, 58, 237, 0.16);
+}
+
+.mission-ai-spark {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #7C3AED, #4F8EF7);
+  color: #fff;
+  font-size: 10px;
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.42);
+}
+
+.mission-ai-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  border: none;
+  background: rgba(4, 7, 15, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.mission-ai-panel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 71;
+  width: min(460px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(155, 107, 255, 0.24);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(124, 58, 237, 0.22), transparent 32%),
+    linear-gradient(180deg, rgba(13, 18, 34, 0.98), rgba(8, 11, 24, 0.98));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.48), 0 0 70px rgba(124, 58, 237, 0.16);
+  overflow: hidden;
+}
+
+.mission-ai-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.mission-ai-header h2 {
+  margin: 3px 0 6px;
+  color: #f4f7ff;
+  font-size: 22px;
+  letter-spacing: -0.04em;
+}
+
+.mission-ai-header p {
+  margin: 0;
+  color: rgba(148, 163, 191, 0.92);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.mission-ai-eyebrow {
+  color: #c5a8ff !important;
+  font-size: 11px !important;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.mission-ai-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.72);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.mission-ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mission-ai-message {
+  max-width: 88%;
+  border-radius: 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.05);
+}
+
+.mission-ai-message.user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, rgba(79, 142, 247, 0.28), rgba(124, 58, 237, 0.2));
+  border-color: rgba(79, 142, 247, 0.28);
+}
+
+.mission-ai-message.assistant {
+  align-self: flex-start;
+}
+
+.mission-ai-message-role {
+  margin-bottom: 6px;
+  color: #c5a8ff;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.mission-ai-message-content {
+  color: rgba(242, 245, 251, 0.94);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.mission-ai-quick {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 18px 12px;
+}
+
+.mission-ai-quick button {
+  flex: 0 0 auto;
+  border: 1px solid rgba(155, 107, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(155, 107, 255, 0.1);
+  color: #d8c8ff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.mission-ai-error {
+  margin: 0 18px 10px;
+  border: 1px solid rgba(240, 81, 102, 0.28);
+  border-radius: 14px;
+  background: rgba(240, 81, 102, 0.1);
+  color: #fda4af;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.mission-ai-usage {
+  padding: 0 18px 10px;
+  color: rgba(148, 163, 191, 0.88);
+  font-size: 11px;
+}
+
+.mission-ai-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 16px 18px 18px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.16);
+}
+
+.mission-ai-form textarea {
+  resize: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.68);
+  color: #f8fafc;
+  padding: 12px 13px;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+}
+
+.mission-ai-form textarea::placeholder {
+  color: rgba(148, 163, 191, 0.68);
+}
+
+.mission-ai-form button {
+  align-self: end;
+  min-height: 44px;
+  border: none;
+  border-radius: 14px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, #7C3AED, #4F8EF7);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mission-ai-form button:disabled,
+.mission-ai-quick button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .mission-notification-count {
   position: absolute;
   top: -4px;
