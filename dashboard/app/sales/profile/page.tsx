@@ -49,6 +49,7 @@ export default function ProfilePage() {
           phone:      d.profile?.phone      ?? '',
           department: d.profile?.department ?? '',
           bio:        d.profile?.bio        ?? '',
+          join_date:  d.profile?.join_date  ?? '',
         })
       })
   }, [])
@@ -152,6 +153,7 @@ export default function ProfilePage() {
                         {DEPT_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
                     </div>
+                    <div>{label('Join Date')}<input className="fadaa-input" type="date" value={form.join_date} onChange={e => setForm(f => ({ ...f, join_date: e.target.value }))} /></div>
                   </div>
                   <div>{label('Bio')}<textarea className="fadaa-input" value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} rows={3} style={{ resize: 'vertical' }} placeholder="A short bio…" /></div>
                   <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>

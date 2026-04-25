@@ -1,12 +1,27 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 
+const BILLING_EXEMPT = [
+  '/sales/billing',
+  '/sales/login',
+  '/sales/logout',
+  '/api/auth',
+  '/api/sales/billing',
+]
+
 export default withAuth(
   function middleware(req) {
-    const token = req.nextauth.token
+    const token = req.nextauth.token as (Record<string, string> & { role?: string; orgId?: string; trialEndsAt?: string }) | null
     const { pathname } = req.nextUrl
 
-    // Sales routes require a real role (not the legacy single-password admin)
+    // Protect onboarding routes — must be authenticated
+    if (pathname.startsWith('/onboarding')) {
+      if (!token) {
+        return NextResponse.redirect(new URL('/sales/login', req.url))
+      }
+    }
+
+    // Sales routes: role-based guards
     if (
       pathname.startsWith('/sales') &&
       !pathname.startsWith('/sales/login') &&
@@ -33,6 +48,21 @@ export default withAuth(
       if (pathname.startsWith('/sales/settings') && token.role === 'rep') {
         return NextResponse.redirect(new URL('/sales/dashboard', req.url))
       }
+
+      // Trial expiry: if org is suspended, send to billing (admin only)
+      if (token.orgStatus === 'suspended' && token.role === 'admin') {
+        const exempt = BILLING_EXEMPT.some((p) => pathname.startsWith(p))
+        if (!exempt) {
+          return NextResponse.redirect(new URL('/sales/billing?expired=1', req.url))
+        }
+      }
+    }
+
+    // Platform admin requires super_admin role
+    if (pathname.startsWith('/platform-admin')) {
+      if (token?.role !== 'super_admin') {
+        return NextResponse.redirect(new URL('/sales/login', req.url))
+      }
     }
 
     return NextResponse.next()
@@ -41,8 +71,13 @@ export default withAuth(
     callbacks: {
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl
-        // Public paths
+        // Fully public paths — no token required
         if (
+          pathname === '/' ||
+          pathname.startsWith('/features') ||
+          pathname.startsWith('/pricing') ||
+          pathname.startsWith('/demo') ||
+          pathname.startsWith('/signup') ||
           pathname.startsWith('/sales/login') ||
           pathname.startsWith('/sales/forgot-password') ||
           pathname.startsWith('/sales/reset-password') ||
@@ -51,11 +86,10 @@ export default withAuth(
           pathname.startsWith('/privacy') ||
           pathname.startsWith('/terms') ||
           pathname.startsWith('/data-deletion') ||
-          // Meta webhook is server-to-server from Facebook — must be public
+          pathname.startsWith('/p/') ||
+          pathname.startsWith('/api/proposals/') ||
           pathname.startsWith('/api/sales/integrations/meta/webhook') ||
-          // Password reset API endpoint must be public for forgot-password flow
           pathname === '/api/sales/password' ||
-          // Invite validate / accept: public (token-authenticated)
           pathname.startsWith('/sales/invite/') ||
           /^\/api\/sales\/invites\/[^/]+(\/accept)?$/.test(pathname)
         ) return true
@@ -69,6 +103,8 @@ export default withAuth(
 export const config = {
   matcher: [
     '/sales/:path*',
-    '/((?!_next/static|_next/image|favicon.ico|login).*)',
+    '/onboarding/:path*',
+    '/platform-admin/:path*',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }
