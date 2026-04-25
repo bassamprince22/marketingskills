@@ -14,7 +14,7 @@ import { ClosedRevenueChart } from '@/components/sales/ClosedRevenueChart'
 import { CrewLeaderboard } from '@/components/sales/CrewLeaderboard'
 import { TodaysOrbit } from '@/components/sales/TodaysOrbit'
 import { SignalStream } from '@/components/sales/SignalStream'
-import { AiPipelineInsight } from '@/components/sales/AiPipelineInsight'
+import { FadaaAiAssistant } from '@/components/sales/FadaaAiAssistant'
 import type {
   ManagerStats,
   RepStats,
@@ -496,6 +496,24 @@ type WVisibleFn = (id: string) => boolean
 
 function ManagerDash({ data, revenue, wVisible }: { data: DashData; revenue: RevenueData | null; wVisible: WVisibleFn }) {
   const stats = data.stats as ManagerStats
+  const aiContext = {
+    dashboardType: 'manager',
+    stats,
+    riskSignals: {
+      unassignedLeads: data.unassignedLeads?.length ?? 0,
+      overdueFollowUps: data.overdue.length,
+      staleLeads: data.stale.length,
+      dealsAtRisk: data.atRisk.length,
+      meetingsToday: data.todayMeetings.length,
+    },
+    pipeline: data.pipeline.map(stage => ({
+      stage: stage.stage,
+      count: stage.count,
+      value: stage.value ?? 0,
+    })),
+    topReps: data.performance.slice(0, 5),
+    recentActivity: data.activities.slice(0, 8),
+  }
 
   return (
     <div className="mission-dashboard">
@@ -540,6 +558,10 @@ function ManagerDash({ data, revenue, wVisible }: { data: DashData; revenue: Rev
         />
       </div>
 
+      {wVisible('ai_assistant') && (
+        <FadaaAiAssistant mode="widget" context={aiContext} />
+      )}
+
       {wVisible('stat_cards') && <section>
         <div className="mission-section-label">Pipeline Overview</div>
         <div className="mission-stat-grid">
@@ -555,18 +577,6 @@ function ManagerDash({ data, revenue, wVisible }: { data: DashData; revenue: Rev
       </section>}
 
       {wVisible('pipeline_constellation') && <PipelineConstellationWidget pipeline={data.pipeline} />}
-
-      {wVisible('ai_pipeline') && (
-        <AiPipelineInsight
-          stats={stats}
-          pipeline={data.pipeline}
-          topReps={data.performance}
-          overdueCount={data.overdue.length}
-          staleCount={data.stale.length}
-          atRiskCount={data.atRisk.length}
-          meetingsToday={data.todayMeetings.length}
-        />
-      )}
 
       {wVisible('notifications') && <NotificationPanel />}
       {wVisible('challenges')    && <ChallengeRaceWidget />}
@@ -605,6 +615,24 @@ function ManagerDash({ data, revenue, wVisible }: { data: DashData; revenue: Rev
 
 function RepDash({ data, revenue, wVisible }: { data: DashData; revenue: RevenueData | null; wVisible: WVisibleFn }) {
   const stats = data.stats as RepStats
+  const aiContext = {
+    dashboardType: 'rep',
+    stats,
+    focusSignals: {
+      overdueFollowUps: data.overdue.length,
+      staleLeads: data.stale.length,
+      dealsAtRisk: data.atRisk.length,
+      meetingsToday: data.todayMeetings.length,
+    },
+    pipeline: data.pipeline.map(stage => ({
+      stage: stage.stage,
+      count: stage.count,
+      value: stage.value ?? 0,
+    })),
+    todayMeetings: data.todayMeetings.slice(0, 5),
+    overdueLeads: data.overdue.slice(0, 5),
+    recentActivity: data.activities.slice(0, 8),
+  }
 
   return (
     <div className="mission-dashboard">
@@ -641,6 +669,10 @@ function RepDash({ data, revenue, wVisible }: { data: DashData; revenue: Revenue
           icon={<Glyph><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2.5" /></Glyph>}
         />
       </div>
+
+      {wVisible('ai_assistant') && (
+        <FadaaAiAssistant mode="widget" context={aiContext} />
+      )}
 
       <section>
         <div className="mission-section-label">My Pipeline</div>

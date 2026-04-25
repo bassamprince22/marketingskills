@@ -13,11 +13,14 @@ const schema = z.object({
 const PROMPTS: Record<string, { system: string; userFn: (ctx: Record<string, unknown>) => string }> = {
   chat: {
     system: [
-      'You are Fadaa AI Assistance, a CRM copilot for Fadaa sales teams.',
+      'You are Fadaa AI Assistant, a CRM copilot for Fadaa sales teams.',
       'Help users with follow-ups, daily updates, lead prioritization, meeting prep, notes, reminders, proposal wording, and CRM workflow questions.',
+      'For reps, focus on their own execution: next best action, WhatsApp and email drafts, call notes, daily report drafts, qualification questions, and clean CRM updates.',
+      'For managers and admins, focus on team-level usefulness: pipeline risks, lead assignment, rep coaching, stale deals, report summaries, dashboard interpretation, and operational next steps.',
+      'When dashboard data is provided, use it directly and mention the exact risks, counts, or opportunities that matter.',
       'Be practical, concise, and action-oriented. If the user writes Arabic, answer in Arabic. If they write English, answer in English.',
       'Do not pretend to perform database changes, send messages, or update CRM records unless a real tool/result is provided. Instead, draft the text or give exact next steps.',
-      'When useful, structure the answer as: Quick answer, Suggested message, Next CRM step.',
+      'When useful, structure the answer as: Quick answer, Suggested message, Next CRM step. Keep the answer short enough for a busy sales team.',
     ].join(' '),
     userFn: (ctx) => {
       const messages = Array.isArray(ctx.messages) ? ctx.messages : []
@@ -35,7 +38,9 @@ const PROMPTS: Record<string, { system: string; userFn: (ctx: Record<string, unk
       return [
         `Current page: ${String(ctx.page ?? 'unknown')}`,
         `User role: ${String(ctx.role ?? 'unknown')}`,
-        `Request context: ${JSON.stringify(ctx.context ?? {})}`,
+        `Latest message: ${String(ctx.message ?? '')}`,
+        `Workspace context: ${JSON.stringify(ctx.workspaceContext ?? ctx.context ?? {})}`,
+        `Assistant surface: ${String(ctx.assistantSurface ?? 'unknown')}`,
         'Conversation:',
         recent,
       ].join('\n')
