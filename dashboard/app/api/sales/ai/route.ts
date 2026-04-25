@@ -47,12 +47,18 @@ export async function POST(req: NextRequest) {
   const { action, context } = parsed.data
   const prompt = PROMPTS[action]
 
+  let usage
   try {
-    await checkAndIncrementAiUsage(orgId)
+    usage = await checkAndIncrementAiUsage(orgId)
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string }
+    const e = err as { code?: string; message?: string; isTrial?: boolean }
     if (e?.code === 'AI_LIMIT') {
-      return NextResponse.json({ error: 'AI call limit reached. Upgrade your plan for more calls.' }, { status: 402 })
+      return NextResponse.json({
+        error:   e.message,
+        code:    'AI_LIMIT',
+        isTrial: e.isTrial ?? false,
+        upgrade: '/sales/billing',
+      }, { status: 402 })
     }
     return NextResponse.json({ error: 'Failed to check AI usage' }, { status: 500 })
   }
@@ -63,16 +69,24 @@ export async function POST(req: NextRequest) {
       { role: 'user',   content: prompt.userFn(context) },
     ])
 
+    const baseResponse = {
+      usage: {
+        used:      usage.used,
+        limit:     usage.limit,
+        remaining: usage.remaining,
+        isTrial:   usage.isTrial,
+      },
+    }
+
     if (action === 'score_lead') {
       try {
-        const json = JSON.parse(result)
-        return NextResponse.json({ result: json })
+        return NextResponse.json({ ...baseResponse, result: JSON.parse(result) })
       } catch {
-        return NextResponse.json({ result })
+        return NextResponse.json({ ...baseResponse, result })
       }
     }
 
-    return NextResponse.json({ result })
+    return NextResponse.json({ ...baseResponse, result })
   } catch (err) {
     console.error('AI error:', err)
     return NextResponse.json({ error: 'AI request failed' }, { status: 500 })

@@ -35,8 +35,9 @@ export default function ProposalsPage() {
   useEffect(() => {
     const q = filter ? `?status=${filter}` : ''
     fetch(`/api/sales/proposals${q}`)
-      .then(r => r.json())
-      .then(setProposals)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setProposals(Array.isArray(d) ? d : []))
+      .catch(() => setProposals([]))
       .finally(() => setLoading(false))
   }, [filter])
 

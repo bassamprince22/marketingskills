@@ -56,6 +56,7 @@ export async function GET(req: Request) {
   }
 
   const { id, role, orgId } = session.user
+  if (!orgId) return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 })
   const { searchParams } = new URL(req.url)
   const { dateFrom, dateTo } = resolveDateRange(searchParams.get('dateRange'))
 

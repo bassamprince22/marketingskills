@@ -15,10 +15,11 @@ const tiers = [
       'Up to 3 team seats',
       'Lead management (unlimited leads)',
       'CSV import & deduplication',
+      '🧠 AI assistant — 20 calls/mo ✨ NEW',
       'Basic daily reports',
       'Email support',
     ],
-    notIncluded: ['AI lead scoring', 'Proposals & contracts', 'Meta integration', 'Team challenges'],
+    notIncluded: ['Proposals & contracts', 'Meta integration', 'Team challenges'],
     cta: 'Start Free Trial',
     href: '/signup?plan=starter',
   },
@@ -31,8 +32,8 @@ const tiers = [
     features: [
       'Everything in Starter',
       'Up to 10 team seats',
-      'AI lead scoring (100 calls/mo)',
-      'AI email drafting & meeting summaries',
+      '🧠 AI assistant — 100 calls/mo ✨ NEW',
+      'AI lead scoring, email drafts, meeting summaries',
       'Proposals & contracts with public URL',
       'Meta Leads integration',
       'Team challenges & leaderboard',
@@ -53,7 +54,7 @@ const tiers = [
     features: [
       'Everything in Pro',
       'Unlimited team seats',
-      'Unlimited AI calls',
+      '🧠 Unlimited AI calls ✨ NEW',
       'White-label (your domain + logo)',
       'REST API access',
       'Custom contract templates',
@@ -99,6 +100,14 @@ const faqs = [
   {
     q: 'How does the Meta Leads integration work?',
     a: 'Connect your Meta Business account and leads from your Facebook/Instagram lead-gen forms sync automatically into your pipeline — no CSV exports needed.',
+  },
+  {
+    q: 'How does the AI assistant work?',
+    a: 'Fadaa uses OpenAI GPT-4o-mini to score leads 1–10, draft follow-up emails, summarise meeting notes, and analyse your pipeline. Every new trial account gets 10 free AI calls. Starter includes 20/mo, Pro 100/mo, Enterprise unlimited.',
+  },
+  {
+    q: 'What happens to unused AI calls?',
+    a: 'AI call counts reset at the start of each billing period. Unused calls do not roll over.',
   },
 ]
 
@@ -201,6 +210,12 @@ export default function PricingPage() {
         <p className="mt-6 text-center text-sm text-white/40">
           All plans include 14-day free trial · No credit card required · Cancel anytime
         </p>
+        {/* AI trial callout */}
+        <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-purple-500/30 bg-purple-500/10 px-6 py-4 text-center">
+          <p className="text-sm font-medium text-purple-300">
+            🧠 <span className="font-semibold">NEW:</span> Every free trial includes <span className="font-bold">10 free AI calls</span> — score leads, draft emails, and summarise meetings instantly with GPT-4o-mini.
+          </p>
+        </div>
       </section>
 
       {/* Feature comparison table */}
@@ -224,8 +239,9 @@ export default function PricingPage() {
                 ['Unlimited leads', true, true, true],
                 ['CSV import', true, true, true],
                 ['Daily reports', 'Basic', 'Advanced', 'Custom'],
-                ['AI lead scoring', false, '100/mo', 'Unlimited'],
-                ['AI email drafts', false, true, true],
+                ['🧠 AI assistant ✨', '20/mo', '100/mo', 'Unlimited'],
+                ['AI lead scoring', true, true, true],
+                ['AI email drafts', true, true, true],
                 ['Proposals & contracts', false, true, true],
                 ['Meta Leads integration', false, true, true],
                 ['Team challenges', false, true, true],

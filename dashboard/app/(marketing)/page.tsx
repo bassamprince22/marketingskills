@@ -7,7 +7,7 @@ export const metadata = {
 
 const features = [
   { icon: '📊', title: 'CRM & Pipeline',     desc: 'Drag-and-drop Kanban board to manage every deal from lead to close.' },
-  { icon: '🧠', title: 'AI Lead Scoring',    desc: 'GPT-powered instant qualification with reasoning and next-action suggestions.' },
+  { icon: '🧠', title: 'AI Lead Scoring', desc: 'GPT-4o-mini instant qualification with reasoning and next-action suggestions.', isNew: true },
   { icon: '📄', title: 'Proposals & Contracts', desc: 'Beautiful branded documents with one-click generation and e-signature.' },
   { icon: '⚡', title: 'Meta Leads Sync',    desc: 'Automatically pull leads from Meta lead-gen forms into your pipeline.' },
   { icon: '🏆', title: 'Team Challenges',    desc: 'Gamified sales contests with leaderboards and instant rewards.' },
@@ -88,8 +88,13 @@ export default function HomePage() {
           {features.map((f) => (
             <div
               key={f.title}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-purple-500/30 hover:bg-white/[0.05]"
+              className="relative rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-purple-500/30 hover:bg-white/[0.05]"
             >
+              {'isNew' in f && f.isNew && (
+                <span className="absolute right-3 top-3 rounded-full bg-gradient-to-r from-[#7C3AED] to-[#4F8EF7] px-2 py-0.5 text-xs font-bold text-white">
+                  NEW
+                </span>
+              )}
               <div className="text-3xl">{f.icon}</div>
               <h3 className="mt-4 text-lg font-semibold">{f.title}</h3>
               <p className="mt-2 text-sm text-white/60">{f.desc}</p>

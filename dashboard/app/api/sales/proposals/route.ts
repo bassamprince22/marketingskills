@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { orgId } = session.user as { orgId: string }
+  if (!orgId) return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const status     = searchParams.get('status')
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id: userId, orgId } = session.user as { id: string; orgId: string }
+  if (!orgId) return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 })
 
   const parsed = createSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })

@@ -690,7 +690,10 @@ function DashboardContent() {
     setError('')
     fetch(`/api/sales/stats?dateRange=${encodeURIComponent(dateRange)}`)
       .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
-      .then(setData)
+      .then(d => {
+        if (d && d.type && Array.isArray(d.pipeline)) setData(d)
+        else throw new Error('bad shape')
+      })
       .catch(() => setError('Failed to load dashboard'))
     fetch(`/api/sales/revenue?dateRange=${encodeURIComponent(dateRange)}`)
       .then(r => r.ok ? r.json() : null)

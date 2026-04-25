@@ -21,8 +21,12 @@ function toSlug(name: string) {
     .slice(0, 60)
 }
 
+// During 14-day trial every new org gets 10 free AI calls regardless of chosen plan.
+// After trial ends / on upgrade, limits scale to the paid plan values.
+const TRIAL_AI_LIMIT = 10
+
 const AI_LIMITS: Record<string, number> = {
-  starter:    0,
+  starter:    20,
   pro:        100,
   enterprise: 9999,
 }
@@ -78,8 +82,8 @@ export async function POST(req: NextRequest) {
       slug,
       plan:          'trial',
       trial_ends_at: trialEndsAt.toISOString(),
-      seats_limit:   SEAT_LIMITS[plan] ?? 5,
-      ai_calls_limit: AI_LIMITS[plan] ?? 0,
+      seats_limit:    SEAT_LIMITS[plan] ?? 5,
+      ai_calls_limit: TRIAL_AI_LIMIT,   // 10 free AI calls during trial
       status:        'active',
     })
     .select()

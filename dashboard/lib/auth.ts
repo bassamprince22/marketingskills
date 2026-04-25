@@ -128,6 +128,24 @@ export const authOptions: NextAuthOptions = {
         token.orgId   = user.orgId
         token.orgName = user.orgName
       }
+      // Backfill orgId for sessions that predate multi-tenancy
+      if (!token.orgId && token.id) {
+        try {
+          const db = getServiceClient()
+          const { data: u } = await db.from('sales_users').select('org_id').eq('id', token.id).single()
+          if (u?.org_id) {
+            token.orgId = u.org_id
+            const { data: org } = await db.from('orgs').select('name').eq('id', u.org_id).single()
+            token.orgName = org?.name ?? 'Fadaa'
+          } else {
+            token.orgId   = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+            token.orgName = 'Fadaa'
+          }
+        } catch {
+          token.orgId   = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+          token.orgName = 'Fadaa'
+        }
+      }
       return token
     },
     async session({ session, token }) {
