@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
@@ -72,6 +73,7 @@ export function FadaaAiAssistant({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [usage, setUsage] = useState<Usage | null>(null)
+  const [mounted, setMounted] = useState(false)
   const [messages, setMessages] = useState<AiMessage[]>([
     {
       role: 'assistant',
@@ -91,6 +93,10 @@ export function FadaaAiAssistant({
     }
     return 'Built for rep execution: follow-up scripts, daily report drafts, lead qualification, meeting prep, and next actions.'
   }, [isManagerView])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!visible) return
@@ -174,7 +180,12 @@ export function FadaaAiAssistant({
 
   function renderPanel(surface: AssistantMode) {
     return (
-      <div className={`mission-ai-${surface === 'widget' ? 'widget' : 'panel'}`} aria-label="Fadaa AI Assistant">
+      <aside
+        className={`mission-ai-${surface === 'widget' ? 'widget' : 'panel'}`}
+        aria-label="Fadaa AI Assistant"
+        role={surface === 'launcher' ? 'dialog' : undefined}
+        aria-modal={surface === 'launcher' ? true : undefined}
+      >
         <div className="mission-ai-header">
           <div className="mission-ai-title-row">
             <span className="mission-ai-logo"><SparkIcon /></span>
@@ -250,7 +261,7 @@ export function FadaaAiAssistant({
             {loading ? 'Sending...' : 'Send'}
           </button>
         </form>
-      </div>
+      </aside>
     )
   }
 
@@ -269,12 +280,15 @@ export function FadaaAiAssistant({
         <span>Fadaa AI</span>
       </button>
 
-      {open && (
-        <>
-          <button className="mission-ai-scrim" onClick={() => setOpen(false)} aria-label="Close Fadaa AI Assistant" />
-          {renderPanel('launcher')}
-        </>
-      )}
+      {mounted && open
+        ? createPortal(
+          <>
+            <button className="mission-ai-scrim" onClick={() => setOpen(false)} aria-label="Close Fadaa AI Assistant" />
+            {renderPanel('launcher')}
+          </>,
+          document.body
+        )
+        : null}
     </>
   )
 }

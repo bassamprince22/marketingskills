@@ -1838,7 +1838,7 @@ select {
 .mission-ai-scrim {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 110;
   border: none;
   background: rgba(4, 7, 15, 0.62);
   backdrop-filter: blur(6px);
@@ -1849,8 +1849,10 @@ select {
   top: 16px;
   right: 16px;
   bottom: 16px;
-  z-index: 71;
+  z-index: 111;
   width: min(460px, calc(100vw - 32px));
+  height: calc(100dvh - 32px);
+  max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(155, 107, 255, 0.24);
@@ -1983,6 +1985,7 @@ select {
 
 .mission-ai-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 18px;
   display: flex;
@@ -2078,6 +2081,7 @@ select {
 }
 
 .mission-ai-form {
+  margin-top: auto;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
