@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { SalesShell } from '@/components/sales/SalesShell'
 
 type Proposal = {
   id: string
@@ -97,7 +98,8 @@ export default function ProposalsPage() {
   )
 
   return (
-    <div className="p-6">
+    <SalesShell>
+    <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Proposals</h1>
@@ -198,5 +200,6 @@ export default function ProposalsPage() {
         </table>
       </div>
     </div>
+    </SalesShell>
   )
 }

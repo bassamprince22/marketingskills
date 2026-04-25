@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import { SalesShell } from '@/components/sales/SalesShell'
 
 type LineItem = { id?: string; sort_order: number; description: string; qty: number; unit: string; rate: number }
 type Adjustment = { id?: string; adj_type: 'tax' | 'discount' | 'adjustment'; label: string; value_type: 'percent' | 'fixed'; value: number }
@@ -163,11 +164,28 @@ export default function ProposalEditorPage() {
     'expiry_date','prepared_by_name','pricing_table','pricing_total','todays_date',
   ]
 
+  if (loading) {
+    return (
+      <SalesShell>
+        <div className="flex h-64 items-center justify-center text-white/40">Loading proposal...</div>
+      </SalesShell>
+    )
+  }
+
+  if (!proposal) {
+    return (
+      <SalesShell>
+        <div className="p-8 text-white/40">Proposal not found.</div>
+      </SalesShell>
+    )
+  }
+
   if (loading) return <div className="flex h-64 items-center justify-center text-white/40">Loading proposal…</div>
   if (!proposal) return <div className="p-8 text-white/40">Proposal not found.</div>
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0A0E1A]">
+    <SalesShell>
+      <div className="flex min-h-screen flex-col bg-[#0A0E1A]">
       {/* Topbar */}
       <div className="flex items-center justify-between border-b border-white/10 bg-[#0A0E1A]/90 px-6 py-3 backdrop-blur">
         <div className="flex items-center gap-3 text-sm text-white/50">
@@ -458,6 +476,7 @@ export default function ProposalEditorPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </SalesShell>
   )
 }

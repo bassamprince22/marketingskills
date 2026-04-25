@@ -40,15 +40,26 @@ function missingProposalTablesPayload(error: unknown) {
     dbError.hint,
   ].filter(Boolean).join(' ').toLowerCase()
 
-  const missing =
+  const missingTable =
     dbError.code === '42P01' ||
     dbError.code === 'PGRST205' ||
     text.includes('relation "proposals" does not exist') ||
     text.includes("relation 'proposals' does not exist") ||
-    text.includes('could not find the table') ||
-    (text.includes('schema cache') && text.includes('proposals'))
+    text.includes('could not find the table')
 
-  if (!missing) return null
+  if (!missingTable) return null
+
+  const schemaCache =
+    dbError.code === 'PGRST205' ||
+    text.includes('schema cache')
+
+  if (schemaCache) {
+    return {
+      error: 'Supabase schema cache has not reloaded the proposals tables yet.',
+      details: "Run this in Supabase SQL Editor: NOTIFY pgrst, 'reload schema'; Then wait 10 seconds and refresh Proposals.",
+      migration: "NOTIFY pgrst, 'reload schema';",
+    }
+  }
 
   return {
     error: 'Proposals database tables are not installed yet.',
@@ -92,7 +103,7 @@ export async function GET(req: NextRequest) {
   const db = getServiceClient()
   let q = db
     .from('proposals')
-    .select('id, proposal_number, title, subtitle, status, proposal_date, valid_until, lead_id, is_template, created_at, updated_at, sales_leads(company_name, contact_person)')
+    .select('id, proposal_number, title, subtitle, status, proposal_date, valid_until, lead_id, is_template, created_at, updated_at')
     .eq('org_id', orgId)
     .eq('is_template', isTemplate)
     .order('created_at', { ascending: false })
