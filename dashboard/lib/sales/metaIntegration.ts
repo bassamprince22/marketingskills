@@ -846,6 +846,14 @@ async function fetchPageOrganicLeadsDirect(
 function getCandidateMetaTokens(...tokens: Array<string | null | undefined>) {
   const seen = new Set<string>()
   const unique: string[] = []
+  // System User token (META_SYSTEM_TOKEN env var) is tried first. It represents
+  // a non-human service account so it never triggers personal account security
+  // lockouts even under high API call volume.
+  const systemToken = process.env.META_SYSTEM_TOKEN?.trim()
+  if (systemToken) {
+    seen.add(systemToken)
+    unique.push(systemToken)
+  }
   for (const rawToken of tokens) {
     const token = rawToken?.trim()
     if (!token || seen.has(token)) continue

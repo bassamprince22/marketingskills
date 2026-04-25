@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import type { Notification } from '@/app/api/sales/notifications/route'
+import AiChatDrawer from '@/components/sales/AiChatDrawer'
 
 type ThemeMode = 'dark' | 'light'
 type DensityMode = 'compact' | 'comfortable'
@@ -58,6 +59,7 @@ export function SalesTopbar({
 
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -159,6 +161,42 @@ export function SalesTopbar({
             </button>
           </div>
         )}
+
+        {/* AI Copilot button */}
+        <button
+          onClick={() => setAiOpen(true)}
+          aria-label="Open AI Sales Copilot"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: '5px 12px 5px 6px',
+            borderRadius: 20,
+            background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(79,142,247,0.15))',
+            border: '1px solid rgba(124,58,237,0.35)',
+            cursor: 'pointer', transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => {
+            const el = e.currentTarget as HTMLButtonElement
+            el.style.background = 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(79,142,247,0.25))'
+            el.style.borderColor = 'rgba(124,58,237,0.6)'
+          }}
+          onMouseLeave={e => {
+            const el = e.currentTarget as HTMLButtonElement
+            el.style.background = 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(79,142,247,0.15))'
+            el.style.borderColor = 'rgba(124,58,237,0.35)'
+          }}
+        >
+          <div style={{
+            width: 26, height: 26, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #7C3AED, #4F8EF7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700, color: '#fff',
+          }}>
+            AI
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap' }}>
+            Fadaa AI
+          </span>
+        </button>
 
         <div className="mission-notifications-wrap">
           <button
@@ -285,6 +323,8 @@ export function SalesTopbar({
           )}
         </div>
       )}
+
+      <AiChatDrawer open={aiOpen} onClose={() => setAiOpen(false)} />
     </header>
   )
 }

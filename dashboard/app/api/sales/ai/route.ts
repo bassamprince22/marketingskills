@@ -6,7 +6,7 @@ import { checkRateLimit, AI_LIMIT } from '@/lib/rateLimit'
 import { z } from 'zod'
 
 const schema = z.object({
-  action:  z.enum(['score_lead', 'draft_followup', 'summarize_meeting', 'suggest_contract_terms', 'analyze_pipeline']),
+  action:  z.enum(['score_lead', 'draft_followup', 'summarize_meeting', 'suggest_contract_terms', 'analyze_pipeline', 'chat']),
   context: z.record(z.string(), z.unknown()),
 })
 
@@ -31,9 +31,20 @@ const PROMPTS: Record<string, { system: string; userFn: (ctx: Record<string, unk
     system: 'You are a sales manager advisor. Analyze this pipeline data and identify: top risks, best opportunities, and recommended actions for this week. Respond in plain text with clear headers.',
     userFn: (ctx) => JSON.stringify(ctx),
   },
+  chat: {
+    system: 'You are Fadaa Sales Copilot, an AI assistant built into a CRM for marketing agencies. Help with sales follow-ups, pipeline analysis, lead qualification, meeting prep, proposal wording, and CRM best practices. Be concise and actionable. Always respond in the same language the user writes in.',
+    userFn: (ctx) => String(ctx.message ?? ''),
+  },
 }
 
 export async function POST(req: NextRequest) {
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: 'OPENAI_API_KEY is not configured in Vercel environment variables.' },
+      { status: 503 }
+    )
+  }
+
   const limited = checkRateLimit(req, AI_LIMIT)
   if (limited) return limited
 
@@ -89,6 +100,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ...baseResponse, result })
   } catch (err) {
     console.error('AI error:', err)
-    return NextResponse.json({ error: 'AI request failed' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'AI request failed'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
