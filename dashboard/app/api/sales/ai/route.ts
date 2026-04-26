@@ -32,8 +32,14 @@ const PROMPTS: Record<string, { system: string; userFn: (ctx: Record<string, unk
     userFn: (ctx) => JSON.stringify(ctx),
   },
   chat: {
-    system: 'You are Fadaa Sales Copilot, an AI assistant built into a CRM for marketing agencies. Help with sales follow-ups, pipeline analysis, lead qualification, meeting prep, proposal wording, and CRM best practices. Be concise and actionable. Always respond in the same language the user writes in.',
-    userFn: (ctx) => String(ctx.message ?? ''),
+    system: 'You are Fadaa Sales Copilot, an AI assistant built into a CRM for marketing agencies.',
+    userFn: (ctx) => {
+      const role = String(ctx.userRole ?? 'rep')
+      const roleContext = role === 'admin' || role === 'manager'
+        ? 'The user is a sales manager or admin. Focus on team performance, pipeline health, revenue forecasting, risk identification, and strategic guidance.'
+        : 'The user is a sales rep. Focus on individual lead follow-ups, meeting preparation, objection handling, proposal writing, and daily prioritization.'
+      return `[Context: ${roleContext} Always respond in the same language the user writes in. Be concise and actionable.]\n\n${String(ctx.message ?? '')}`
+    },
   },
 }
 

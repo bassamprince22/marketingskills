@@ -324,7 +324,7 @@ export function SalesTopbar({
         </div>
       )}
 
-      <AiChatDrawer open={aiOpen} onClose={() => setAiOpen(false)} />
+      <AiChatDrawer open={aiOpen} onClose={() => setAiOpen(false)} userRole={role} />
     </header>
   )
 }

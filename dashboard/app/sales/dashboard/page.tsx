@@ -14,6 +14,7 @@ import { ClosedRevenueChart } from '@/components/sales/ClosedRevenueChart'
 import { CrewLeaderboard } from '@/components/sales/CrewLeaderboard'
 import { TodaysOrbit } from '@/components/sales/TodaysOrbit'
 import { SignalStream } from '@/components/sales/SignalStream'
+import DashboardAiWidget from '@/components/sales/DashboardAiWidget'
 import type {
   ManagerStats,
   RepStats,
@@ -493,12 +494,14 @@ function DashboardSkeleton() {
 
 type WVisibleFn = (id: string) => boolean
 
-function ManagerDash({ data, revenue, wVisible }: { data: DashData; revenue: RevenueData | null; wVisible: WVisibleFn }) {
+function ManagerDash({ data, revenue, wVisible, role }: { data: DashData; revenue: RevenueData | null; wVisible: WVisibleFn; role: string }) {
   const stats = data.stats as ManagerStats
 
   return (
     <div className="mission-dashboard">
       <DashboardHero title="Mission Control" subtitle="A cosmic view of your sales pipeline" />
+
+      <DashboardAiWidget role={role === 'admin' ? 'admin' : 'manager'} />
 
       <div className="mission-alert-grid">
         <MissionAlertPill
@@ -596,6 +599,8 @@ function RepDash({ data, revenue, wVisible }: { data: DashData; revenue: Revenue
   return (
     <div className="mission-dashboard">
       <DashboardHero title="Mission Control" subtitle="A cosmic view of your sales pipeline" />
+
+      <DashboardAiWidget role="rep" />
 
       <div className="mission-alert-grid">
         <MissionAlertPill
@@ -742,7 +747,7 @@ function DashboardContent() {
         </div>
       )}
 
-      {!data ? <DashboardSkeleton /> : role === 'manager' || role === 'admin' ? <ManagerDash data={data} revenue={revenue} wVisible={wVisible} /> : <RepDash data={data} revenue={revenue} wVisible={wVisible} />}
+      {!data ? <DashboardSkeleton /> : role === 'manager' || role === 'admin' ? <ManagerDash data={data} revenue={revenue} wVisible={wVisible} role={role} /> : <RepDash data={data} revenue={revenue} wVisible={wVisible} />}
     </SalesShell>
   )
 }
