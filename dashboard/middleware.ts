@@ -89,6 +89,7 @@ export default withAuth(
           pathname.startsWith('/p/') ||
           pathname.startsWith('/api/proposals/') ||
           pathname.startsWith('/api/sales/integrations/meta/webhook') ||
+          pathname === '/api/healthcheck' ||
           pathname === '/api/sales/password' ||
           pathname.startsWith('/sales/invite/') ||
           /^\/api\/sales\/invites\/[^/]+(\/accept)?$/.test(pathname)
