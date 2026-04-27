@@ -160,6 +160,7 @@ export function TemplateEditor({ onSaved }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields: { company_name: 'Acme Corp', contact_person: 'John Smith', email: 'john@acme.com', estimated_value: '$5,000', sales_rep: 'Sales Rep', contract_date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) } }),
     })
+    if (!res.ok) return
     const d = await res.json()
     setPreviewHtml(buildQuickPreview(content, d.fields ?? {}, d.html))
   }

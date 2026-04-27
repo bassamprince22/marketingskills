@@ -35,7 +35,7 @@ export function CommissionsTable({ role }: { role: string }) {
   function load() {
     const sp = filterStatus ? `?status=${filterStatus}` : ''
     fetch(`/api/sales/commissions${sp}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => {
         setCommissions(d.commissions ?? [])
         setTotals(d.totals ?? { total: 0, pending: 0, paid: 0 })

@@ -4,6 +4,9 @@ import { getServiceClient } from '@/lib/supabase'
 let _client: OpenAI | null = null
 
 function getClient(): OpenAI {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not configured in Vercel environment variables.')
+  }
   if (!_client) {
     _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   }
@@ -26,7 +29,7 @@ export async function checkAndIncrementAiUsage(orgId: string): Promise<AiUsage> 
     .eq('id', orgId)
     .single()
 
-  if (!org) throw new Error('Org not found')
+  if (!org) throw new Error('AI usage is not configured for this workspace. Make sure the orgs table exists and your user has an org_id.')
 
   const isTrial   = org.plan === 'trial'
   const remaining = org.ai_calls_limit - org.ai_calls_used

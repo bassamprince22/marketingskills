@@ -263,8 +263,8 @@ export default function AdminUsersPage() {
   function load() {
     setLoading(true)
     Promise.all([
-      fetch('/api/sales/users').then(r => r.json()),
-      fetch('/api/sales/invites').then(r => r.json()),
+      fetch('/api/sales/users').then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch('/api/sales/invites').then(r => r.ok ? r.json() : Promise.resolve({})),
     ]).then(([u, i]) => {
       setUsers(u.users ?? [])
       setInvites(i.invites ?? [])

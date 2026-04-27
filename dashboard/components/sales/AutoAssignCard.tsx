@@ -49,7 +49,7 @@ export function AutoAssignCard() {
   function load() {
     setLoadErr(false)
     fetch('/api/sales/settings')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => {
         setData(d?.settings?.auto_assign ? d : DEFAULT_SETTINGS)
       })

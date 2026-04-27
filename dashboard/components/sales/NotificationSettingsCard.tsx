@@ -181,7 +181,7 @@ function SystemSettingsSection() {
 
   useEffect(() => {
     fetch('/api/sales/settings')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => {
         if (d.settings?.notifications?.system) setSys(d.settings.notifications.system)
         setLoading(false)

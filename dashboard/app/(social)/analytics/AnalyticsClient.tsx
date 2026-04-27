@@ -15,7 +15,7 @@ export function AnalyticsClient() {
   useEffect(() => {
     if (!workspaceId) return
     fetch(`/api/analytics?workspace_id=${workspaceId}`)
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : Promise.resolve({}))
       .then((d) => setSnapshots(d.snapshots ?? []))
       .finally(() => setLoading(false))
   }, [workspaceId])

@@ -30,7 +30,7 @@ export function NotificationPanel() {
     const d = getDismissed()
     setDismissed(d)
     fetch('/api/sales/notifications')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(data => { setNotifications(data.notifications ?? []); setLoaded(true) })
       .catch(() => setLoaded(true))
   }, [])

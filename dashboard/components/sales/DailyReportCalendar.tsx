@@ -36,7 +36,7 @@ export function DailyReportCalendar({ onDaySelect }: { onDaySelect?: (date: stri
     const to   = `${year}-${pad(month + 1)}-${pad(lastDay)}`
 
     fetch(`/api/sales/daily-reports?from=${from}&to=${to}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => {
         setReports(d.reports ?? [])
         setReps(d.reps ?? [])

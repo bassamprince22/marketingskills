@@ -22,7 +22,7 @@ export default function MarketingPage() {
     if (from) sp.set('from', from)
     if (to)   sp.set('to', to)
     fetch(`/api/sales/marketing?${sp}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => { setApiData(d); setLoading(false) })
       .catch(() => setLoading(false))
   }

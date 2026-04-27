@@ -41,7 +41,7 @@ export function WorkspacesClient() {
   const fetchWorkspaces = () => {
     setLoading(true)
     fetch('/api/workspaces', { cache: 'no-store' })
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : Promise.resolve({}))
       .then((d) => setWorkspaces(d.workspaces ?? []))
       .finally(() => setLoading(false))
   }

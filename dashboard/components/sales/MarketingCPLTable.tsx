@@ -64,7 +64,7 @@ export function MarketingCPLTable({ from, to }: { from?: string; to?: string }) 
     if (from) sp.set('from', from)
     if (to)   sp.set('to', to)
     fetch(`/api/sales/marketing?${sp}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => { setKpis(d.kpis ?? []); setCosts(d.costs ?? []); setLoading(false) })
       .catch(() => setLoading(false))
   }

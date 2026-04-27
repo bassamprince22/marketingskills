@@ -32,7 +32,7 @@ export function ContractEditor({ lead, onClose, onSaved }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ leadId: lead.id }),
     })
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({ error: `HTTP ${r.status}` }))
       .then(d => {
         if (d.error) {
           if (d.error.includes('No contract template')) { setView('no-template'); return }
@@ -54,7 +54,7 @@ export function ContractEditor({ lead, onClose, onSaved }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ fields: updatedFields }),
       })
-        .then(r => r.json())
+        .then(r => r.ok ? r.json() : Promise.resolve({}))
         .then(d => { if (d.html) setHtml(d.html) })
         .catch(() => {})
     }, 500)
@@ -84,8 +84,9 @@ export function ContractEditor({ lead, onClose, onSaved }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ leadId: lead.id, fields, filename: lead.company_name }),
       })
+      if (!res.ok) { alert('Failed to save contract'); return }
       const d = await res.json()
-      if (!res.ok || !d.ok) { alert(d.error ?? 'Failed to save contract'); return }
+      if (!d.ok) { alert(d.error ?? 'Failed to save contract'); return }
       setSaved(true)
       onSaved?.()
       setTimeout(() => setSaved(false), 3000)

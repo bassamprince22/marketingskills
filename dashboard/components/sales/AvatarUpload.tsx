@@ -26,11 +26,13 @@ export function AvatarUpload({ currentUrl, onUploaded }: { currentUrl?: string |
     const form = new FormData()
     form.append('file', file)
     const res  = await fetch('/api/sales/profile/avatar', { method: 'POST', body: form })
-    const d    = await res.json()
     setLoading(false)
-
-    if (!res.ok) { flash(d.error ?? 'Upload failed', 'err'); return }
-
+    if (!res.ok) {
+      let errMsg = 'Upload failed'
+      try { const d = await res.json(); if (d.error) errMsg = d.error } catch {}
+      flash(errMsg, 'err'); return
+    }
+    const d = await res.json()
     flash('Photo updated!', 'ok')
     onUploaded?.(d.avatar_url)
     // Update NextAuth session

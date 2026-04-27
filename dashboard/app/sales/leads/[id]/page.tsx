@@ -8,6 +8,7 @@ import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
 import { ActivityFeed } from '@/components/sales/ActivityFeed'
 import { ContractEditor } from '@/components/sales/ContractEditor'
+import AiPanel from '@/components/sales/AiPanel'
 import type { Lead, Meeting, Document as Doc, Activity, PipelineStageConfig } from '@/lib/sales/types'
 import { DEFAULT_PIPELINE_STAGE_CONFIGS, STAGE_LABELS, SERVICE_LABELS, SOURCE_LABELS, PRIORITY_LABELS } from '@/lib/sales/types'
 import { getSuggestedDocTypesForStage, normalizePipelineStages } from '@/lib/sales/pipeline'
@@ -56,10 +57,10 @@ export default function LeadDetailPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/sales/leads/${id}`).then(r => r.json()),
-      fetch(`/api/sales/meetings?leadId=${id}`).then(r => r.json()),
-      fetch(`/api/sales/documents?leadId=${id}`).then(r => r.json()),
-      fetch(`/api/sales/activities?leadId=${id}`).then(r => r.json()),
+      fetch(`/api/sales/leads/${id}`).then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch(`/api/sales/meetings?leadId=${id}`).then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch(`/api/sales/documents?leadId=${id}`).then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch(`/api/sales/activities?leadId=${id}`).then(r => r.ok ? r.json() : Promise.resolve({})),
     ]).then(([l, m, d, a]) => {
       setLead(l.lead)
       setStage(l.lead?.pipeline_stage ?? '')
@@ -72,7 +73,7 @@ export default function LeadDetailPage() {
 
   useEffect(() => {
     fetch('/api/sales/settings')
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => setStageConfigs(normalizePipelineStages(payload.settings?.pipeline?.stages)))
       .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
   }, [])
@@ -130,6 +131,32 @@ export default function LeadDetailPage() {
     { key: 'activity',   label: 'Activity' },
   ] as const
 
+  const aiLeadData = {
+    company_name: lead.company_name,
+    contact_person: lead.contact_person,
+    phone: lead.phone,
+    email: lead.email,
+    service_type: SERVICE_LABELS[lead.service_type],
+    lead_source: SOURCE_LABELS[lead.lead_source],
+    budget_range: lead.budget_range,
+    pipeline_stage: lead.pipeline_stage,
+    priority: PRIORITY_LABELS[lead.priority],
+    deal_type: lead.deal_type,
+    estimated_value: lead.estimated_value,
+    assigned_to: lead.assigned_rep?.name ?? null,
+    next_follow_up_date: lead.next_follow_up_date,
+    expected_close_date: lead.expected_close_date,
+    notes: lead.notes,
+    is_qualified: lead.is_qualified,
+    meta_origin: lead.meta_origin,
+    meta_campaign_name: lead.meta_campaign_name ?? lead.meta_raw_payload?.campaign_name,
+    meta_form_name: lead.meta_raw_payload?.form_name,
+    meta_ad_name: lead.meta_raw_payload?.ad_name,
+    meta_stage: lead.meta_stage_label ?? lead.meta_raw_payload?.stage_label,
+    meta_assignee: lead.meta_assignee_name ?? lead.meta_raw_payload?.assignee_name,
+    meta_answers: lead.meta_raw_payload?.fields,
+  }
+
   return (
     <SalesShell>
       {/* Back link */}
@@ -179,7 +206,7 @@ export default function LeadDetailPage() {
         </select>
         {updatingStage && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--brand-primary)', fontSize: 12 }}>
-            <span className="spinner spinner-sm" />Updating…
+            <span className="spinner spinner-sm" />Updating...
           </span>
         )}
       </div>
@@ -200,6 +227,10 @@ export default function LeadDetailPage() {
       {/* Overview tab */}
       {tab === 'overview' && (
         <div className="grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <AiPanel leadId={lead.id} leadData={aiLeadData} />
+          </div>
+
           <div className="fadaa-card">
             <div className="card-header">
               <h3 className="t-label" style={{ color: 'var(--brand-primary)' }}>Contact</h3>
@@ -349,7 +380,7 @@ export default function LeadDetailPage() {
                   </div>
                   {m.notes     && <p className="t-body" style={{ marginTop: 8 }}>📝 {m.notes}</p>}
                   {m.outcome   && <p style={{ color: '#4ADE80', fontSize: 13, marginTop: 6 }}>✓ {m.outcome}</p>}
-                  {m.next_action && <p style={{ color: '#F59E0B', fontSize: 13, marginTop: 6 }}>→ Next: {m.next_action}</p>}
+                  {m.next_action && <p style={{ color: '#F59E0B', fontSize: 13, marginTop: 6 }}>Next: {m.next_action}</p>}
                 </div>
               ))}
             </div>

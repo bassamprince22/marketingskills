@@ -128,12 +128,12 @@ export function ChallengeRaceWidget({ onManageClick }: Props) {
   const load = useCallback(async () => {
     try {
       const res  = await fetch('/api/sales/challenges')
-      const data = await res.json()
+      const data = res.ok ? await res.json() : {}
       const active = (data.challenges ?? []).find((c: Challenge) => c.is_active)
       if (!active) { setLoading(false); return }
       setChallenge(active)
       const lbRes  = await fetch(`/api/sales/challenges/${active.id}/leaderboard`)
-      const lbData = await lbRes.json()
+      const lbData = lbRes.ok ? await lbRes.json() : {}
       setLeaderboard(lbData.leaderboard ?? [])
       setRewards(lbData.rewards ?? [])
       setLoading(false)

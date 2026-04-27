@@ -150,7 +150,7 @@ function PermissionsModal({ userId, userName, onClose }: { userId: string; userN
 
   useEffect(() => {
     fetch(`/api/sales/permissions?userId=${userId}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => { setPerms(d.permissions ?? []); setReady(true) })
   }, [userId])
 
@@ -293,7 +293,7 @@ function RolePermissionsTab() {
   useEffect(() => {
     setLoadingPerms(true)
     fetch(`/api/sales/role-permissions?role=${selectedRole}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => { setPerms(d.permissions ?? []); setLoadingPerms(false) })
   }, [selectedRole])
 
@@ -375,7 +375,7 @@ function RolePermissionsTab() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ role: selectedRole, permissions: perms }),
-            }).then(r => r.json()).then(d => {
+            }).then(r => r.ok ? r.json() : Promise.resolve({})).then(d => {
               setApplied(`Applied to ${d.applied ?? 0} ${selectedRole}(s)`)
               setTimeout(() => setApplied(''), 3000)
             })
@@ -411,7 +411,7 @@ export default function TeamPage() {
   function load() {
     setLoading(true)
     fetch('/api/sales/team')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => { setUsers(d.users ?? []); setLoading(false) })
   }
   useEffect(() => { load() }, [])

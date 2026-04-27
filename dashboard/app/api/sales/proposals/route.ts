@@ -18,11 +18,87 @@ const createSchema = z.object({
   is_template:   z.boolean().default(false),
 })
 
+type DbErrorLike = {
+  code?: string
+  message?: string
+  details?: string
+  hint?: string
+}
+
+function normalizeDbError(error: unknown): DbErrorLike {
+  if (error && typeof error === 'object') return error as DbErrorLike
+  if (error instanceof Error) return { message: error.message }
+  return { message: String(error ?? 'Unknown database error') }
+}
+
+function getSupabaseProjectRef() {
+  try {
+    const host = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname
+    return host.endsWith('.supabase.co') ? host.replace('.supabase.co', '') : host
+  } catch {
+    return 'unknown'
+  }
+}
+
+function missingProposalTablesPayload(error: unknown) {
+  const dbError = normalizeDbError(error)
+  const projectRef = getSupabaseProjectRef()
+  const text = [
+    dbError.code,
+    dbError.message,
+    dbError.details,
+    dbError.hint,
+  ].filter(Boolean).join(' ').toLowerCase()
+
+  const missingTable =
+    dbError.code === '42P01' ||
+    dbError.code === 'PGRST205' ||
+    text.includes('relation "proposals" does not exist') ||
+    text.includes("relation 'proposals' does not exist") ||
+    text.includes('could not find the table')
+
+  if (!missingTable) return null
+
+  const schemaCache =
+    dbError.code === 'PGRST205' ||
+    text.includes('schema cache')
+
+  if (schemaCache) {
+    return {
+      error: 'Supabase schema cache has not reloaded the proposals tables yet.',
+      details: `Production is connected to Supabase project "${projectRef}". If you already ran SELECT pg_notify('pgrst', 'reload schema') and this still appears, the SQL was likely run in a different Supabase project or the proposals table is not in the public schema.`,
+      migration: "NOTIFY pgrst, 'reload schema';",
+      projectRef,
+      originalError: dbError.message,
+    }
+  }
+
+  return {
+    error: 'Proposals database tables are not installed yet.',
+    details: `Production is connected to Supabase project "${projectRef}". Run dashboard/supabase/009_proposals_safe_install.sql in that exact project. If Supabase says orgs does not exist, run dashboard/supabase/006_multi_tenancy.sql first.`,
+    migration: 'dashboard/supabase/009_proposals_safe_install.sql',
+    projectRef,
+    originalError: dbError.message,
+  }
+}
+
+function proposalDbErrorResponse(error: unknown, fallback: string) {
+  const installPayload = missingProposalTablesPayload(error)
+  if (installPayload) return NextResponse.json(installPayload, { status: 503 })
+
+  const dbError = normalizeDbError(error)
+  return NextResponse.json({
+    error: dbError.message ?? fallback,
+    details: dbError.details ?? dbError.hint,
+  }, { status: 500 })
+}
+
 async function nextProposalNumber(db: ReturnType<typeof getServiceClient>, orgId: string): Promise<string> {
-  const { count } = await db
+  const { count, error } = await db
     .from('proposals')
     .select('id', { count: 'exact', head: true })
     .eq('org_id', orgId)
+  if (error) throw error
   const n = (count ?? 0) + 1
   return `PROP-${String(n).padStart(5, '0')}`
 }
@@ -31,7 +107,7 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { orgId } = session.user as { orgId: string }
-  if (!orgId) return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 })
+  if (!orgId) return NextResponse.json({ error: 'Session expired - please sign in again' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const status     = searchParams.get('status')
@@ -41,7 +117,7 @@ export async function GET(req: NextRequest) {
   const db = getServiceClient()
   let q = db
     .from('proposals')
-    .select('id, proposal_number, title, subtitle, status, proposal_date, valid_until, lead_id, is_template, created_at, updated_at, sales_leads(company_name, contact_person)')
+    .select('id, proposal_number, title, subtitle, status, proposal_date, valid_until, lead_id, is_template, created_at, updated_at')
     .eq('org_id', orgId)
     .eq('is_template', isTemplate)
     .order('created_at', { ascending: false })
@@ -50,7 +126,7 @@ export async function GET(req: NextRequest) {
   if (status) q = q.eq('status', status)
 
   const { data, error } = await q
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return proposalDbErrorResponse(error, 'Failed to load proposals')
   return NextResponse.json(data)
 }
 
@@ -61,13 +137,18 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id: userId, orgId } = session.user as { id: string; orgId: string }
-  if (!orgId) return NextResponse.json({ error: 'Session expired — please sign in again' }, { status: 401 })
+  if (!orgId) return NextResponse.json({ error: 'Session expired - please sign in again' }, { status: 401 })
 
   const parsed = createSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
   const db = getServiceClient()
-  const proposalNumber = await nextProposalNumber(db, orgId)
+  let proposalNumber: string
+  try {
+    proposalNumber = await nextProposalNumber(db, orgId)
+  } catch (error) {
+    return proposalDbErrorResponse(error, 'Failed to prepare proposal number')
+  }
 
   const { data, error } = await db
     .from('proposals')
@@ -80,6 +161,6 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return proposalDbErrorResponse(error, 'Failed to create proposal')
   return NextResponse.json(data, { status: 201 })
 }

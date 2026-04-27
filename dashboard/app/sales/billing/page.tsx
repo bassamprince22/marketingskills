@@ -66,7 +66,7 @@ function BillingContent() {
 
   useEffect(() => {
     fetch('/api/sales/billing')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(setOrg)
       .catch(() => {})
       .finally(() => setLoading(false))

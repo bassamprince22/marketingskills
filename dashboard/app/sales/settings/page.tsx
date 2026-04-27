@@ -36,7 +36,7 @@ function ContractTemplateCard() {
 
   function load() {
     fetch('/api/sales/contracts/template')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => { setHas(d.hasTemplate); setPh(d.placeholders ?? []); setStatus('ready') })
       .catch(() => setStatus('ready'))
   }
@@ -157,7 +157,7 @@ function CommissionTargetCard() {
   const [msgType, setMsgType] = useState<'ok'|'err'>('ok')
 
   useEffect(() => {
-    fetch('/api/sales/settings').then(r => r.json()).then(d => {
+    fetch('/api/sales/settings').then(r => r.ok ? r.json() : Promise.resolve({})).then(d => {
       setTarget(d.settings?.commission?.team_target ?? 0)
       setPeriod(d.settings?.commission?.team_target_period ?? 'monthly')
       setLoading(false)

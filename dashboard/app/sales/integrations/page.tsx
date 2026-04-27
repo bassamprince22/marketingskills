@@ -196,7 +196,7 @@ function MetaCard({ connectedParam, errorParam }: { connectedParam: string | nul
   useEffect(() => {
     const timer = setInterval(() => {
       fetch('/api/sales/integrations/meta/pages')
-        .then((response) => response.json())
+        .then((response) => response.ok ? response.json() : Promise.resolve({}))
         .then((payload) => setData(payload))
         .catch(() => {})
     }, 30_000)
