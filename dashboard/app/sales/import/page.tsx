@@ -72,7 +72,7 @@ export default function ImportPage() {
 
   useEffect(() => {
     fetch('/api/sales/users?role=rep')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => setReps(d.users ?? []))
   }, [])
 

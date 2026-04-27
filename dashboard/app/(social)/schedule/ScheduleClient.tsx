@@ -14,7 +14,7 @@ export function ScheduleClient() {
     if (!workspaceId) return
     setLoading(true)
     fetch(`/api/buffer/queue?workspace_id=${workspaceId}`)
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : Promise.resolve({}))
       .then((d) => setUpdates(d.updates ?? []))
       .finally(() => setLoading(false))
   }

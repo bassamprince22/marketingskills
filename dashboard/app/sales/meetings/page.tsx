@@ -23,7 +23,7 @@ function MeetingForm({ leadId, onSaved, onCancel }: {
 
   useEffect(() => {
     if (!leadId) {
-      fetch('/api/sales/leads?limit=200').then(r => r.json()).then(d => setLeads(d.leads ?? []))
+      fetch('/api/sales/leads?limit=200').then(r => r.ok ? r.json() : Promise.resolve({})).then(d => setLeads(d.leads ?? []))
     }
   }, [leadId])
 

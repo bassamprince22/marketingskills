@@ -57,10 +57,10 @@ export default function LeadDetailPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/sales/leads/${id}`).then(r => r.json()),
-      fetch(`/api/sales/meetings?leadId=${id}`).then(r => r.json()),
-      fetch(`/api/sales/documents?leadId=${id}`).then(r => r.json()),
-      fetch(`/api/sales/activities?leadId=${id}`).then(r => r.json()),
+      fetch(`/api/sales/leads/${id}`).then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch(`/api/sales/meetings?leadId=${id}`).then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch(`/api/sales/documents?leadId=${id}`).then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch(`/api/sales/activities?leadId=${id}`).then(r => r.ok ? r.json() : Promise.resolve({})),
     ]).then(([l, m, d, a]) => {
       setLead(l.lead)
       setStage(l.lead?.pipeline_stage ?? '')
@@ -73,7 +73,7 @@ export default function LeadDetailPage() {
 
   useEffect(() => {
     fetch('/api/sales/settings')
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => setStageConfigs(normalizePipelineStages(payload.settings?.pipeline?.stages)))
       .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
   }, [])

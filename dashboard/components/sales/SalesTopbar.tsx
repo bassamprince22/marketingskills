@@ -66,6 +66,7 @@ export function SalesTopbar({
     async function loadNotifications() {
       try {
         const res = await fetch('/api/sales/notifications')
+        if (!res.ok) return
         const data = await res.json()
         if (active) setNotifications(data.notifications ?? [])
       } catch {

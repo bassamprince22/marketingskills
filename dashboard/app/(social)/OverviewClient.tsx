@@ -35,9 +35,9 @@ export function OverviewClient() {
     if (!workspaceId) return
     setLoading(true)
     Promise.all([
-      fetch(`/api/queue?workspace_id=${workspaceId}`).then((r) => r.json()),
-      fetch(`/api/trends?workspace_id=${workspaceId}&limit=5`).then((r) => r.json()),
-      fetch(`/api/analytics?workspace_id=${workspaceId}`).then((r) => r.json()),
+      fetch(`/api/queue?workspace_id=${workspaceId}`).then((r) => r.ok ? r.json() : Promise.resolve({})),
+      fetch(`/api/trends?workspace_id=${workspaceId}&limit=5`).then((r) => r.ok ? r.json() : Promise.resolve({})),
+      fetch(`/api/analytics?workspace_id=${workspaceId}`).then((r) => r.ok ? r.json() : Promise.resolve({})),
     ])
       .then(([queueData, trendsData, analyticsData]) => {
         setQueue(queueData.rows ?? [])

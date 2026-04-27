@@ -151,8 +151,8 @@ export default function QualifiedPage() {
   const load = useCallback(() => {
     setLoading(true)
     Promise.all([
-      fetch('/api/sales/qualifications' + (filterSvc ? `?serviceType=${filterSvc}` : '')).then(r => r.json()),
-      fetch('/api/sales/leads?limit=200').then(r => r.json()),
+      fetch('/api/sales/qualifications' + (filterSvc ? `?serviceType=${filterSvc}` : '')).then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch('/api/sales/leads?limit=200').then(r => r.ok ? r.json() : Promise.resolve({})),
     ]).then(([q, l]) => {
       setLeads(q.leads ?? [])
       setAllLeads((l.leads ?? []).filter((ld: Lead) => !ld.is_qualified))

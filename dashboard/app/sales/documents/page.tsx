@@ -93,7 +93,7 @@ function UploadForm({
   useEffect(() => {
     if (defaultLeadId) return
     fetch('/api/sales/leads?limit=500')
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => setLeads(payload.leads ?? []))
   }, [defaultLeadId])
 
@@ -292,7 +292,7 @@ function DocumentsContent() {
     setLoading(true)
     const query = leadId ? `?leadId=${leadId}` : ''
     fetch(`/api/sales/documents${query}`)
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => {
         setDocs(payload.documents ?? [])
         setLoading(false)

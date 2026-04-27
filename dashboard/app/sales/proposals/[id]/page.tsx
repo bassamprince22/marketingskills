@@ -64,7 +64,7 @@ export default function ProposalEditorPage() {
 
   useEffect(() => {
     fetch(`/api/sales/proposals/${id}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then((data: Proposal) => {
         setProposal(data)
         setTitle(data.title)

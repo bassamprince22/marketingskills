@@ -24,8 +24,8 @@ export function CommissionWidget() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/sales/commissions').then(r => r.json()),
-      fetch('/api/sales/settings').then(r => r.json()),
+      fetch('/api/sales/commissions').then(r => r.ok ? r.json() : Promise.resolve({})),
+      fetch('/api/sales/settings').then(r => r.ok ? r.json() : Promise.resolve({})),
     ]).then(([cd, sd]) => {
       setTotals(cd.totals ?? null)
       setTarget(sd.settings?.commission?.team_target ?? 0)

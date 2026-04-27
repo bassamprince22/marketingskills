@@ -40,6 +40,7 @@ export function NotificationToast() {
   const poll = useCallback(async () => {
     try {
       const res  = await fetch('/api/sales/notifications')
+      if (!res.ok) return
       const data = await res.json()
       const notifications: Notification[] = data.notifications ?? []
       const seen = seenRef.current

@@ -27,7 +27,7 @@ export function PipelineSettingsCard() {
 
   useEffect(() => {
     fetch('/api/sales/settings')
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => setStages(normalizePipelineStages(payload.settings?.pipeline?.stages)))
       .catch(() => setStages(DEFAULT_PIPELINE_STAGE_CONFIGS))
   }, [])

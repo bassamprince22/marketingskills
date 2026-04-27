@@ -134,7 +134,7 @@ function TeamDayDetail({
   const load = () => {
     setLoading(true)
     fetch(`/api/sales/daily-reports?date=${date}`)
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => {
         setReports(payload.reports ?? [])
         setLoading(false)
@@ -295,7 +295,7 @@ export default function ReportsPage() {
   useEffect(() => {
     setPermissionLoading(true)
     fetch('/api/sales/permissions?effective=1&module=reports')
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => {
         setPermission(payload.permissions?.[0] ?? null)
         setPermissionLoading(false)
@@ -322,7 +322,7 @@ export default function ReportsPage() {
       anchor: `${anchorMonth}-01`,
     })
     fetch(`/api/sales/reports?${params.toString()}`)
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => {
         setAnalytics(payload)
         setAnalyticsLoading(false)

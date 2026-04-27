@@ -128,7 +128,7 @@ function LeadsContent() {
     if (filters.metaOrigin)  sp.set('metaOrigin',  filters.metaOrigin)
     if (dateRange)           sp.set('dateRange',   dateRange)
     fetch(`/api/sales/leads?${sp}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => {
         const list: Lead[] = d.leads ?? []
         const emailCount = new Map<string, number>()
@@ -152,12 +152,12 @@ function LeadsContent() {
 
   useEffect(() => {
     if (!canAssign) return
-    fetch('/api/sales/users?role=rep').then(r => r.json()).then(d => setReps(d.users ?? []))
+    fetch('/api/sales/users?role=rep').then(r => r.ok ? r.json() : Promise.resolve({})).then(d => setReps(d.users ?? []))
   }, [canAssign])
 
   useEffect(() => {
     fetch('/api/sales/settings')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => setStageConfigs(normalizePipelineStages(d.settings?.pipeline?.stages)))
       .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
   }, [])

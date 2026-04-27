@@ -112,7 +112,7 @@ export function DailyReportForm({
 
     if (reportId) {
       fetch(`/api/sales/daily-reports/${reportId}`)
-        .then((response) => response.json())
+        .then((response) => response.ok ? response.json() : Promise.resolve({}))
         .then((payload) => {
           if (payload.report) setReport(payload.report)
           setLoading(false)
@@ -122,7 +122,7 @@ export function DailyReportForm({
     }
 
     fetch(`/api/sales/daily-reports?from=${date}&to=${date}`)
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => {
         const existing = payload.reports?.find((entry: Report) => entry.report_date === date)
         if (existing) {
@@ -133,7 +133,7 @@ export function DailyReportForm({
 
         if (!adminMode && date === TODAY) {
           fetch('/api/sales/daily-reports/today-stats')
-            .then((response) => response.json())
+            .then((response) => response.ok ? response.json() : Promise.resolve({}))
             .then((stats) => setReport((prev) => ({ ...prev, ...stats })))
             .catch(() => {})
             .finally(() => setLoading(false))
@@ -164,12 +164,14 @@ export function DailyReportForm({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...report, status }),
     })
-    const payload = await response.json()
     setSaving(false)
     if (!response.ok) {
-      flash(payload.error ?? 'Save failed', 'err')
+      let errMsg = 'Save failed'
+      try { const d = await response.json(); if (d.error) errMsg = d.error } catch {}
+      flash(errMsg, 'err')
       return
     }
+    const payload = await response.json()
     setReport(payload.report)
     flash(status === 'submitted' ? 'Report submitted!' : 'Draft saved', 'ok')
     if (status === 'submitted') onSubmitted?.()
@@ -182,12 +184,14 @@ export function DailyReportForm({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ report_date: date, user_id: targetUserId }),
     })
-    const payload = await response.json()
     setGenerating(false)
     if (!response.ok) {
-      flash(payload.error ?? 'Failed to generate draft', 'err')
+      let errMsg = 'Failed to generate draft'
+      try { const d = await response.json(); if (d.error) errMsg = d.error } catch {}
+      flash(errMsg, 'err')
       return
     }
+    const payload = await response.json()
     setReport((prev) => ({ ...prev, ...payload.draft, report_date: payload.report_date ?? prev.report_date }))
     flash('Draft generated from today\'s work', 'ok')
   }

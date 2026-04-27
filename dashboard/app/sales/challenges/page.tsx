@@ -38,7 +38,7 @@ function PastChallengeCard({ c }: { c: ChallengeRow }) {
   async function toggle() {
     if (!expanded && lb.length === 0) {
       setLbLoad(true)
-      const d = await fetch(`/api/sales/challenges/${c.id}/leaderboard`).then(r => r.json())
+      const d = await fetch(`/api/sales/challenges/${c.id}/leaderboard`).then(r => r.ok ? r.json() : Promise.resolve({}))
       setLb(d.leaderboard ?? [])
       setLbLoad(false)
     }
@@ -129,7 +129,7 @@ export default function ChallengesPage() {
     if (histFetched) return
     setHistLoad(true)
     fetch('/api/sales/challenges')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => { setChallenges(d.challenges ?? []); setHistLoad(false); setHistFetched(true) })
       .catch(() => setHistLoad(false))
   }, [histFetched])

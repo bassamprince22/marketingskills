@@ -14,7 +14,7 @@ export function UploadsClient() {
     if (!workspaceId) return
     setLoading(true)
     fetch(`/api/queue?workspace_id=${workspaceId}&video_type=real-video&status=pending`)
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : Promise.resolve({}))
       .then((d) => setSlots(d.rows ?? []))
       .finally(() => setLoading(false))
   }

@@ -49,9 +49,14 @@ export function BrandSettingsCard() {
     const form = new FormData()
     form.append('file', file)
     const res = await fetch('/api/sales/brand/logo', { method: 'POST', body: form })
-    const d   = await res.json()
     setUploading(false)
-    if (!res.ok || !d.url) { flash(d.error ?? 'Upload failed', false); return }
+    if (!res.ok) {
+      let errMsg = 'Upload failed'
+      try { const d = await res.json(); if (d.error) errMsg = d.error } catch {}
+      flash(errMsg, false); return
+    }
+    const d = await res.json()
+    if (!d.url) { flash(d.error ?? 'Upload failed', false); return }
     setBrand(b => ({ ...b, logoUrl: d.url }))
     flash('Logo uploaded', true)
   }

@@ -103,7 +103,7 @@ export function ContractModal({ lead, onClose }: Props) {
   // Load template & placeholders on open
   useEffect(() => {
     fetch('/api/sales/contracts/template')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => {
         if (!d.hasTemplate) { setView('no-template'); return }
         initForm(d.placeholders)
@@ -127,8 +127,12 @@ export function ContractModal({ lead, onClose }: Props) {
     const form = new FormData()
     form.append('file', file)
     const res  = await fetch('/api/sales/contracts/template', { method: 'POST', body: form })
+    if (!res.ok) {
+      let errMsg = 'Upload failed'
+      try { const d = await res.json(); if (d.error) errMsg = d.error } catch {}
+      setUploadError(errMsg); setView('no-template'); return
+    }
     const data = await res.json()
-    if (!res.ok) { setUploadError(data.error ?? 'Upload failed'); setView('no-template'); return }
     initForm(data.placeholders)
   }
 

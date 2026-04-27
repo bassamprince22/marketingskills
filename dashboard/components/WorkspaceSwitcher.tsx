@@ -29,7 +29,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     } else {
       // auto-select first workspace
       fetch('/api/workspaces')
-        .then((r) => r.json())
+        .then((r) => r.ok ? r.json() : Promise.resolve({}))
         .then((d) => {
           const first = d.workspaces?.[0]
           if (first) setWorkspaceId(first.id)
@@ -50,7 +50,7 @@ export function WorkspaceSwitcher() {
 
   useEffect(() => {
     fetch('/api/workspaces')
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : Promise.resolve({}))
       .then((d) => setWorkspaces(d.workspaces ?? []))
   }, [])
 

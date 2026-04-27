@@ -62,7 +62,7 @@ export function ChallengeAdminPanel() {
 
   function load() {
     fetch('/api/sales/challenges')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => { setChallenges(d.challenges ?? []); setLoading(false) })
       .catch(() => setLoading(false))
   }
@@ -117,8 +117,8 @@ export function ChallengeAdminPanel() {
     const url    = editId ? `/api/sales/challenges/${editId}` : '/api/sales/challenges'
     const method = editId ? 'PATCH' : 'POST'
     const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!res.ok) { setSaving(false); flash('Save failed', 'err'); return }
     const d      = await res.json()
-    if (!res.ok) { setSaving(false); flash(d.error ?? 'Save failed', 'err'); return }
 
     await fetch(`/api/sales/challenges/${d.challenge.id}/rewards`, {
       method: 'POST',
@@ -153,7 +153,7 @@ export function ChallengeAdminPanel() {
     if (!claimsData[challengeId]) {
       setClaimsLoading(challengeId)
       try {
-        const d = await fetch(`/api/sales/challenges/${challengeId}/leaderboard`).then(r => r.json())
+        const d = await fetch(`/api/sales/challenges/${challengeId}/leaderboard`).then(r => r.ok ? r.json() : Promise.resolve({}))
         setClaimsData(prev => ({
           ...prev,
           [challengeId]: {

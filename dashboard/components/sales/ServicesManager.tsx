@@ -37,7 +37,7 @@ export function ServicesManager() {
   const [showPresets, setShowPresets] = useState(false)
 
   function load() {
-    fetch('/api/sales/services').then(r => r.json()).then(d => {
+    fetch('/api/sales/services').then(r => r.ok ? r.json() : Promise.resolve({})).then(d => {
       setServices(d.services ?? [])
       setLoading(false)
     }).catch(() => setLoading(false))

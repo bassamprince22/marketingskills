@@ -17,8 +17,8 @@ export function ControlClient() {
     if (!workspaceId) return
     setLoading(true)
     Promise.all([
-      fetch(`/api/config?workspace_id=${workspaceId}`).then((r) => r.json()),
-      fetch(`/api/workspaces`).then((r) => r.json()),
+      fetch(`/api/config?workspace_id=${workspaceId}`).then((r) => r.ok ? r.json() : Promise.resolve({})),
+      fetch(`/api/workspaces`).then((r) => r.ok ? r.json() : Promise.resolve({})),
     ])
       .then(([configData, workspacesData]) => {
         setConfig(configData.config ?? null)

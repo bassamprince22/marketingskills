@@ -14,7 +14,7 @@ export default function EditLeadPage() {
 
   useEffect(() => {
     fetch(`/api/sales/leads/${id}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => setLead(d.lead))
   }, [id])
 

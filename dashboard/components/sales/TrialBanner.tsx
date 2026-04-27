@@ -11,7 +11,7 @@ export default function TrialBanner() {
   useEffect(() => {
     if (!session?.user) return
     fetch('/api/sales/onboarding')
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : Promise.resolve({}))
       .then((d) => {
         if (d.trial_ends_at && d.plan === 'trial') {
           const ms = new Date(d.trial_ends_at).getTime() - Date.now()

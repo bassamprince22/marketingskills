@@ -181,8 +181,8 @@ function PipelineContent() {
     leadQuery.set('limit', '500')
     if (dateRange) leadQuery.set('dateRange', dateRange)
     Promise.all([
-      fetch(`/api/sales/leads?${leadQuery.toString()}`).then(r => r.json()),
-      canAssign ? fetch('/api/sales/users?role=rep').then(r => r.json()) : Promise.resolve({ users: [] }),
+      fetch(`/api/sales/leads?${leadQuery.toString()}`).then(r => r.ok ? r.json() : Promise.resolve({})),
+      canAssign ? fetch('/api/sales/users?role=rep').then(r => r.ok ? r.json() : Promise.resolve({})) : Promise.resolve({ users: [] }),
     ]).then(([ld, ud]) => {
       const leads: Lead[] = ld.leads ?? []
       const b: Board = {}
@@ -198,7 +198,7 @@ function PipelineContent() {
 
   useEffect(() => {
     fetch('/api/sales/settings')
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => setStageConfigs(normalizePipelineStages(payload.settings?.pipeline?.stages)))
       .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
   }, [])

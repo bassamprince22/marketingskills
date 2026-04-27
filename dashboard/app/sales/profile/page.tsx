@@ -38,7 +38,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     fetch('/api/sales/profile')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
       .then(d => {
         setUser(d.user)
         setProfile(d.profile)

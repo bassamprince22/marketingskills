@@ -58,14 +58,14 @@ export function LeadForm({ initial = {}, mode, leadId }: Props) {
   useEffect(() => {
     if (role === 'manager' || role === 'admin') {
       fetch('/api/sales/users?role=rep')
-        .then(r => r.json())
+        .then(r => r.ok ? r.json() : Promise.resolve({}))
         .then(d => setReps(d.users ?? []))
     }
   }, [role])
 
   useEffect(() => {
     fetch('/api/sales/settings')
-      .then((response) => response.json())
+      .then((response) => response.ok ? response.json() : Promise.resolve({}))
       .then((payload) => setStageConfigs(normalizePipelineStages(payload.settings?.pipeline?.stages)))
       .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
   }, [])
@@ -88,8 +88,12 @@ export function LeadForm({ initial = {}, mode, leadId }: Props) {
       const url    = mode === 'edit' ? `/api/sales/leads/${leadId}` : '/api/sales/leads'
       const method = mode === 'edit' ? 'PATCH' : 'POST'
       const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!res.ok) {
+        let msg = 'Failed'
+        try { const d = await res.json(); if (d.error) msg = d.error } catch {}
+        throw new Error(msg)
+      }
       const data   = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Failed')
       router.push(`/sales/leads/${data.lead.id}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
