@@ -3,8 +3,8 @@ import './globals.css'
 import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: 'Social Dashboard',
-  description: 'Automated social content pipeline',
+  title: 'Fadaa Sales CRM',
+  description: 'CRM and sales operations for marketing agencies',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
