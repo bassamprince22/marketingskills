@@ -218,6 +218,7 @@ CREATE TABLE IF NOT EXISTS sales_leads (
   meta_page_id         TEXT,
   meta_form_id         TEXT,
   meta_raw_payload     JSONB,
+  meta_origin          TEXT CHECK (meta_origin IN ('paid', 'organic')),
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
