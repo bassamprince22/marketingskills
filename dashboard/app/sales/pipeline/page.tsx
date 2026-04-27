@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
@@ -169,6 +169,7 @@ function PipelineContent() {
   const dateRange = searchParams.get('dateRange') ?? ''
 
   const [board,   setBoard]   = useState<Board>({})
+  const boardRef = useRef<Board>({})
   const [reps,    setReps]    = useState<Rep[]>([])
   const [stageConfigs, setStageConfigs] = useState<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
   const [loading, setLoading] = useState(true)
@@ -195,6 +196,8 @@ function PipelineContent() {
   }, [canAssign, dateRange, stageKeys.join('|')])
 
   useEffect(() => { loadLeads() }, [loadLeads])
+
+  useEffect(() => { boardRef.current = board }, [board])
 
   useEffect(() => {
     fetch('/api/sales/settings')
@@ -227,7 +230,7 @@ function PipelineContent() {
     if (!destination || destination.droppableId === source.droppableId) return
     const srcStage  = source.droppableId
     const destStage = destination.droppableId
-    const lead      = board[srcStage]?.[source.index]
+    const lead      = boardRef.current[srcStage]?.[source.index]
     if (!lead) return
 
     setBoard(prev => {
@@ -242,12 +245,26 @@ function PipelineContent() {
       return next
     })
 
-    await fetch(`/api/sales/leads/${draggableId}`, {
+    const res = await fetch(`/api/sales/leads/${draggableId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pipeline_stage: destStage }),
     })
-  }, [board])
+
+    if (!res.ok) {
+      setBoard(prev => {
+        const next = { ...prev }
+        next[destStage] = prev[destStage].filter(l => l.id !== draggableId)
+        const revertedLead = { ...lead, pipeline_stage: srcStage as any }
+        next[srcStage] = [
+          ...prev[srcStage].slice(0, source.index),
+          revertedLead,
+          ...prev[srcStage].slice(source.index),
+        ]
+        return next
+      })
+    }
+  }, [])
 
   const totalValue = Object.values(board).flat().reduce((s, l) => s + (l.estimated_value ?? 0), 0)
   const totalLeads = Object.values(board).flat().length

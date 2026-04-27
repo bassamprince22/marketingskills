@@ -357,7 +357,9 @@ function LeadsContent() {
             const isSel  = selected.has(lead.id)
             const isLast = i === leads.length - 1
             const metaOriginLabel = lead.lead_source === 'meta'
-              ? ((lead.meta_origin ?? (lead.meta_raw_payload?.ad_name ? 'paid' : 'organic')) === 'paid' ? 'Paid' : 'Organic')
+              ? (lead.meta_origin
+                  ? (lead.meta_origin === 'paid' ? 'Paid' : 'Organic')
+                  : (lead.meta_raw_payload ? (lead.meta_raw_payload?.ad_name ? 'Paid' : 'Organic') : null))
               : null
 
             return (
@@ -480,7 +482,7 @@ function LeadsContent() {
                     fontSize: 11, fontWeight: 600, color: srcm.color,
                     whiteSpace: 'nowrap',
                   }}>
-                    {lead.lead_source === 'meta' && metaOriginLabel ? `meta · ${metaOriginLabel}` : (lead.lead_source ?? 'other')}
+                    {lead.lead_source === 'meta' && metaOriginLabel ? `Meta · ${metaOriginLabel}` : ({ meta: 'Meta Ads', referral: 'Referral', website: 'Website', outbound: 'Outbound', other: 'Other' }[lead.lead_source ?? 'other'] ?? lead.lead_source ?? 'Other')}
                   </span>
                 </div>
 
