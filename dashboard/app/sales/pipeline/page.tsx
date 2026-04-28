@@ -253,6 +253,9 @@ function PipelineContent() {
       return next
     })
 
+    // Force browser repaint — without this the layout freezes until scroll
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')))
+
     // Fire-and-forget PATCH — don't await so onDragEnd stays synchronous
     fetch(`/api/sales/leads/${draggableId}`, {
       method: 'PATCH',
@@ -305,7 +308,7 @@ function PipelineContent() {
         </div>
       ) : view === 'kanban' ? (
         <DragDropContext onDragStart={() => { isDragging.current = true }} onDragEnd={onDragEnd}>
-          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start', transform: 'translateZ(0)', willChange: 'transform' }}>
             {stageKeys.map(stage => {
               const cards  = board[stage] ?? []
               const accent = STAGE_ACCENT[stage]
