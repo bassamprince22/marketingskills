@@ -46,6 +46,7 @@ function getServiceClient() {
 }
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     // Sales system: username + password per user (stored in sales_users table)
     CredentialsProvider({
@@ -57,6 +58,9 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null
+        console.log('[auth] attempt for:', credentials.username)
+        console.log('[auth] supabase url:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+        console.log('[auth] service key set:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
         try {
           const db = getServiceClient()
           const { data: user, error: dbErr } = await db
