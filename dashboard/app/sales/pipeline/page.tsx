@@ -231,7 +231,7 @@ function PipelineContent() {
     })
   }, [reps])
 
-  const onDragEnd = useCallback(async (result: DropResult) => {
+  const onDragEnd = useCallback((result: DropResult) => {
     isDragging.current = false
     const { source, destination, draggableId } = result
     if (!destination || destination.droppableId === source.droppableId) return
@@ -240,40 +240,40 @@ function PipelineContent() {
     const lead      = boardRef.current[srcStage]?.[source.index]
     if (!lead) return
 
-    // Defer state update one tick so @hello-pangea/dnd finishes its cleanup first
-    setTimeout(() => {
-      setBoard(prev => {
-        const next = { ...prev }
-        next[srcStage]  = (prev[srcStage] ?? []).filter(l => l.id !== draggableId)
-        const newLead   = { ...lead, pipeline_stage: destStage as any }
-        next[destStage] = [
-          ...(prev[destStage] ?? []).slice(0, destination.index),
-          newLead,
-          ...(prev[destStage] ?? []).slice(destination.index),
-        ]
-        return next
-      })
-    }, 0)
+    // Synchronous optimistic update — must be sync for @hello-pangea/dnd to work correctly
+    setBoard(prev => {
+      const next = { ...prev }
+      next[srcStage]  = (prev[srcStage] ?? []).filter(l => l.id !== draggableId)
+      const newLead   = { ...lead, pipeline_stage: destStage as any }
+      next[destStage] = [
+        ...(prev[destStage] ?? []).slice(0, destination.index),
+        newLead,
+        ...(prev[destStage] ?? []).slice(destination.index),
+      ]
+      return next
+    })
 
-    const res = await fetch(`/api/sales/leads/${draggableId}`, {
+    // Fire-and-forget PATCH — don't await so onDragEnd stays synchronous
+    fetch(`/api/sales/leads/${draggableId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pipeline_stage: destStage }),
+    }).then(res => {
+      if (!res.ok) {
+        // Revert on failure
+        setBoard(prev => {
+          const next = { ...prev }
+          next[destStage] = (prev[destStage] ?? []).filter(l => l.id !== draggableId)
+          const revertedLead = { ...lead, pipeline_stage: srcStage as any }
+          next[srcStage] = [
+            ...(prev[srcStage] ?? []).slice(0, source.index),
+            revertedLead,
+            ...(prev[srcStage] ?? []).slice(source.index),
+          ]
+          return next
+        })
+      }
     })
-
-    if (!res.ok) {
-      setBoard(prev => {
-        const next = { ...prev }
-        next[destStage] = (prev[destStage] ?? []).filter(l => l.id !== draggableId)
-        const revertedLead = { ...lead, pipeline_stage: srcStage as any }
-        next[srcStage] = [
-          ...(prev[srcStage] ?? []).slice(0, source.index),
-          revertedLead,
-          ...(prev[srcStage] ?? []).slice(source.index),
-        ]
-        return next
-      })
-    }
   }, [])
 
   const totalValue = Object.values(board).flat().reduce((s, l) => s + (l.estimated_value ?? 0), 0)
