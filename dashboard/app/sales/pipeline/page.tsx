@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
+
 import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
 import Link from 'next/link'
@@ -62,6 +62,51 @@ function RepPicker({ lead, reps, onAssign }: { lead: Lead; reps: Rep[]; onAssign
   )
 }
 
+function StageMover({ lead, stageConfigs, onMove }: {
+  lead: Lead
+  stageConfigs: PipelineStageConfig[]
+  onMove: (leadId: string, stage: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const otherStages = stageConfigs.filter(s => s.key !== lead.pipeline_stage)
+
+  return (
+    <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        title="Move to stage"
+        style={{
+          background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)',
+          borderRadius: 999, padding: '2px 7px', fontSize: 9, color: '#A78BFA',
+          cursor: 'pointer', whiteSpace: 'nowrap', lineHeight: '14px',
+          transition: 'background 0.15s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(124,58,237,0.16)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(124,58,237,0.08)')}
+      >
+        Move ▾
+      </button>
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
+          <div className="fadaa-dropdown" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 50, minWidth: 160 }}>
+            <p className="fadaa-dropdown-label">Move to stage</p>
+            {otherStages.map(s => (
+              <button
+                key={s.key}
+                className="fadaa-dropdown-item"
+                onClick={() => { onMove(lead.id, s.key); setOpen(false) }}
+              >
+                {s.label ?? STAGE_LABELS[s.key] ?? s.key}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function timeAgo(date: string) {
   const secs = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
   if (secs < 60)         return 'just now'
@@ -87,129 +132,124 @@ const STAGE_ACCENT: Record<string, string> = {
   lost:              '#F87171',
 }
 
-function KanbanCard({ lead, index, reps, onAssign, canAssign }: {
-  lead: Lead; index: number; reps: Rep[]
+function KanbanCard({ lead, reps, stageConfigs, onAssign, onMove, canAssign }: {
+  lead: Lead; reps: Rep[]
+  stageConfigs: PipelineStageConfig[]
   onAssign: (leadId: string, repId: string | null) => void
+  onMove: (leadId: string, stage: string) => void
   canAssign: boolean
 }) {
   const today      = new Date().toISOString().slice(0, 10)
   const isNewToday = lead.created_at.slice(0, 10) === today && lead.pipeline_stage === 'new_lead'
 
   return (
-    <Draggable draggableId={lead.id} index={index}>
-      {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          style={{
-            ...provided.draggableProps.style,
-            background: snapshot.isDragging ? '#1A2840' : 'rgba(16,24,44,0.9)',
-            border: `1px solid ${snapshot.isDragging ? 'rgba(79,142,247,0.5)' : isNewToday ? 'rgba(79,142,247,0.25)' : 'var(--border-subtle)'}`,
-            borderRadius: 10,
-            padding: '11px 13px',
-            marginBottom: 7,
-            cursor: snapshot.isDragging ? 'grabbing' : 'grab',
-            boxShadow: snapshot.isDragging
-              ? '0 12px 40px rgba(79,142,247,0.25), 0 4px 16px rgba(0,0,0,0.4)'
-              : '0 1px 4px rgba(0,0,0,0.3)',
-            transition: snapshot.isDragging ? 'none' : 'box-shadow 0.15s, border-color 0.15s',
-          }}
-        >
-          <Link href={`/sales/leads/${lead.id}`} style={{ textDecoration: 'none' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
-              <div style={{ minWidth: 0 }}>
-                <p className="t-card-title t-truncate">{lead.contact_person}</p>
-                <p className="t-caption" style={{ marginTop: 2 }}>{lead.company_name}</p>
-              </div>
-              {isNewToday && (
-                <span className="badge badge-new" style={{ fontSize: 9, flexShrink: 0, marginTop: 1 }}>NEW</span>
-              )}
-            </div>
-          </Link>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 9 }}>
-            <span className={`badge service-${lead.service_type}`} style={{ fontSize: 10 }}>
-              {SERVICE_LABELS[lead.service_type]}
-            </span>
-            {lead.estimated_value ? (
-              <span className="t-mono" style={{ color: '#4ADE80', fontSize: 11, fontWeight: 600 }}>
-                ${(lead.estimated_value / 1000).toFixed(1)}k
-              </span>
-            ) : null}
+    <div
+      style={{
+        background: 'rgba(16,24,44,0.9)',
+        border: `1px solid ${isNewToday ? 'rgba(79,142,247,0.25)' : 'var(--border-subtle)'}`,
+        borderRadius: 10,
+        padding: '11px 13px',
+        marginBottom: 7,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+        transition: 'box-shadow 0.15s, border-color 0.15s',
+        cursor: 'default',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.4)')}
+      onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)')}
+    >
+      <Link href={`/sales/leads/${lead.id}`} style={{ textDecoration: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+          <div style={{ minWidth: 0 }}>
+            <p className="t-card-title t-truncate">{lead.contact_person}</p>
+            <p className="t-caption" style={{ marginTop: 2 }}>{lead.company_name}</p>
           </div>
-
-          {canAssign ? (
-            <div style={{ marginTop: 8 }}>
-              <RepPicker lead={lead} reps={reps} onAssign={onAssign} />
-            </div>
-          ) : lead.assigned_rep?.name ? (
-            <p className="t-caption" style={{ marginTop: 6, fontSize: 10 }}>↳ {lead.assigned_rep.name}</p>
-          ) : null}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 7 }}>
-            <span style={{ fontSize: 9, color: lead.lead_source === 'meta' ? '#7CB9FC' : 'var(--text-faint)' }}>
-              {lead.lead_source === 'meta' ? '⚡' : '◎'}
-            </span>
-            <span style={{ fontSize: 9, color: 'var(--text-faint)' }}>
-              {lead.lead_source === 'meta' ? 'Meta · ' : ''}{timeAgo(lead.created_at)}
-            </span>
-          </div>
+          {isNewToday && (
+            <span className="badge badge-new" style={{ fontSize: 9, flexShrink: 0, marginTop: 1 }}>NEW</span>
+          )}
         </div>
+      </Link>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 9 }}>
+        <span className={`badge service-${lead.service_type}`} style={{ fontSize: 10 }}>
+          {SERVICE_LABELS[lead.service_type]}
+        </span>
+        {lead.estimated_value ? (
+          <span className="t-mono" style={{ color: '#4ADE80', fontSize: 11, fontWeight: 600 }}>
+            ${(lead.estimated_value / 1000).toFixed(1)}k
+          </span>
+        ) : null}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+        <StageMover lead={lead} stageConfigs={stageConfigs} onMove={onMove} />
+        {canAssign && <RepPicker lead={lead} reps={reps} onAssign={onAssign} />}
+      </div>
+
+      {!canAssign && lead.assigned_rep?.name && (
+        <p className="t-caption" style={{ marginTop: 6, fontSize: 10 }}>↳ {lead.assigned_rep.name}</p>
       )}
-    </Draggable>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 7 }}>
+        <span style={{ fontSize: 9, color: lead.lead_source === 'meta' ? '#7CB9FC' : 'var(--text-faint)' }}>
+          {lead.lead_source === 'meta' ? '⚡' : '◎'}
+        </span>
+        <span style={{ fontSize: 9, color: 'var(--text-faint)' }}>
+          {lead.lead_source === 'meta' ? 'Meta · ' : ''}{timeAgo(lead.created_at)}
+        </span>
+      </div>
+    </div>
   )
 }
 
 function PipelineContent() {
   const searchParams = useSearchParams()
   const { data: session } = useSession()
-  const role     = (session?.user as { role?: string })?.role ?? 'rep'
+  const role      = (session?.user as { role?: string })?.role ?? 'rep'
   const canAssign = role === 'admin' || role === 'manager'
   const dateRange = searchParams.get('dateRange') ?? ''
 
-  const [board,   setBoard]   = useState<Board>({})
-  const boardRef = useRef<Board>({})
-  const [reps,    setReps]    = useState<Rep[]>([])
+  const [board,        setBoard]        = useState<Board>({})
+  const [reps,         setReps]         = useState<Rep[]>([])
   const [stageConfigs, setStageConfigs] = useState<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
+  const stageConfigsRef = useRef<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
   const [loading, setLoading] = useState(true)
   const [view,    setView]    = useState<'kanban' | 'list'>('kanban')
-  const stageKeys = stageConfigs.map((stage) => stage.key)
+  const stageKeys = stageConfigs.map(s => s.key)
+
+  useEffect(() => { stageConfigsRef.current = stageConfigs }, [stageConfigs])
 
   const loadLeads = useCallback(() => {
     setLoading(true)
-    const leadQuery = new URLSearchParams()
-    leadQuery.set('limit', '500')
-    if (dateRange) leadQuery.set('dateRange', dateRange)
+    const q = new URLSearchParams({ limit: '500' })
+    if (dateRange) q.set('dateRange', dateRange)
+    const keys = stageConfigsRef.current.map(s => s.key)
     Promise.all([
-      fetch(`/api/sales/leads?${leadQuery.toString()}`).then(r => r.json()),
-      canAssign ? fetch('/api/sales/users?role=rep').then(r => r.json()) : Promise.resolve({ users: [] }),
+      fetch(`/api/sales/leads?${q}`).then(r => r.ok ? r.json() : Promise.resolve({})),
+      canAssign ? fetch('/api/sales/users?role=rep').then(r => r.ok ? r.json() : Promise.resolve({})) : Promise.resolve({ users: [] }),
     ]).then(([ld, ud]) => {
       const leads: Lead[] = ld.leads ?? []
       const b: Board = {}
-      stageKeys.forEach(s => { b[s] = [] })
+      keys.forEach(s => { b[s] = [] })
       leads.forEach(l => { if (b[l.pipeline_stage]) b[l.pipeline_stage].push(l) })
       setBoard(b)
       setReps(ud.users ?? [])
       setLoading(false)
     })
-  }, [canAssign, dateRange, stageKeys.join('|')])
+  }, [canAssign, dateRange])
 
   useEffect(() => { loadLeads() }, [loadLeads])
 
-  useEffect(() => { boardRef.current = board }, [board])
-
   useEffect(() => {
     fetch('/api/sales/settings')
-      .then((response) => response.json())
-      .then((payload) => setStageConfigs(normalizePipelineStages(payload.settings?.pipeline?.stages)))
+      .then(r => r.ok ? r.json() : Promise.resolve({}))
+      .then(p => setStageConfigs(normalizePipelineStages(p.settings?.pipeline?.stages)))
       .catch(() => setStageConfigs(DEFAULT_PIPELINE_STAGE_CONFIGS))
   }, [])
 
   const handleAssign = useCallback(async (leadId: string, repId: string | null) => {
     setBoard(prev => {
       const next = { ...prev }
-      for (const stage of stageKeys) {
+      for (const stage of Object.keys(next)) {
         next[stage] = (prev[stage] ?? []).map(l => {
           if (l.id !== leadId) return l
           const rep = repId ? (reps.find(r => r.id === repId) ?? null) : null
@@ -225,46 +265,31 @@ function PipelineContent() {
     })
   }, [reps])
 
-  const onDragEnd = useCallback(async (result: DropResult) => {
-    const { source, destination, draggableId } = result
-    if (!destination || destination.droppableId === source.droppableId) return
-    const srcStage  = source.droppableId
-    const destStage = destination.droppableId
-    const lead      = boardRef.current[srcStage]?.[source.index]
-    if (!lead) return
-
+  const handleMove = useCallback((leadId: string, newStage: string) => {
+    let movedLead: Lead | undefined
     setBoard(prev => {
       const next = { ...prev }
-      next[srcStage]  = prev[srcStage].filter(l => l.id !== draggableId)
-      const newLead   = { ...lead, pipeline_stage: destStage as any }
-      next[destStage] = [
-        ...prev[destStage].slice(0, destination.index),
-        newLead,
-        ...prev[destStage].slice(destination.index),
-      ]
+      for (const stage of Object.keys(next)) {
+        const idx = next[stage].findIndex(l => l.id === leadId)
+        if (idx !== -1) {
+          movedLead = next[stage][idx]
+          next[stage] = next[stage].filter(l => l.id !== leadId)
+          break
+        }
+      }
+      if (movedLead) {
+        next[newStage] = [{ ...movedLead, pipeline_stage: newStage as any }, ...(next[newStage] ?? [])]
+      }
       return next
     })
-
-    const res = await fetch(`/api/sales/leads/${draggableId}`, {
+    fetch(`/api/sales/leads/${leadId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pipeline_stage: destStage }),
+      body: JSON.stringify({ pipeline_stage: newStage }),
+    }).then(res => {
+      if (!res.ok) loadLeads()
     })
-
-    if (!res.ok) {
-      setBoard(prev => {
-        const next = { ...prev }
-        next[destStage] = prev[destStage].filter(l => l.id !== draggableId)
-        const revertedLead = { ...lead, pipeline_stage: srcStage as any }
-        next[srcStage] = [
-          ...prev[srcStage].slice(0, source.index),
-          revertedLead,
-          ...prev[srcStage].slice(source.index),
-        ]
-        return next
-      })
-    }
-  }, [])
+  }, [loadLeads])
 
   const totalValue = Object.values(board).flat().reduce((s, l) => s + (l.estimated_value ?? 0), 0)
   const totalLeads = Object.values(board).flat().length
@@ -294,68 +319,58 @@ function PipelineContent() {
           ))}
         </div>
       ) : view === 'kanban' ? (
-        <DragDropContext onDragEnd={onDragEnd}>
-          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
-            {stageKeys.map(stage => {
-              const cards  = board[stage] ?? []
-              const accent = STAGE_ACCENT[stage]
-              const colVal = cards.reduce((s, l) => s + (l.estimated_value ?? 0), 0)
-              return (
-                <div key={stage} className="kanban-col" style={{ flexShrink: 0 }}>
-                  {/* Column header */}
-                  <div style={{
-                    padding: '9px 12px',
-                    borderRadius: '10px 10px 0 0',
-                    background: 'rgba(10,14,26,0.85)',
-                    border: `1px solid ${accent}22`,
-                    borderBottom: `2px solid ${accent}`,
-                    marginBottom: 6,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <p style={{ color: accent, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  {stageConfigs.find((entry) => entry.key === stage)?.label ?? STAGE_LABELS[stage] ?? stage}
-                      </p>
-                      <span className="badge" style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}28`, fontSize: 10 }}>
-                        {cards.length}
-                      </span>
-                    </div>
-                    <p className="t-mono" style={{ marginTop: 3, fontSize: 11, color: colVal > 0 ? '#4ADE80' : 'var(--text-faint)' }}>
-                      {colVal > 0 ? `$${(colVal / 1000).toFixed(1)}k` : '—'}
+        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
+          {stageKeys.map(stage => {
+            const cards  = board[stage] ?? []
+            const accent = STAGE_ACCENT[stage] ?? '#64748B'
+            const colVal = cards.reduce((s, l) => s + (l.estimated_value ?? 0), 0)
+            return (
+              <div key={stage} className="kanban-col" style={{ flexShrink: 0 }}>
+                {/* Column header */}
+                <div style={{
+                  padding: '9px 12px',
+                  borderRadius: '10px 10px 0 0',
+                  background: 'rgba(10,14,26,0.85)',
+                  border: `1px solid ${accent}22`,
+                  borderBottom: `2px solid ${accent}`,
+                  marginBottom: 6,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <p style={{ color: accent, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      {stageConfigs.find(e => e.key === stage)?.label ?? STAGE_LABELS[stage] ?? stage}
                     </p>
+                    <span className="badge" style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}28`, fontSize: 10 }}>
+                      {cards.length}
+                    </span>
                   </div>
-
-                  {/* Drop zone */}
-                  <Droppable droppableId={stage}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={snapshot.isDraggingOver ? 'kanban-drop-active' : ''}
-                        style={{
-                          minHeight: 80,
-                          borderRadius: 10,
-                          padding: 3,
-                          border: snapshot.isDraggingOver ? '1px dashed rgba(79,142,247,0.35)' : '1px solid transparent',
-                          transition: 'border-color 0.15s, background 0.15s',
-                        }}
-                      >
-                        {cards.map((lead, i) => (
-                          <KanbanCard key={lead.id} lead={lead} index={i} reps={reps} onAssign={handleAssign} canAssign={canAssign} />
-                        ))}
-                        {provided.placeholder}
-                        {cards.length === 0 && !snapshot.isDraggingOver && (
-                          <p style={{ color: 'var(--text-faint)', fontSize: 11, textAlign: 'center', padding: '18px 0', letterSpacing: '0.04em' }}>
-                            Drop here
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </Droppable>
+                  <p className="t-mono" style={{ marginTop: 3, fontSize: 11, color: colVal > 0 ? '#4ADE80' : 'var(--text-faint)' }}>
+                    {colVal > 0 ? `$${(colVal / 1000).toFixed(1)}k` : '—'}
+                  </p>
                 </div>
-              )
-            })}
-          </div>
-        </DragDropContext>
+
+                {/* Cards */}
+                <div style={{ minHeight: 80, borderRadius: 10, padding: 3 }}>
+                  {cards.map(lead => (
+                    <KanbanCard
+                      key={lead.id}
+                      lead={lead}
+                      reps={reps}
+                      stageConfigs={stageConfigs}
+                      onAssign={handleAssign}
+                      onMove={handleMove}
+                      canAssign={canAssign}
+                    />
+                  ))}
+                  {cards.length === 0 && (
+                    <p style={{ color: 'var(--text-faint)', fontSize: 11, textAlign: 'center', padding: '18px 0', letterSpacing: '0.04em' }}>
+                      No leads
+                    </p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       ) : (
         /* List view */
         <div className="fadaa-card fadaa-table-wrapper">
@@ -370,7 +385,7 @@ function PipelineContent() {
             <tbody>
               {stageKeys.flatMap(stage =>
                 (board[stage] ?? []).map(lead => (
-                  <tr key={lead.id} onClick={() => window.location.href = `/sales/leads/${lead.id}`}>
+                  <tr key={lead.id} onClick={() => window.location.href = `/sales/leads/${lead.id}`} style={{ cursor: 'pointer' }}>
                     <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{lead.company_name}</td>
                     <td>{lead.contact_person}</td>
                     <td><StageBadge stage={lead.pipeline_stage} size="sm" /></td>
