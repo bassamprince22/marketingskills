@@ -57,7 +57,16 @@ export async function POST(req: NextRequest) {
 
     // Upload to Supabase Storage
     const db    = getServiceClient()
-    const path  = `leads/${leadId}/${docType}s/${version}_${Date.now()}_${file.name}`
+    // Sanitize filename: strip non-ASCII, replace spaces/special chars with underscores
+    const ext      = file.name.includes('.') ? '.' + file.name.split('.').pop() : ''
+    const baseName = file.name.replace(/\.[^.]+$/, '')
+    const safeName = baseName
+      .replace(/[^\x00-\x7F]/g, '')   // strip non-ASCII (Arabic, etc.)
+      .replace(/[^a-zA-Z0-9._-]/g, '_') // replace remaining unsafe chars
+      .replace(/_+/g, '_')             // collapse repeated underscores
+      .replace(/^_|_$/g, '')           // trim leading/trailing underscores
+      || 'file'                        // fallback if name becomes empty
+    const path  = `leads/${leadId}/${docType}s/${version}_${Date.now()}_${safeName}${ext}`
     const bytes = await file.arrayBuffer()
     const { data: upload, error: upErr } = await db.storage
       .from('sales-documents')
