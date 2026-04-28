@@ -19,11 +19,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   if (cerr || !challenge) return err('Not found', 404)
 
-  // Get all reps
+  // Get reps only — admins and managers are not participants
   const { data: reps } = await db.from('sales_users')
     .select('id, name, avatar_url')
     .eq('is_active', true)
-    .in('role', ['rep', 'manager'])
+    .eq('role', 'rep')
     .order('name')
 
   // Get won leads within challenge date range
