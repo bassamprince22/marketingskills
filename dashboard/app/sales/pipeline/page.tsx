@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react'
-import { flushSync } from 'react-dom'
+
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { SalesShell } from '@/components/sales/SalesShell'
 import { StageBadge } from '@/components/sales/StageBadge'
@@ -241,22 +241,20 @@ function PipelineContent() {
     const lead      = boardRef.current[srcStage]?.[source.index]
     if (!lead) return
 
-    // flushSync forces React to update the DOM synchronously before @hello-pangea/dnd
-    // finishes its cleanup — without this React 18 batches the update async, causing
-    // the board to freeze visually until the user scrolls
-    flushSync(() => {
-      setBoard(prev => {
-        const next = { ...prev }
-        next[srcStage]  = (prev[srcStage] ?? []).filter(l => l.id !== draggableId)
-        const newLead   = { ...lead, pipeline_stage: destStage as any }
-        next[destStage] = [
-          ...(prev[destStage] ?? []).slice(0, destination.index),
-          newLead,
-          ...(prev[destStage] ?? []).slice(destination.index),
-        ]
-        return next
-      })
+    setBoard(prev => {
+      const next = { ...prev }
+      next[srcStage]  = (prev[srcStage] ?? []).filter(l => l.id !== draggableId)
+      const newLead   = { ...lead, pipeline_stage: destStage as any }
+      next[destStage] = [
+        ...(prev[destStage] ?? []).slice(0, destination.index),
+        newLead,
+        ...(prev[destStage] ?? []).slice(destination.index),
+      ]
+      return next
     })
+    // Force a layout flush so the browser paints the new card position immediately
+    // (avoids the "freeze until scroll" caused by React 18 async batching)
+    void document.getElementById('kanban-board')?.offsetHeight
 
     // Fire-and-forget PATCH — don't await so onDragEnd stays synchronous
     fetch(`/api/sales/leads/${draggableId}`, {
@@ -310,7 +308,7 @@ function PipelineContent() {
         </div>
       ) : view === 'kanban' ? (
         <DragDropContext onDragStart={() => { isDragging.current = true }} onDragEnd={onDragEnd}>
-          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start', transform: 'translateZ(0)', willChange: 'transform' }}>
+          <div id="kanban-board" style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
             {stageKeys.map(stage => {
               const cards  = board[stage] ?? []
               const accent = STAGE_ACCENT[stage]
