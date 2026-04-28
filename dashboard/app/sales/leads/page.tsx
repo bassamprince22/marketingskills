@@ -273,7 +273,8 @@ function LeadsContent() {
 
           <select className="filter-select" value={filters.source} onChange={setFilter('source')}>
             <option value="">All sources</option>
-            <option value="meta">Meta</option>
+            <option value="meta">Meta Ads</option>
+            <option value="organic">Organic</option>
             <option value="referral">Referral</option>
             <option value="website">Website</option>
             <option value="outbound">Outbound</option>
@@ -482,7 +483,7 @@ function LeadsContent() {
                     fontSize: 11, fontWeight: 600, color: srcm.color,
                     whiteSpace: 'nowrap',
                   }}>
-                    {lead.lead_source === 'meta' && metaOriginLabel ? `Meta · ${metaOriginLabel}` : ({ meta: 'Meta Ads', referral: 'Referral', website: 'Website', outbound: 'Outbound', other: 'Other' }[lead.lead_source ?? 'other'] ?? lead.lead_source ?? 'Other')}
+                    {lead.lead_source === 'meta' && metaOriginLabel ? `Meta · ${metaOriginLabel}` : ({ meta: 'Meta Ads', organic: 'Organic', referral: 'Referral', website: 'Website', outbound: 'Outbound', other: 'Other' }[lead.lead_source ?? 'other'] ?? lead.lead_source ?? 'Other')}
                   </span>
                 </div>
 

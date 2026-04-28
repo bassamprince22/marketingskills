@@ -152,6 +152,7 @@ export function LeadForm({ initial = {}, mode, leadId }: Props) {
             <label className="form-label">Lead Source <span style={{ color: '#F87171' }}>*</span></label>
             <select className="fadaa-input" value={form.lead_source} onChange={set('lead_source')} required>
               <option value="meta">Meta Ads</option>
+              <option value="organic">Organic</option>
               <option value="referral">Referral</option>
               <option value="website">Website</option>
               <option value="outbound">Outbound</option>

@@ -169,31 +169,37 @@ function PipelineContent() {
   const dateRange = searchParams.get('dateRange') ?? ''
 
   const [board,   setBoard]   = useState<Board>({})
-  const boardRef = useRef<Board>({})
+  const boardRef  = useRef<Board>({})
+  const isDragging = useRef(false)
   const [reps,    setReps]    = useState<Rep[]>([])
   const [stageConfigs, setStageConfigs] = useState<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
+  const stageConfigsRef = useRef<PipelineStageConfig[]>(DEFAULT_PIPELINE_STAGE_CONFIGS)
   const [loading, setLoading] = useState(true)
   const [view,    setView]    = useState<'kanban' | 'list'>('kanban')
   const stageKeys = stageConfigs.map((stage) => stage.key)
 
+  useEffect(() => { stageConfigsRef.current = stageConfigs }, [stageConfigs])
+
   const loadLeads = useCallback(() => {
+    if (isDragging.current) return
     setLoading(true)
     const leadQuery = new URLSearchParams()
     leadQuery.set('limit', '500')
     if (dateRange) leadQuery.set('dateRange', dateRange)
+    const keys = stageConfigsRef.current.map(s => s.key)
     Promise.all([
       fetch(`/api/sales/leads?${leadQuery.toString()}`).then(r => r.ok ? r.json() : Promise.resolve({})),
       canAssign ? fetch('/api/sales/users?role=rep').then(r => r.ok ? r.json() : Promise.resolve({})) : Promise.resolve({ users: [] }),
     ]).then(([ld, ud]) => {
       const leads: Lead[] = ld.leads ?? []
       const b: Board = {}
-      stageKeys.forEach(s => { b[s] = [] })
+      keys.forEach(s => { b[s] = [] })
       leads.forEach(l => { if (b[l.pipeline_stage]) b[l.pipeline_stage].push(l) })
       setBoard(b)
       setReps(ud.users ?? [])
       setLoading(false)
     })
-  }, [canAssign, dateRange, stageKeys.join('|')])
+  }, [canAssign, dateRange])
 
   useEffect(() => { loadLeads() }, [loadLeads])
 
@@ -226,6 +232,7 @@ function PipelineContent() {
   }, [reps])
 
   const onDragEnd = useCallback(async (result: DropResult) => {
+    isDragging.current = false
     const { source, destination, draggableId } = result
     if (!destination || destination.droppableId === source.droppableId) return
     const srcStage  = source.droppableId
@@ -233,17 +240,20 @@ function PipelineContent() {
     const lead      = boardRef.current[srcStage]?.[source.index]
     if (!lead) return
 
-    setBoard(prev => {
-      const next = { ...prev }
-      next[srcStage]  = prev[srcStage].filter(l => l.id !== draggableId)
-      const newLead   = { ...lead, pipeline_stage: destStage as any }
-      next[destStage] = [
-        ...prev[destStage].slice(0, destination.index),
-        newLead,
-        ...prev[destStage].slice(destination.index),
-      ]
-      return next
-    })
+    // Defer state update one tick so @hello-pangea/dnd finishes its cleanup first
+    setTimeout(() => {
+      setBoard(prev => {
+        const next = { ...prev }
+        next[srcStage]  = (prev[srcStage] ?? []).filter(l => l.id !== draggableId)
+        const newLead   = { ...lead, pipeline_stage: destStage as any }
+        next[destStage] = [
+          ...(prev[destStage] ?? []).slice(0, destination.index),
+          newLead,
+          ...(prev[destStage] ?? []).slice(destination.index),
+        ]
+        return next
+      })
+    }, 0)
 
     const res = await fetch(`/api/sales/leads/${draggableId}`, {
       method: 'PATCH',
@@ -254,12 +264,12 @@ function PipelineContent() {
     if (!res.ok) {
       setBoard(prev => {
         const next = { ...prev }
-        next[destStage] = prev[destStage].filter(l => l.id !== draggableId)
+        next[destStage] = (prev[destStage] ?? []).filter(l => l.id !== draggableId)
         const revertedLead = { ...lead, pipeline_stage: srcStage as any }
         next[srcStage] = [
-          ...prev[srcStage].slice(0, source.index),
+          ...(prev[srcStage] ?? []).slice(0, source.index),
           revertedLead,
-          ...prev[srcStage].slice(source.index),
+          ...(prev[srcStage] ?? []).slice(source.index),
         ]
         return next
       })
@@ -294,7 +304,7 @@ function PipelineContent() {
           ))}
         </div>
       ) : view === 'kanban' ? (
-        <DragDropContext onDragEnd={onDragEnd}>
+        <DragDropContext onDragStart={() => { isDragging.current = true }} onDragEnd={onDragEnd}>
           <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 20, alignItems: 'flex-start' }}>
             {stageKeys.map(stage => {
               const cards  = board[stage] ?? []
