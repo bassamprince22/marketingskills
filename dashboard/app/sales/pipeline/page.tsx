@@ -252,9 +252,14 @@ function PipelineContent() {
       ]
       return next
     })
-    // Force a layout flush so the browser paints the new card position immediately
-    // (avoids the "freeze until scroll" caused by React 18 async batching)
-    void document.getElementById('kanban-board')?.offsetHeight
+    // Mimic the user's manual scroll-to-unstick — programmatically nudge scroll
+    // by 1px and back to force a browser repaint after @hello-pangea/dnd cleanup
+    requestAnimationFrame(() => {
+      const x = window.scrollX
+      const y = window.scrollY
+      window.scrollTo(x, y + 1)
+      window.scrollTo(x, y)
+    })
 
     // Fire-and-forget PATCH — don't await so onDragEnd stays synchronous
     fetch(`/api/sales/leads/${draggableId}`, {
