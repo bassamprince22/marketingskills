@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getServiceClient } from '@/lib/supabase'
+import { upsertUserProfile } from '@/lib/sales/db'
 
 const BUCKET  = 'sales-avatars'
 const MAX_MB  = 5
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
   const { data: { publicUrl } } = db.storage.from(BUCKET).getPublicUrl(path)
   const avatarUrl = `${publicUrl}?t=${Date.now()}`
 
-  // Update user record
+  // Update sales_users and sales_user_profiles (profile page reads from both)
   const { error: updateErr } = await db.from('sales_users')
     .update({ avatar_url: avatarUrl })
     .eq('id', user.id)
@@ -51,6 +52,8 @@ export async function POST(req: NextRequest) {
   if (updateErr) {
     return NextResponse.json({ error: `Avatar saved but profile update failed: ${updateErr.message}` }, { status: 500 })
   }
+
+  await upsertUserProfile(user.id, { avatar_url: avatarUrl })
 
   return NextResponse.json({ ok: true, avatar_url: avatarUrl })
 }
